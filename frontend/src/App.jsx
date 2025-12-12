@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Navbar from "./components/Navbar";
 
 
 function App() {
@@ -6,7 +7,8 @@ function App() {
 
   return (
     <>
-    <p>Hello World</p>
+    <Navbar />
+    <h1 className="text-red-500 text-3xl">Tailwind Working!</h1>
     </>
   )
 }
