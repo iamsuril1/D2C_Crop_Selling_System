@@ -8,7 +8,7 @@ function App() {
   return (
     <>
     <Navbar />
-    <h1 className="text-red-500 text-3xl">Tailwind Working!</h1>
+    <h1 className="text-green-500 text-3xl">Welcome to D2C Crop Selling System</h1>
     </>
   )
 }
