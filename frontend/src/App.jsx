@@ -1,16 +1,20 @@
-import { useState } from 'react'
 import Navbar from "./components/Navbar";
-
+import Footer from "./components/Footer";
+import { Routes, Route } from "react-router-dom";
+import Home from "./pages/Home";
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
     <>
-    <Navbar />
-    <h1 className="text-green-500 text-3xl">Welcome to D2C Crop Selling System</h1>
+      <Navbar />
+
+      <Routes>
+        <Route path="/" element={<Home />} />
+      </Routes>
+
+      <Footer/>
     </>
-  )
+  );
 }
 
-export default App
+export default App;
