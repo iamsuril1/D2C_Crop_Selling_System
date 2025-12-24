@@ -6,6 +6,60 @@
   --font-primary: 'Montserrat', sans-serif;
   --font-secondary: 'Poppins', sans-serif;
 }
+
 body {
   font-family: var(--font-primary);
+}
+
+/* ================= ANIMATION ================= */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(25px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 1.2s ease-out forwards;
+}
+
+/* ================= AUTH INPUT ================= */
+.auth-input {
+  width: 100%;
+  padding: 16px 14px;
+  border: 1.5px solid #000000;   /* BLACK BORDER */
+  border-radius: 10px;
+  background: transparent;
+  font-size: 14px;
+  outline: none;
+}
+
+/* Keep border black on focus */
+.auth-input:focus {
+  border-color: #000000;
+}
+
+/* ================= FLOATING LABEL ================= */
+.floating-label {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: white;
+  padding: 0 6px;
+  color: #000000;               /* BLACK LABEL */
+  font-size: 13px;
+  pointer-events: none;
+  transition: 0.3s ease;
+}
+
+.peer:focus + .floating-label,
+.peer:not(:placeholder-shown) + .floating-label {
+  top: -8px;
+  font-size: 11px;
+  color: #000000;
 }
