@@ -2,17 +2,12 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-
 export const register = async (req, res) => {
   try {
     const { firstName, lastName, email, password, role } = req.body;
 
     if (!firstName || !lastName || !email || !password || !role) {
       return res.status(400).json({ message: "All fields are required" });
-    }
-
-    if (!["consumer", "farmer"].includes(role)) {
-      return res.status(400).json({ message: "Invalid role" });
     }
 
     const existingUser = await User.findOne({ email });
@@ -22,7 +17,7 @@ export const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
+    await User.create({
       firstName,
       lastName,
       email,
@@ -30,13 +25,8 @@ export const register = async (req, res) => {
       role,
     });
 
-    console.log(
-      ` REGISTERED | Email: ${user.email} | Role: ${user.role}`
-    );
-
     res.status(201).json({ message: "Registration successful" });
-  } catch (error) {
-    console.error("Registration error:", error);
+  } catch {
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -44,10 +34,6 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password required" });
-    }
 
     const user = await User.findOne({ email });
     if (!user) {
@@ -60,19 +46,10 @@ export const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      {
-        id: user._id,
-        role: user.role,
-      },
+      { id: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
-
-    console.log(
-      `🔐 LOGIN | Email: ${user.email} | Role: ${user.role}`
-    );
-
-    console.log("🔥 authController.js loaded");
 
     res.status(200).json({
       token,
@@ -84,8 +61,11 @@ export const login = async (req, res) => {
         role: user.role,
       },
     });
-  } catch (error) {
-    console.error("❌ Login error:", error);
+  } catch {
     res.status(500).json({ message: "Server error" });
   }
+};
+
+export const getMe = async (req, res) => {
+  res.status(200).json({ user: req.user });
 };

@@ -1,5 +1,5 @@
-import { createContext, useState, useEffect } from "react";
-import api from "./api"; // <-- updated path (same folder)
+import { createContext, useEffect, useState } from "react";
+import api from "./api";
 
 export const AuthContext = createContext();
 
@@ -7,23 +7,30 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Auto-check login on refresh
   useEffect(() => {
-    const fetchUser = async () => {
+    const loadUser = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const res = await api.get("/api/auth/me");
         setUser(res.data.user);
-      } catch (error) {
+      } catch {
+        localStorage.removeItem("token");
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
-    fetchUser();
+    loadUser();
   }, []);
 
-  const logout = async () => {
-    await api.post("/api/auth/logout");
+  const logout = () => {
+    localStorage.removeItem("token");
     setUser(null);
   };
 

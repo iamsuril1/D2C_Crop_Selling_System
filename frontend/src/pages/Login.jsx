@@ -1,53 +1,28 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { AuthContext } from "../context/AuthContext";
+import api from "../context/api";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { setUser } = useContext(AuthContext);
 
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
-
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) => {
+  const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-
     try {
       setLoading(true);
-
-      const res = await axios.post(
-        "http://localhost:5000/api/auth/login",
-        formData
-      );
-
-      const { token, user } = res.data;
-
-      // Store auth data
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
-
-      setSuccess(true);
-
-      // Role-based redirect
-      setTimeout(() => {
-        if (user.role === "consumer") {
-          navigate("/dashboard");
-        } else if (user.role === "farmer") {
-          navigate("/farmer");
-        } else if (user.role === "admin") {
-          navigate("/admin");
-        }
-      }, 2000);
+      const res = await api.post("/api/auth/login", formData);
+      localStorage.setItem("token", res.data.token);
+      setUser(res.data.user);
+      navigate("/");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
     } finally {
@@ -57,41 +32,43 @@ const Login = () => {
 
   return (
     <div className="min-h-screen grid md:grid-cols-2 font-[Poppins]">
-
       {/* LEFT FORM */}
-      <div className="flex items-center justify-center px-6 py-16">
+      <div className="flex items-center justify-center px-6 py-16 bg-gradient-to-b from-[#E6F4EA] to-[#FDF8E3]">
         <form
           onSubmit={handleSubmit}
-          className="w-full max-w-md space-y-6"
+          className="w-full max-w-md bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl p-10 space-y-6 animate-fadeIn border border-green-100"
         >
-          <h2 className="font-[Montserrat] text-3xl font-bold text-center">
-            Login
-          </h2>
+          <div className="text-center space-y-2">
+            <h2 className="font-[Montserrat] text-3xl font-bold text-[#1E9C17]">
+              Welcome Back
+            </h2>
+            <p className="text-sm text-gray-700">
+              Login to buy fresh crops directly from farmers.
+            </p>
+          </div>
 
-          {/* EMAIL */}
-          <div className="relative">
+          <div className="relative group">
             <input
               type="email"
               name="email"
-              placeholder=" "
               required
-              className="peer auth-input"
+              placeholder=" "
               onChange={handleChange}
+              className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
             />
-            <label className="floating-label">Email</label>
+            <label className="floating-label text-green-700">Email</label>
           </div>
 
-          {/* PASSWORD */}
-          <div className="relative">
+          <div className="relative group">
             <input
               type="password"
               name="password"
-              placeholder=" "
               required
-              className="peer auth-input"
+              placeholder=" "
               onChange={handleChange}
+              className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
             />
-            <label className="floating-label">Password</label>
+            <label className="floating-label text-green-700">Password</label>
           </div>
 
           {error && (
@@ -101,16 +78,16 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#1E9C17] text-white py-3 rounded-lg
-                       font-semibold hover:scale-105 transition"
+            className="w-full bg-gradient-to-r from-[#1E9C17] to-[#27AE60] text-white py-3 rounded-2xl
+                       font-semibold tracking-wide shadow-lg hover:scale-105 hover:shadow-2xl transition"
           >
             {loading ? "Logging in..." : "Login"}
           </button>
 
-          <p className="text-center text-sm">
+          <p className="text-center text-sm text-gray-700">
             Don’t have an account?{" "}
             <span
-              className="text-[#1E9C17] cursor-pointer font-medium"
+              className="text-[#1E9C17] cursor-pointer font-medium hover:underline"
               onClick={() => navigate("/register")}
             >
               Register
@@ -119,35 +96,34 @@ const Login = () => {
         </form>
       </div>
 
-      {/* RIGHT IMAGE */}
+      {/* RIGHT IMAGE + HERO TEXT */}
       <div className="hidden md:block relative">
         <img
           src="/home/login.jpg"
           alt="Login"
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-black/40" />
-        <div className="relative z-10 flex items-center justify-center h-full px-10 text-white">
-          <h1 className="font-[Montserrat] text-4xl font-bold text-center">
-            Welcome Back to{" "}
-            <span className="text-[#FDB933]">MeroBari</span>
+        <div className="absolute inset-0 bg-black/55" />
+
+        <div className="relative z-10 flex flex-col justify-center h-full px-16 text-white space-y-8 animate-fadeIn">
+          <p className="uppercase tracking-[0.3em] text-sm text-[#FDB933]">
+            Direct to Consumer Marketplace
+          </p>
+
+          <h1 className="font-[Montserrat] text-5xl leading-tight font-extrabold">
+            Fresh, Organic Crops <br />
+            <span className="text-[#FDB933]">
+              Delivered Straight From Farmers
+            </span>
           </h1>
+
+          <p className="text-base text-gray-200 leading-relaxed max-w-2xl">
+            MeroBari bridges the gap between farmers and consumers by eliminating
+            middlemen. Get farm-fresh produce at fair prices while empowering
+            farmers to sell directly to the market with transparency and trust.
+          </p>
         </div>
       </div>
-
-      {/* SUCCESS CARD */}
-      {success && (
-        <div className="fixed top-6 right-6 z-50 animate-fadeIn">
-          <div className="bg-white border border-black rounded-xl px-6 py-4 shadow-lg">
-            <h4 className="font-[Montserrat] font-semibold text-[#1E9C17]">
-              Login Successful
-            </h4>
-            <p className="text-sm text-[#4F4F4F] mt-1">
-              Redirecting to dashboard...
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

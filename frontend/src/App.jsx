@@ -4,6 +4,7 @@ import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
@@ -12,11 +13,32 @@ function App() {
 
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/register" element={<Register />} />
-         <Route path="/login" element={<Login />} />
+
+        {/* Protect login/register for logged-in users */}
+        <Route
+          path="/register"
+          element={
+            <ProtectedRoute>
+              <Register />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <ProtectedRoute>
+              <Login />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Example dashboard routes */}
+        <Route path="/dashboard" element={<div>Consumer Dashboard</div>} />
+        <Route path="/farmer" element={<div>Farmer Dashboard</div>} />
+        <Route path="/admin" element={<div>Admin Dashboard</div>} />
       </Routes>
 
-      <Footer/>
+      <Footer />
     </>
   );
 }
