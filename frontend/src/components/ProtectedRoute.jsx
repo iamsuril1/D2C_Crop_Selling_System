@@ -1,4 +1,3 @@
-// components/ProtectedRoute.jsx
 import { useContext } from "react";
 import { Navigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
@@ -6,15 +5,23 @@ import { AuthContext } from "../context/AuthContext";
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
 
-  if (loading) return null; // or a spinner
+  // Wait until auth state is resolved
+  if (loading) return null;
 
-  if (!user) return children; // allow access if not logged in
+  // If user is logged in, redirect to correct dashboard
+  if (user) {
+    if (user.role === "consumer") {
+      return <Navigate to="/dashboard" replace />;
+    }
+    if (user.role === "farmer") {
+      return <Navigate to="/farmer" replace />;
+    }
+    if (user.role === "admin") {
+      return <Navigate to="/admin" replace />;
+    }
+  }
 
-  // Redirect logged-in users to dashboard based on role
-  if (user.role === "consumer") return <Navigate to="/dashboard" />;
-  if (user.role === "farmer") return <Navigate to="/farmer" />;
-  if (user.role === "admin") return <Navigate to="/admin" />;
-
+  // If NOT logged in, allow access to route (login/register)
   return children;
 };
 

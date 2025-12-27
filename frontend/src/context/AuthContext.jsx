@@ -1,42 +1,43 @@
 import { createContext, useEffect, useState } from "react";
-import api from "./api";
+import { useNavigate } from "react-router-dom";
+import jwtDecode from "jwt-decode"; // Make sure you installed jwt-decode@3.1.2
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Load user from token on refresh
   useEffect(() => {
-    const loadUser = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
+    const token = localStorage.getItem("token");
+    if (token) {
       try {
-        const res = await api.get("/api/auth/me");
-        setUser(res.data.user);
-      } catch {
+        const decoded = jwtDecode(token); // decode JWT token
+        setUser({
+          id: decoded.id,
+          role: decoded.role,
+        });
+      } catch (error) {
+        console.error("Invalid token", error);
         localStorage.removeItem("token");
         setUser(null);
-      } finally {
-        setLoading(false);
       }
-    };
-
-    loadUser();
+    }
+    setLoading(false);
   }, []);
 
+  // Logout function
   const logout = () => {
     localStorage.removeItem("token");
     setUser(null);
+    navigate("/"); // redirect to Home
   };
 
   return (
     <AuthContext.Provider value={{ user, setUser, logout, loading }}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };

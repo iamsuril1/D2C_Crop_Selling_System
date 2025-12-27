@@ -99,7 +99,7 @@ const Login = () => {
       {/* RIGHT IMAGE + HERO TEXT */}
       <div className="hidden md:block relative">
         <img
-          src="/home/login.jpg"
+          src="Login.jpg"
           alt="Login"
           className="absolute inset-0 w-full h-full object-cover"
         />

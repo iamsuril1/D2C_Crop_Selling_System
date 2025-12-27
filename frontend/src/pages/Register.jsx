@@ -42,7 +42,7 @@ const Register = () => {
       {/* LEFT IMAGE + HERO TEXT */}
       <div className="hidden md:block relative">
         <img
-          src="/home/register.jpg"
+          src="Register.png"
           alt="Register"
           className="absolute inset-0 w-full h-full object-cover"
         />
