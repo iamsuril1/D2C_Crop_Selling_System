@@ -16,15 +16,34 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (loading) return;
     setError("");
+
     try {
       setLoading(true);
+
       const res = await api.post("/api/auth/login", formData);
+
+      if (!res?.data?.token || !res?.data?.user) {
+        throw new Error("Invalid server response");
+      }
+
       localStorage.setItem("token", res.data.token);
       setUser(res.data.user);
       navigate("/");
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
+      let message = "Login failed";
+
+      if (!navigator.onLine) {
+        message = "No internet connection";
+      } else if (err.response?.data?.message) {
+        message = err.response.data.message;
+      } else if (err.message) {
+        message = err.message;
+      }
+
+      setError(message);
     } finally {
       setLoading(false);
     }

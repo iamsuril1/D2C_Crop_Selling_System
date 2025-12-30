@@ -1,11 +1,15 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { useContext } from "react";
+
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+
 import Home from "./pages/Home";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
-import { useContext } from "react";
+import EditProfile from "./pages/EditProfile";
+
 import { AuthContext } from "./context/AuthContext";
 
 function App() {
@@ -14,21 +18,22 @@ function App() {
   // Wait until auth state is resolved
   if (loading) return null;
 
-  // Redirect logged-in users from login/register to their dashboard
+  // Redirect logged-in users from login/register
   const RedirectIfAuthenticated = ({ children }) => {
     if (user) {
-      if (user.role === "consumer") return <Navigate to="/dashboard" />;
-      if (user.role === "farmer") return <Navigate to="/farmer" />;
-      if (user.role === "admin") return <Navigate to="/admin" />;
+      if (user.role === "consumer") return <Navigate to="/dashboard" replace />;
+      if (user.role === "farmer") return <Navigate to="/farmer" replace />;
+      if (user.role === "admin") return <Navigate to="/admin" replace />;
     }
     return children;
   };
 
-  // Inline Role-Based Protection
+  // Role-based protection
   const ProtectedRoute = ({ allowedRoles, children }) => {
-    if (!user) return <Navigate to="/login" replace />; // Not logged in
-    if (!allowedRoles.includes(user.role)) return <Navigate to="/" replace />; // Wrong role
-    return children; // Allowed
+    if (!user) return <Navigate to="/login" replace />;
+    if (!allowedRoles.includes(user.role))
+      return <Navigate to="/" replace />;
+    return children;
   };
 
   return (
@@ -36,8 +41,9 @@ function App() {
       <Navbar />
 
       <Routes>
-        {/* Public routes */}
+        {/* Public */}
         <Route path="/" element={<Home />} />
+
         <Route
           path="/register"
           element={
@@ -46,6 +52,7 @@ function App() {
             </RedirectIfAuthenticated>
           }
         />
+
         <Route
           path="/login"
           element={
@@ -64,6 +71,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/farmer"
           element={
@@ -72,6 +80,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/admin"
           element={
@@ -81,12 +90,21 @@ function App() {
           }
         />
 
-        {/* Profile page */}
+        {/* Profile */}
         <Route
           path="/profile"
           element={
             <ProtectedRoute allowedRoles={["consumer", "farmer", "admin"]}>
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/profile/edit"
+          element={
+            <ProtectedRoute allowedRoles={["consumer", "farmer", "admin"]}>
+              <EditProfile />
             </ProtectedRoute>
           }
         />
