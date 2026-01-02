@@ -1,38 +1,46 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useContext } from "react";
+import { AuthContext } from "./context/AuthContext";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
 import Home from "./pages/Home";
-import Register from "./pages/Register";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
-
-import { AuthContext } from "./context/AuthContext";
+import FarmerDashboard from "./pages/FarmerDashboard";
+import ProductForm from "./components/ProductForm";
+import ConsumerDashboard from "./pages/ConsumerDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function App() {
   const { user, loading } = useContext(AuthContext);
 
-  // Wait until auth state is resolved
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
 
-  // Redirect logged-in users from login/register
-  const RedirectIfAuthenticated = ({ children }) => {
-    if (user) {
-      if (user.role === "consumer") return <Navigate to="/dashboard" replace />;
-      if (user.role === "farmer") return <Navigate to="/farmer" replace />;
-      if (user.role === "admin") return <Navigate to="/admin" replace />;
-    }
-    return children;
+  // Central role-based redirect
+  const roleRedirect = () => {
+    if (!user) return <Home />;
+
+    if (user.role === "farmer") return <Navigate to="/farmer" replace />;
+    if (user.role === "consumer") return <Navigate to="/consumer" replace />;
+    if (user.role === "admin") return <Navigate to="/admin" replace />;
+
+    return <Home />;
   };
 
-  // Role-based protection
-  const ProtectedRoute = ({ allowedRoles, children }) => {
+  // Protected route helper
+  const ProtectedRoute = ({ roles, children }) => {
     if (!user) return <Navigate to="/login" replace />;
-    if (!allowedRoles.includes(user.role))
-      return <Navigate to="/" replace />;
+    if (!roles.includes(user.role)) return <Navigate to="/" replace />;
     return children;
   };
 
@@ -40,75 +48,83 @@ function App() {
     <>
       <Navbar />
 
-      <Routes>
-        {/* Public */}
-        <Route path="/" element={<Home />} />
+      <main style={{ minHeight: "80vh" }}>
+        <Routes>
+          {/* Root route */}
+          <Route path="/" element={roleRedirect()} />
 
-        <Route
-          path="/register"
-          element={
-            <RedirectIfAuthenticated>
-              <Register />
-            </RedirectIfAuthenticated>
-          }
-        />
+          {/* Auth routes */}
+          <Route
+            path="/login"
+            element={!user ? <Login /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/register"
+            element={!user ? <Register /> : <Navigate to="/" replace />}
+          />
 
-        <Route
-          path="/login"
-          element={
-            <RedirectIfAuthenticated>
-              <Login />
-            </RedirectIfAuthenticated>
-          }
-        />
+          {/* Farmer routes */}
+          <Route
+            path="/farmer"
+            element={
+              <ProtectedRoute roles={["farmer"]}>
+                <FarmerDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Dashboards */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={["consumer"]}>
-              <div>Consumer Dashboard</div>
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/add-product"
+            element={
+              <ProtectedRoute roles={["farmer"]}>
+                <ProductForm />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/farmer"
-          element={
-            <ProtectedRoute allowedRoles={["farmer"]}>
-              <div>Farmer Dashboard</div>
-            </ProtectedRoute>
-          }
-        />
+          {/* Consumer routes */}
+          <Route
+            path="/consumer"
+            element={
+              <ProtectedRoute roles={["consumer"]}>
+                <ConsumerDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <div>Admin Dashboard</div>
-            </ProtectedRoute>
-          }
-        />
+          {/* Admin routes */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Profile */}
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute allowedRoles={["consumer", "farmer", "admin"]}>
-              <Profile />
-            </ProtectedRoute>
-          }
-        />
+          {/* Profile */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute roles={["consumer", "farmer", "admin"]}>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/profile/edit"
-          element={
-            <ProtectedRoute allowedRoles={["consumer", "farmer", "admin"]}>
-              <EditProfile />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
+          <Route
+            path="/profile/edit"
+            element={
+              <ProtectedRoute roles={["consumer", "farmer", "admin"]}>
+                <EditProfile />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
 
       <Footer />
     </>

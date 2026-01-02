@@ -14,17 +14,16 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpg|jpeg|png/;
-  const ext = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mime = allowedTypes.test(file.mimetype);
+  const allowed = /jpg|jpeg|png/;
+  const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+  const mime = allowed.test(file.mimetype);
 
   if (ext && mime) cb(null, true);
   else cb(new Error("Images only"));
 };
 
-const upload = multer({
+export default multer({
   storage,
   fileFilter,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
 });
-
-export default upload;

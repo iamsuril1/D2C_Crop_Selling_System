@@ -17,10 +17,7 @@ const userSchema = new mongoose.Schema(
       enum: ["consumer", "farmer", "admin"],
       default: "consumer",
     },
-    profileImage: {
-      type: String,
-      default: "",
-    },
+    profileImage: { type: String, default: "" },
   },
   { timestamps: true }
 );

@@ -53,7 +53,7 @@ const Navbar = () => {
       </button>
     );
     if (user.role === "farmer") return (
-      <button onClick={() => navigate("/farmer")} className="hover:text-[#1E9C17] transition">
+      <button onClick={() => navigate("/add-product")} className="hover:text-[#1E9C17] transition">
         Add Product
       </button>
     );

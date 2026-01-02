@@ -1,30 +1,62 @@
 import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
-import api from "../context/api";
+import api from "../api/axios";
+
 
 const Login = () => {
   const navigate = useNavigate();
   const { setUser } = useContext(AuthContext);
 
-  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) =>
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    setError(""); // clear error when user types
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (loading) return;
+
+    const email = formData.email.trim();
+    const password = formData.password.trim();
+
+    // ✅ Explicit page-level error if fields are missing
+    if (!email && !password) {
+      setError("Email and password are required");
+      return;
+    }
+
+    if (!email) {
+      setError("Email is required");
+      return;
+    }
+
+    if (!password) {
+      setError("Password is required");
+      return;
+    }
+
     setError("");
+    setLoading(true);
 
     try {
-      setLoading(true);
+      const res = await api.post("/api/auth/login", {
+        email,
+        password,
+      });
 
-      const res = await api.post("/api/auth/login", formData);
-
+      // Validate backend response
       if (!res?.data?.token || !res?.data?.user) {
         throw new Error("Invalid server response");
       }
@@ -33,12 +65,16 @@ const Login = () => {
       setUser(res.data.user);
       navigate("/");
     } catch (err) {
-      let message = "Login failed";
+      let message = "Login failed. Please try again.";
 
       if (!navigator.onLine) {
         message = "No internet connection";
-      } else if (err.response?.data?.message) {
-        message = err.response.data.message;
+      } else if (err.response) {
+        message =
+          err.response.data?.message ||
+          `Server error (${err.response.status})`;
+      } else if (err.request) {
+        message = "Server is not responding. Please try later.";
       } else if (err.message) {
         message = err.message;
       }
@@ -70,7 +106,6 @@ const Login = () => {
             <input
               type="email"
               name="email"
-              required
               placeholder=" "
               onChange={handleChange}
               className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
@@ -82,7 +117,6 @@ const Login = () => {
             <input
               type="password"
               name="password"
-              required
               placeholder=" "
               onChange={handleChange}
               className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
@@ -90,6 +124,7 @@ const Login = () => {
             <label className="floating-label text-green-700">Password</label>
           </div>
 
+          {/* ✅ Page-level error */}
           {error && (
             <p className="text-red-500 text-sm text-center">{error}</p>
           )}
@@ -115,7 +150,7 @@ const Login = () => {
         </form>
       </div>
 
-      {/* RIGHT IMAGE + HERO TEXT */}
+      {/* RIGHT IMAGE */}
       <div className="hidden md:block relative">
         <img
           src="Login.jpg"
@@ -138,8 +173,7 @@ const Login = () => {
 
           <p className="text-base text-gray-200 leading-relaxed max-w-2xl">
             MeroBari bridges the gap between farmers and consumers by eliminating
-            middlemen. Get farm-fresh produce at fair prices while empowering
-            farmers to sell directly to the market with transparency and trust.
+            middlemen.
           </p>
         </div>
       </div>

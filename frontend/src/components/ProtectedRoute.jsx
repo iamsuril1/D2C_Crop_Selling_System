@@ -1,27 +1,28 @@
-import { useContext } from "react";
 import { Navigate } from "react-router-dom";
+import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ publicOnly = false, allowedRoles, children }) => {
   const { user, loading } = useContext(AuthContext);
 
-  // Wait until auth state is resolved
-  if (loading) return null;
-
-  // If user is logged in, redirect to correct dashboard
-  if (user) {
-    if (user.role === "consumer") {
-      return <Navigate to="/dashboard" replace />;
-    }
-    if (user.role === "farmer") {
-      return <Navigate to="/farmer" replace />;
-    }
-    if (user.role === "admin") {
-      return <Navigate to="/admin" replace />;
-    }
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  // If NOT logged in, allow access to route (login/register)
+  if (publicOnly && user) {
+    if (user.role === "consumer") return <Navigate to="/dashboard" replace />;
+    if (user.role === "farmer") return <Navigate to="/farmer" replace />;
+    if (user.role === "admin") return <Navigate to="/admin" replace />;
+  }
+
+  if (!publicOnly && !user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!publicOnly && allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+
   return children;
 };
 

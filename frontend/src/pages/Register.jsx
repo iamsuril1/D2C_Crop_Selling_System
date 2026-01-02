@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../context/api";
+import api from "../api/axios";
+
 
 const Register = () => {
   const navigate = useNavigate();
@@ -17,21 +18,76 @@ const Register = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) =>
+  const handleChange = (e) => {
+    setError(""); // clear error on input change
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.password !== formData.confirmPassword) {
-      return setError("Passwords do not match");
+    if (loading) return;
+
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      confirmPassword,
+      role,
+    } = formData;
+
+    // ✅ Explicit page-level validations (no UI change)
+    if (
+      !firstName.trim() ||
+      !lastName.trim() ||
+      !email.trim() ||
+      !password.trim() ||
+      !confirmPassword.trim()
+    ) {
+      setError("All fields are required");
+      return;
     }
 
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
     try {
-      setLoading(true);
-      await api.post("/api/auth/register", formData);
+      const res = await api.post("/api/auth/register", {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        password,
+        confirmPassword,
+        role,
+      });
+
+      // Optional safety check
+      if (!res || res.status !== 201) {
+        // backend may still return 200; keep flexible
+      }
+
       navigate("/login");
     } catch (err) {
-      setError(err.response?.data?.message || "Registration failed");
+      let message = "Registration failed. Please try again.";
+
+      if (!navigator.onLine) {
+        message = "No internet connection";
+      } else if (err.response) {
+        message =
+          err.response.data?.message ||
+          `Server error (${err.response.status})`;
+      } else if (err.request) {
+        message = "Server is not responding. Please try later.";
+      } else if (err.message) {
+        message = err.message;
+      }
+
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -80,42 +136,83 @@ const Register = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="relative">
-              <input name="firstName" required placeholder=" " onChange={handleChange} className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition" />
+              <input
+                name="firstName"
+                placeholder=" "
+                onChange={handleChange}
+                className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
+              />
               <label className="floating-label text-green-700">First Name</label>
             </div>
             <div className="relative">
-              <input name="lastName" required placeholder=" " onChange={handleChange} className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition" />
+              <input
+                name="lastName"
+                placeholder=" "
+                onChange={handleChange}
+                className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
+              />
               <label className="floating-label text-green-700">Last Name</label>
             </div>
           </div>
 
           <div className="relative">
-            <input type="email" name="email" required placeholder=" " onChange={handleChange} className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition" />
+            <input
+              type="email"
+              name="email"
+              placeholder=" "
+              onChange={handleChange}
+              className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
+            />
             <label className="floating-label text-green-700">Email</label>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="relative">
-              <input type="password" name="password" required placeholder=" " onChange={handleChange} className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition" />
+              <input
+                type="password"
+                name="password"
+                placeholder=" "
+                onChange={handleChange}
+                className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
+              />
               <label className="floating-label text-green-700">Password</label>
             </div>
             <div className="relative">
-              <input type="password" name="confirmPassword" required placeholder=" " onChange={handleChange} className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition" />
+              <input
+                type="password"
+                name="confirmPassword"
+                placeholder=" "
+                onChange={handleChange}
+                className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
+              />
               <label className="floating-label text-green-700">Confirm</label>
             </div>
           </div>
 
           <div className="flex justify-center gap-8 pt-2">
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="role" value="consumer" checked={formData.role === "consumer"} onChange={handleChange} />
+              <input
+                type="radio"
+                name="role"
+                value="consumer"
+                checked={formData.role === "consumer"}
+                onChange={handleChange}
+              />
               Consumer
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="role" value="farmer" checked={formData.role === "farmer"} onChange={handleChange} />
+              <input
+                type="radio"
+                name="role"
+                value="farmer"
+                checked={formData.role === "farmer"}
+                onChange={handleChange}
+              />
               Farmer
             </label>
           </div>
 
+          {/* ✅ Page-level error */}
           {error && (
             <p className="text-center text-red-500 text-sm">{error}</p>
           )}

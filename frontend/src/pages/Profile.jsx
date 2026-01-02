@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api, { BASE_URL } from "../context/api";
+import api from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
 
 const Profile = () => {

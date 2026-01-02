@@ -88,13 +88,8 @@ const Footer = () => {
 
         {/* BOTTOM */}
         <div className="flex flex-col md:flex-row items-center justify-between text-sm text-[#BDBDBD] gap-4">
-          <p>
-            © {new Date().getFullYear()} MeroBari. All rights reserved.
-          </p>
-
-          <p>
-            D2C Crop Selling System | Final Year Project
-          </p>
+          <p>© {new Date().getFullYear()} MeroBari. All rights reserved.</p>
+          <p>D2C Crop Selling System | Final Year Project</p>
         </div>
       </div>
     </footer>
