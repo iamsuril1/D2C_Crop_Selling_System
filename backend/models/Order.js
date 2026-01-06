@@ -14,18 +14,30 @@ const orderSchema = new mongoose.Schema(
     },
     items: [
       {
-        product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+        product: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
         name: String,
         quantity: Number,
         price: Number,
       },
     ],
-    totalAmount: { type: Number, required: true },
+    totalAmount: {
+      type: Number,
+      required: true,
+    },
     status: {
       type: String,
-      enum: ["pending", "confirmed", "shipped", "delivered"],
+      enum: ["pending", "confirmed", "shipped", "delivered", "cancelled"],
       default: "pending",
     },
+    cancelledBy: {
+      type: String,
+      enum: ["admin", "farmer", "consumer"],
+    },
+    cancelledAt: Date,
   },
   { timestamps: true }
 );
