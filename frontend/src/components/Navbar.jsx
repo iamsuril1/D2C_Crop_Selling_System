@@ -39,7 +39,7 @@ const Navbar = () => {
   // Role-based navigation
   const goToDashboard = () => {
     setDropdownOpen(false);
-    if (user?.role === "consumer") navigate("/dashboard");
+    if (user?.role === "consumer") navigate("/consumer");
     if (user?.role === "farmer") navigate("/farmer");
     if (user?.role === "admin") navigate("/admin");
   };
@@ -48,7 +48,7 @@ const Navbar = () => {
   const roleMenuItem = () => {
     if (!user) return null;
     if (user.role === "consumer") return (
-      <button onClick={() => navigate("/dashboard")} className="hover:text-[#1E9C17] transition">
+      <button onClick={() => navigate("/consuemr")} className="hover:text-[#1E9C17] transition">
         View Products
       </button>
     );

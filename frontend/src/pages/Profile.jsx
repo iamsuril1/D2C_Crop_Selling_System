@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 const Profile = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();

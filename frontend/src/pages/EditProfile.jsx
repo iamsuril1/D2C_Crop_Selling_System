@@ -1,9 +1,9 @@
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
 import { AuthContext } from "../context/AuthContext";
+
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const EditProfile = () => {
   const { user, setUser } = useContext(AuthContext);
@@ -55,8 +55,8 @@ const EditProfile = () => {
 
     try {
       setLoading(true);
-
       const data = new FormData();
+
       Object.entries(formData).forEach(([key, value]) => {
         if (value) data.append(key, value);
       });
@@ -77,10 +77,10 @@ const EditProfile = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4">
-      <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-8">
+    <div className="min-h-screen bg-[#E0E0E0] py-12 px-4">
+      <div className="max-w-2xl mx-auto bg-[#FFFFFF] rounded-2xl shadow-lg p-8">
 
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">
+        <h2 className="text-2xl font-bold mb-6 text-[#1D1D1D]">
           Edit Profile
         </h2>
 
@@ -91,7 +91,7 @@ const EditProfile = () => {
             <img
               src={preview || "/avatar.png"}
               alt="Preview"
-              className="w-24 h-24 rounded-full border object-cover"
+              className="w-24 h-24 rounded-full border border-[#BDBDBD] object-cover"
             />
 
             <label className="cursor-pointer text-sm font-medium text-[#1E9C17]">
@@ -106,9 +106,28 @@ const EditProfile = () => {
             </label>
           </div>
 
-          <Input label="First Name" name="firstName" value={formData.firstName} onChange={handleChange} />
-          <Input label="Last Name" name="lastName" value={formData.lastName} onChange={handleChange} />
-          <Input label="Email" name="email" type="email" value={formData.email} onChange={handleChange} />
+          <Input
+            label="First Name"
+            name="firstName"
+            value={formData.firstName}
+            onChange={handleChange}
+          />
+
+          <Input
+            label="Last Name"
+            name="lastName"
+            value={formData.lastName}
+            onChange={handleChange}
+          />
+
+          <Input
+            label="Email"
+            name="email"
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+          />
+
           <Input
             label="New Password"
             name="password"
@@ -122,7 +141,7 @@ const EditProfile = () => {
             <button
               type="submit"
               disabled={loading}
-              className="bg-[#1E9C17] text-white px-6 py-2 rounded-md hover:bg-[#158212] transition"
+              className="bg-[#1E9C17] text-[#FFFFFF] px-6 py-2 rounded-md transition disabled:opacity-60"
             >
               {loading ? "Saving..." : "Save Changes"}
             </button>
@@ -130,7 +149,7 @@ const EditProfile = () => {
             <button
               type="button"
               onClick={() => navigate("/profile")}
-              className="border px-6 py-2 rounded-md hover:bg-gray-100 transition"
+              className="border border-[#BDBDBD] text-[#333333] px-6 py-2 rounded-md transition hover:bg-[#E0E0E0]"
             >
               Cancel
             </button>
@@ -144,12 +163,13 @@ const EditProfile = () => {
 
 const Input = ({ label, ...props }) => (
   <div>
-    <label className="block text-sm font-medium text-gray-600 mb-1">
+    <label className="block text-sm font-medium text-[#4F4F4F] mb-1">
       {label}
     </label>
     <input
       {...props}
-      className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1E9C17]"
+      className="w-full border border-[#BDBDBD] rounded-md px-3 py-2 text-[#1D1D1D] focus:outline-none"
+      style={{ boxShadow: "0 0 0 2px rgba(30,156,23,0.25)" }}
     />
   </div>
 );

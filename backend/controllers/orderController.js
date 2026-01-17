@@ -25,6 +25,7 @@ export const getFarmerOrders = async (req, res) => {
   res.json(orders);
 };
 
+
 export const updateOrderStatus = async (req, res) => {
   const { status } = req.body;
 
@@ -43,5 +44,35 @@ export const updateOrderStatus = async (req, res) => {
   order.status = status;
   await order.save();
 
+  res.json(order);
+};
+// Get orders for logged-in consumer
+export const getMyOrders = async (req, res) => {
+  const orders = await Order.find({ consumer: req.user._id })
+    .populate("farmer", "firstName lastName email")
+    .sort({ createdAt: -1 });
+
+  res.json(orders);
+};
+
+// Cancel order as consumer
+export const cancelOrderConsumer = async (req, res) => {
+  const order = await Order.findById(req.params.id);
+
+  if (!order) return res.status(404).json({ message: "Order not found" });
+
+  if (order.consumer.toString() !== req.user._id.toString()) {
+    return res.status(403).json({ message: "Unauthorized" });
+  }
+
+  if (order.status === "delivered") {
+    return res.status(400).json({ message: "Delivered orders cannot be cancelled" });
+  }
+
+  order.status = "cancelled";
+  order.cancelledBy = "consumer";
+  order.cancelledAt = new Date();
+
+  await order.save();
   res.json(order);
 };
