@@ -11,9 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+import { API_BASE_URL } from "../utils/config";
 
 const AdminDashboard = () => {
   const [products, setProducts] = useState([]);
@@ -21,8 +19,7 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("active");
 
   const orderTabs = ["active", "pending", "received", "cancelled"];
@@ -53,34 +50,24 @@ const AdminDashboard = () => {
   const deleteProduct = async (id) => {
     if (!window.confirm("Delete this product permanently?")) return;
     try {
-      await api.delete(`/api/products/${id}`);
+      await api.delete(`/api/admin/products/${id}`);
       setProducts((prev) => prev.filter((p) => p._id !== id));
-    } catch {
-      alert("Failed to delete product");
+      loadAdminData();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete product");
     }
   };
 
-  /* -------------------- CHART DATA -------------------- */
-
-  const consumerCount = users.filter(
-    (u) => u.role === "consumer"
-  ).length;
-  const farmerCount = users.filter(
-    (u) => u.role === "farmer"
-  ).length;
-
+  // CHART DATA
+  const consumerCount = users.filter((u) => u.role === "consumer").length;
+  const farmerCount = users.filter((u) => u.role === "farmer").length;
   const userPieData = [
     { name: "Consumers", value: consumerCount },
     { name: "Farmers", value: farmerCount },
   ];
 
-  const deliveredOrders = orders.filter(
-    (o) => o.status === "delivered"
-  ).length;
-  const cancelledOrders = orders.filter(
-    (o) => o.status === "cancelled"
-  ).length;
-
+  const deliveredOrders = orders.filter((o) => o.status === "delivered").length;
+  const cancelledOrders = orders.filter((o) => o.status === "cancelled").length;
   const orderBarData = [
     { status: "Delivered", count: deliveredOrders },
     { status: "Cancelled", count: cancelledOrders },
@@ -88,8 +75,7 @@ const AdminDashboard = () => {
 
   const COLORS = ["#16a34a", "#2563eb"];
 
-  /* -------------------- FILTER ORDERS -------------------- */
-
+  // FILTER ORDERS
   const filteredOrders = orders.filter((o) => {
     if (activeTab === "pending") return o.status === "pending";
     if (activeTab === "active")
@@ -110,7 +96,7 @@ const AdminDashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-600">
-        Loading dashboard…
+        Loading dashboard...
       </div>
     );
   }
@@ -123,20 +109,23 @@ const AdminDashboard = () => {
     );
   }
 
+  // SEARCH FILTER
+  const filteredProducts = products.filter(
+    (p) =>
+      p.name?.toLowerCase().includes(search.toLowerCase()) ||
+      p.category?.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-gray-100 p-8 space-y-10">
-
-      {/* ================= ANALYTICS ================= */}
+      {/* ANALYTICS */}
       <section className="bg-white rounded-xl shadow-sm p-6">
         <h2 className="text-xl font-semibold mb-6">Analytics</h2>
-
         <div className="grid md:grid-cols-2 gap-8">
-          {/* USER PIE */}
           <div className="h-80">
             <h3 className="text-sm font-medium text-gray-600 mb-4">
               User Distribution
             </h3>
-
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -146,34 +135,34 @@ const AdminDashboard = () => {
                   outerRadius={100}
                   label
                 >
-                  {userPieData.map((_, index) => (
-                    <Cell key={index} fill={COLORS[index]} />
+                  {userPieData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                    />
                   ))}
                 </Pie>
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
           </div>
-
-          {/* ORDER BAR */}
           <div className="h-80">
             <h3 className="text-sm font-medium text-gray-600 mb-4">
               Delivered vs Cancelled Orders
             </h3>
-
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={orderBarData}>
                 <XAxis dataKey="status" />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Bar dataKey="count" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="#16a34a" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
       </section>
 
-      {/* ================= USERS ================= */}
+      {/* USERS */}
       <section className="bg-white rounded-xl shadow-sm p-6">
         <h2 className="text-xl font-semibold mb-4">Users</h2>
         <div className="overflow-x-auto">
@@ -207,44 +196,55 @@ const AdminDashboard = () => {
         </div>
       </section>
 
-      {/* ================= PRODUCTS ================= */}
+      {/* PRODUCTS WITH SEARCH */}
       <section className="bg-white rounded-xl shadow-sm p-6">
         <h2 className="text-xl font-semibold mb-6">Products</h2>
 
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {products.map((p) => (
-            <div key={p._id} className="border rounded-xl overflow-hidden">
-              {p.image && (
-                <img
-                  src={`${API_BASE_URL}${p.image}`}
-                  alt={p.name}
-                  className="h-44 w-full object-cover"
-                />
-              )}
+        {/* SEARCH INPUT */}
+        <div className="mb-6">
+          <input
+            type="text"
+            placeholder="Search products by name or category..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-1E9C17 focus:border-transparent"
+          />
+        </div>
 
+        <h3 className="text-lg font-medium mb-4">
+          Showing {filteredProducts.length} of {products.length} products
+        </h3>
+
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {filteredProducts.map((p) => (
+            <div
+              key={p._id}
+              className="border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+            >
+              <img
+                src={`${API_BASE_URL}${p.image || ""}`}
+                alt={p.name}
+                className="h-44 w-full object-cover"
+                onError={(e) => (e.target.src = "/placeholder.jpg")}
+              />
               <div className="p-4 space-y-2">
                 <h3 className="font-semibold truncate">{p.name}</h3>
                 <p className="text-xs text-gray-500">{p.category}</p>
-
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="font-semibold text-green-700">
-                    Rs. {p.price}
+                    Rs. {p.price} / {p.unit}
                   </span>
                   <span className="text-xs text-gray-400">
                     {p.farmer?.firstName || "N/A"}
                   </span>
                 </div>
-
                 <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={() => setSelectedProduct(p)}
-                    className="flex-1 bg-green-600 text-white py-1 rounded"
-                  >
+                  <button className="flex-1 bg-green-600 text-white py-1 rounded text-xs hover:bg-green-700">
                     View
                   </button>
                   <button
                     onClick={() => deleteProduct(p._id)}
-                    className="flex-1 bg-red-500 text-white py-1 rounded"
+                    className="flex-1 bg-red-500 text-white py-1 rounded text-xs hover:bg-red-600"
                   >
                     Delete
                   </button>
@@ -252,51 +252,57 @@ const AdminDashboard = () => {
               </div>
             </div>
           ))}
+          {filteredProducts.length === 0 && (
+            <div className="col-span-full text-center py-12 text-gray-400">
+              {search ? "No products match your search" : "No products found"}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* ================= ORDERS ================= */}
+      {/* ORDERS */}
       <section className="bg-white rounded-xl shadow-sm p-6">
         <h2 className="text-xl font-semibold mb-4">Orders</h2>
-
-        <div className="flex gap-3 mb-6">
+        <div className="flex gap-3 mb-6 flex-wrap">
           {orderTabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded-full text-sm ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                 activeTab === tab
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-200"
+                  ? "bg-green-600 text-white shadow-md"
+                  : "bg-gray-200 hover:bg-gray-300"
               }`}
             >
-              {tab}
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
-
-        <div className="space-y-3">
+        <div className="space-y-3 max-h-96 overflow-y-auto">
           {filteredOrders.map((o) => (
-            <div key={o._id} className="border rounded-lg p-4 flex justify-between">
-              <div>
-                <p className="font-medium">Order #{o._id.slice(-6)}</p>
+            <div
+              key={o._id}
+              className="border rounded-lg p-4 flex flex-col md:flex-row md:justify-between md:items-center hover:shadow-sm transition-shadow"
+            >
+              <div className="mb-2 md:mb-0">
+                <p className="font-medium text-sm">Order #{o._id.slice(-6)}</p>
                 <p className="text-xs text-gray-500">
-                  {(o.items || []).map((i) => i.name).join(", ")}
+                  {o.items.map((i) => i.name).join(", ")}
                 </p>
-                <p className="text-xs text-gray-400">
-                  {o.consumer?.email}
-                </p>
+                <p className="text-xs text-gray-400">{o.consumer?.email}</p>
               </div>
-
               <span
-                className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  statusBadge[o.status]
-                }`}
+                className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge[o.status]}`}
               >
-                {o.status}
+                {o.status.charAt(0).toUpperCase() + o.status.slice(1)}
               </span>
             </div>
           ))}
+          {filteredOrders.length === 0 && (
+            <div className="text-center py-12 text-gray-400">
+              No orders in this status
+            </div>
+          )}
         </div>
       </section>
     </div>

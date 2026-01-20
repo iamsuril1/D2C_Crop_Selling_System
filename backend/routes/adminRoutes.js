@@ -7,6 +7,7 @@ import {
   toggleProduct,
   getAllOrders,
   cancelOrderAdmin,
+  deleteProductAdmin,
 } from "../controllers/adminController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { authorize } from "../middleware/roleMiddleware.js";
@@ -28,5 +29,7 @@ router.put("/products/:id/toggle", toggleProduct);
 // ORDERS
 router.get("/orders", getAllOrders);
 router.put("/orders/:id/cancel", cancelOrderAdmin);
+router.delete("/products/:id", deleteProductAdmin);
+
 
 export default router;

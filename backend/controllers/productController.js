@@ -59,3 +59,15 @@ export const deleteProduct = async (req, res) => {
 
   res.json({ message: "Product disabled" });
 };
+
+export const getPublicProducts = async (req, res) => {
+  try {
+    const products = await Product.find({ isActive: true })
+      .populate("farmer", "firstName lastName email")
+      .sort({ createdAt: -1 });
+
+    res.json(products);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

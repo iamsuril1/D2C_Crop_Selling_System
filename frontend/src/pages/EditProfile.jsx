@@ -2,8 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
-
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+import { API_BASE_URL } from "../utils/config";
 
 const EditProfile = () => {
   const { user, setUser } = useContext(AuthContext);
@@ -34,7 +33,7 @@ const EditProfile = () => {
     }));
 
     if (user.profileImage) {
-      setPreview(`${BASE_URL}${user.profileImage}`);
+      setPreview(`${API_BASE_URL}${user.profileImage}`);
     }
   }, [user, navigate]);
 
@@ -79,13 +78,11 @@ const EditProfile = () => {
   return (
     <div className="min-h-screen bg-[#E0E0E0] py-12 px-4">
       <div className="max-w-2xl mx-auto bg-[#FFFFFF] rounded-2xl shadow-lg p-8">
-
         <h2 className="text-2xl font-bold mb-6 text-[#1D1D1D]">
           Edit Profile
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-
           {/* IMAGE */}
           <div className="flex items-center gap-6">
             <img
@@ -154,7 +151,6 @@ const EditProfile = () => {
               Cancel
             </button>
           </div>
-
         </form>
       </div>
     </div>

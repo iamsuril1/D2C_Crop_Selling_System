@@ -76,6 +76,16 @@ export const toggleProduct = async (req, res) => {
   }
 };
 
+export const deleteProductAdmin = async (req, res) => {
+  try {
+    const product = await Product.findByIdAndDelete(req.params.id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    res.json({ message: "Product deleted" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 /* ================= ORDERS ================= */
 export const getAllOrders = async (req, res) => {
   try {

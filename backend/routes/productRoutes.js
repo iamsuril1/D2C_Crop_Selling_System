@@ -4,6 +4,7 @@ import {
   getMyProducts,
   updateProduct,
   deleteProduct,
+  getPublicProducts,
 } from "../controllers/productController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { authorize } from "../middleware/roleMiddleware.js";
@@ -15,5 +16,5 @@ router.post("/", protect, authorize("farmer"), upload.single("image"), createPro
 router.get("/my-products", protect, authorize("farmer"), getMyProducts);
 router.put("/:id", protect, authorize("farmer"), upload.single("image"), updateProduct);
 router.delete("/:id", protect, authorize("farmer"), deleteProduct);
-
+router.get("/", getPublicProducts);
 export default router;
