@@ -6,19 +6,16 @@ import {
   getFarmerOrders,
   updateOrderStatus,
   getMyOrders,
-  cancelOrderConsumer
+  cancelOrderConsumer,
 } from "../controllers/orderController.js";
-
 
 const router = express.Router();
 
 router.post("/", protect, authorize("consumer"), createOrder);
 router.get("/farmer", protect, authorize("farmer"), getFarmerOrders);
 router.put("/:id/status", protect, authorize("farmer"), updateOrderStatus);
-// Consumer routes
+
 router.get("/my", protect, authorize("consumer"), getMyOrders);
 router.put("/:id/cancel", protect, authorize("consumer"), cancelOrderConsumer);
-
-
 
 export default router;

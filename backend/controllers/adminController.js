@@ -3,10 +3,14 @@ import Product from "../models/Product.js";
 import Order from "../models/Order.js";
 import bcrypt from "bcryptjs";
 
-/* ================= USERS ================= */
+const notExpiredFilter = () => ({
+  $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+});
+
+/* USERS */
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select("-password");
+    const users = await User.find().select("-password").sort({ createdAt: -1 });
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -34,7 +38,7 @@ export const createUser = async (req, res) => {
       role,
     });
 
-    res.status(201).json(user);
+    res.status(201).json({ _id: user._id, firstName, lastName, email, role });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -49,13 +53,13 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-/* ================= PRODUCTS ================= */
+/* PRODUCTS */
 export const getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find().populate(
-      "farmer",
-      "firstName lastName email"
-    );
+    const products = await Product.find({ ...notExpiredFilter() })
+      .populate("farmer", "firstName lastName email")
+      .sort({ createdAt: -1 });
+
     res.json(products);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -86,13 +90,14 @@ export const deleteProductAdmin = async (req, res) => {
   }
 };
 
-/* ================= ORDERS ================= */
+/* ORDERS */
 export const getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find()
       .populate("farmer", "firstName lastName email")
       .populate("consumer", "firstName lastName email")
       .sort({ createdAt: -1 });
+
     res.json(orders);
   } catch (err) {
     res.status(500).json({ message: err.message });
