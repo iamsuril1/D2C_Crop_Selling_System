@@ -1,5 +1,9 @@
-export const API_BASE_URL =
+export const APIBASEURL =
   import.meta.env.VITEAPIBASEURL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITEAPIURL ||
   "http://localhost:5000";
+
+export const API_BASE_URL = APIBASEURL; // for EditProfile.jsx
+export const APIURL = APIBASEURL; // for older files
+
+export default APIBASEURL;

@@ -1,48 +1,37 @@
 import { useEffect, useMemo, useState, useContext } from "react";
+import { useContext as useRouterContext } from "react"; // Not used but for completeness
 import api from "../api/axios";
 import { CartContext } from "../context/CartContext";
-import { API_BASE_URL } from "../utils/config";
+import { APIBASEURL } from "../utils/config";
+
+// Normalize helper
+const normalize = (v) => v?.toString().toLowerCase().trim();
 
 const ConsumerDashboard = () => {
   const { addToCart, cartItems } = useContext(CartContext);
-
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // UI state (matches screenshot style)
+  // UI state
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All Products");
   const [sortBy, setSortBy] = useState("Featured");
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
 
-  // Popup modal
+  // Modal
   const [selectedProduct, setSelectedProduct] = useState(null);
-
-  const normalize = (v) => (v || "").toString().toLowerCase().trim();
-
-  // In your Product model there is no organic/local flag, so infer from text
-  const isOrganic = (p) => {
-    const hay = `${p?.name || ""} ${p?.description || ""} ${
-      p?.category || ""
-    }`.toLowerCase();
-    return hay.includes("organic");
-  };
-
-  const isLocalFarm = (p) => {
-    const hay = `${p?.description || ""} ${p?.category || ""}`.toLowerCase();
-    return hay.includes("local") || hay.includes("farm");
-  };
 
   const loadProducts = async () => {
     try {
       setLoading(true);
       setError("");
-      // NOTE: this requires backend route GET /api/products (public list)
       const res = await api.get("/api/products");
       setProducts(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load products");
+      setError(
+        err.response?.data?.message || "Failed to load products"
+      );
     } finally {
       setLoading(false);
     }
@@ -64,19 +53,47 @@ const ConsumerDashboard = () => {
     []
   );
 
+  // Infer organic/local from text (no model flags)
+  const isOrganic = (p) => {
+    const hay = [
+      p?.name,
+      p?.description,
+      p?.category,
+    ]
+      .join(" ")
+      .toLowerCase();
+    return hay.includes("organic");
+  };
+
+  const isLocalFarm = (p) => {
+    const hay = [
+      p?.description,
+      p?.category,
+    ]
+      .join(" ")
+      .toLowerCase();
+    return hay.includes("local") || hay.includes("farm");
+  };
+
   const filteredProducts = useMemo(() => {
     const q = normalize(query);
-
     let list = [...products].filter((p) => {
-      const hay =
-        `${p?.name || ""} ${p?.category || ""} ${p?.farmer?.firstName || ""} ${
-          p?.farmer?.lastName || ""
-        }`.toLowerCase();
+      const hay = [
+        p?.name,
+        p?.category,
+        p?.farmer?.firstName,
+        p?.farmer?.lastName,
+      ]
+        .join(" ")
+        .toLowerCase();
       const matchesSearch = !q || hay.includes(q);
 
       let matchesChip = true;
       if (["Vegetables", "Fruits", "Herbs"].includes(activeFilter)) {
-        matchesChip = normalize(p?.category).includes(normalize(activeFilter));
+        matchesChip =
+          normalize(p?.category).includes(
+            normalize(activeFilter)
+          );
       } else if (activeFilter === "Organic Only") {
         matchesChip = isOrganic(p);
       } else if (activeFilter === "Local Farms") {
@@ -86,13 +103,15 @@ const ConsumerDashboard = () => {
       return matchesSearch && matchesChip;
     });
 
-    if (sortBy === "Price: Low to High")
+    // Sort
+    if (sortBy === "Price Low to High")
       list.sort((a, b) => (a?.price || 0) - (b?.price || 0));
-    if (sortBy === "Price: High to Low")
+    if (sortBy === "Price High to Low")
       list.sort((a, b) => (b?.price || 0) - (a?.price || 0));
     if (sortBy === "Newest")
       list.sort(
-        (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0)
+        (a, b) =>
+          new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0)
       );
 
     return list;
@@ -101,10 +120,9 @@ const ConsumerDashboard = () => {
   const cartCount = Array.isArray(cartItems) ? cartItems.length : 0;
 
   const handleAddToCart = (p) => {
-    // Your CartContext removeFromCart uses item.id, so store id properly
+    // CartContext expects item.id, so store id properly
     addToCart({
-      id: p._id,
-      _id: p._id,
+      id: p.id || p._id,
       name: p.name,
       price: p.price,
       unit: p.unit,
@@ -114,6 +132,7 @@ const ConsumerDashboard = () => {
     });
   };
 
+  // ProductBadge (Organic/Local labels)
   const ProductBadge = ({ p }) => {
     const organic = isOrganic(p);
     const local = isLocalFarm(p);
@@ -130,21 +149,18 @@ const ConsumerDashboard = () => {
     }
 
     return (
-      <span
-        className={`absolute left-3 top-3 px-2 py-1 text-xs font-semibold rounded-full ${cls}`}
-      >
+      <span className={`absolute left-3 top-3 px-2 py-1 text-xs font-semibold rounded-full ${cls}`}>
         {label}
       </span>
     );
   };
 
+  // ProductCard (Grid view)
   const ProductCard = ({ p }) => {
-    const imgSrc = p?.image
-      ? `${API_BASE_URL}${p.image}`
-      : "/placeholder-product.jpg";
-    const farmName =
-      `${p?.farmer?.firstName || ""} ${p?.farmer?.lastName || ""}`.trim() ||
-      "Farm";
+    const imgSrc = p?.image ? `${APIBASEURL}${p.image}` : "placeholder-product.jpg";
+    const farmName = [p?.farmer?.firstName, p?.farmer?.lastName]
+      .filter(Boolean)
+      .join(" ") || "Farm";
 
     return (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition">
@@ -161,7 +177,7 @@ const ConsumerDashboard = () => {
               alt={p?.name}
               className="h-48 w-full object-cover"
               onError={(e) => {
-                e.currentTarget.src = "/placeholder-product.jpg";
+                e.currentTarget.src = "placeholder-product.jpg";
               }}
             />
           </button>
@@ -175,14 +191,13 @@ const ConsumerDashboard = () => {
 
           <div className="flex items-center justify-between">
             <div className="text-lg font-bold text-gray-900">
-              Rs. {p?.price}{" "}
-              <span className="text-sm font-medium text-gray-500">
-                / {p?.unit}
-              </span>
+              Rs. {p?.price}
+              <span className="text-sm font-medium text-gray-500"> /{p?.unit}</span>
             </div>
-            <div className="text-sm text-gray-500">
-              {p?.quantity} {p?.unit}
-            </div>
+          </div>
+
+          <div className="text-sm text-gray-500">
+            {p?.quantity} {p?.unit}
           </div>
 
           <button
@@ -197,13 +212,12 @@ const ConsumerDashboard = () => {
     );
   };
 
+  // ProductRow (List view)
   const ProductRow = ({ p }) => {
-    const imgSrc = p?.image
-      ? `${API_BASE_URL}${p.image}`
-      : "/placeholder-product.jpg";
-    const farmName =
-      `${p?.farmer?.firstName || ""} ${p?.farmer?.lastName || ""}`.trim() ||
-      "Farm";
+    const imgSrc = p?.image ? `${APIBASEURL}${p.image}` : "placeholder-product.jpg";
+    const farmName = [p?.farmer?.firstName, p?.farmer?.lastName]
+      .filter(Boolean)
+      .join(" ") || "Farm";
 
     return (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex gap-4 items-center">
@@ -217,7 +231,7 @@ const ConsumerDashboard = () => {
             alt={p?.name}
             className="h-20 w-28 object-cover rounded-xl"
             onError={(e) => {
-              e.currentTarget.src = "/placeholder-product.jpg";
+              e.currentTarget.src = "placeholder-product.jpg";
             }}
           />
         </button>
@@ -225,9 +239,11 @@ const ConsumerDashboard = () => {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-gray-900 truncate">{p?.name}</h3>
-            <span className="text-xs text-gray-500">({p?.category})</span>
+            <span className="text-xs text-gray-500">{p?.category}</span>
           </div>
+
           <p className="text-sm text-gray-500 truncate">{farmName}</p>
+
           <p className="text-sm text-gray-600 line-clamp-1">
             {p?.description || "No description"}
           </p>
@@ -235,11 +251,10 @@ const ConsumerDashboard = () => {
 
         <div className="text-right space-y-2">
           <div className="text-lg font-bold text-gray-900">
-            Rs. {p?.price}{" "}
-            <span className="text-sm font-medium text-gray-500">
-              / {p?.unit}
-            </span>
+            Rs. {p?.price}
+            <span className="text-sm font-medium text-gray-500"> /{p?.unit}</span>
           </div>
+
           <button
             type="button"
             onClick={() => handleAddToCart(p)}
@@ -252,18 +267,27 @@ const ConsumerDashboard = () => {
     );
   };
 
+  // ✅ FULL FEATURED ProductModal - shows ALL product details
   const ProductModal = ({ p }) => {
     if (!p) return null;
-    const imgSrc = p?.image
-      ? `${API_BASE_URL}${p.image}`
-      : "/placeholder-product.jpg";
+
+    const imgSrc = p?.image ? `${APIBASEURL}${p.image}` : "placeholder-product.jpg";
     const farmName =
-      `${p?.farmer?.firstName || ""} ${p?.farmer?.lastName || ""}`.trim() ||
-      "Farm";
+      [p?.farmer?.firstName, p?.farmer?.lastName]
+        .filter(Boolean)
+        .join(" ") || "Farm";
+
+    const harvestDate = p.harvestDate
+      ? new Date(p.harvestDate).toLocaleDateString("en-IN")
+      : "Not specified";
+    const expiryDate = p.expiresAt
+      ? new Date(p.expiresAt).toLocaleDateString("en-IN")
+      : "No expiry";
 
     return (
       <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
         <div className="bg-white w-full max-w-3xl rounded-2xl overflow-hidden shadow-xl">
+          {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b">
             <h2 className="text-xl font-bold text-gray-900 truncate">
               {p?.name}
@@ -278,6 +302,7 @@ const ConsumerDashboard = () => {
             </button>
           </div>
 
+          {/* Content */}
           <div className="grid md:grid-cols-2 gap-0">
             <div className="bg-gray-50">
               <img
@@ -285,12 +310,13 @@ const ConsumerDashboard = () => {
                 alt={p?.name}
                 className="w-full h-72 md:h-full object-cover"
                 onError={(e) => {
-                  e.currentTarget.src = "/placeholder-product.jpg";
+                  e.currentTarget.src = "placeholder-product.jpg";
                 }}
               />
             </div>
 
             <div className="p-6 space-y-4">
+              {/* Category & Farmer */}
               <div className="flex items-center justify-between">
                 <span className="text-sm px-3 py-1 rounded-full bg-gray-100 text-gray-700">
                   {p?.category}
@@ -298,13 +324,15 @@ const ConsumerDashboard = () => {
                 <span className="text-sm text-gray-500">{farmName}</span>
               </div>
 
+              {/* Price */}
               <div className="text-3xl font-extrabold text-gray-900">
-                Rs. {p?.price}{" "}
+                Rs. {p?.price}
                 <span className="text-base font-semibold text-gray-500">
-                  / {p?.unit}
+                  {" "} /{p?.unit}
                 </span>
               </div>
 
+              {/* Availability & Status */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="bg-gray-50 rounded-xl p-3">
                   <div className="text-gray-500">Available</div>
@@ -312,6 +340,7 @@ const ConsumerDashboard = () => {
                     {p?.quantity} {p?.unit}
                   </div>
                 </div>
+
                 <div className="bg-gray-50 rounded-xl p-3">
                   <div className="text-gray-500">Status</div>
                   <div className="font-semibold text-gray-900">
@@ -320,15 +349,38 @@ const ConsumerDashboard = () => {
                 </div>
               </div>
 
-              <div>
-                <div className="font-semibold text-gray-900 mb-1">
-                  Description
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-blue-50 rounded-xl p-3">
+                  <div className="text-gray-500">Harvest Date</div>
+                  <div className="font-semibold text-gray-900">{harvestDate}</div>
                 </div>
+
+                <div className="bg-orange-50 rounded-xl p-3">
+                  <div className="text-gray-500">Expires</div>
+                  <div className="font-semibold text-gray-900">{expiryDate}</div>
+                </div>
+              </div>
+
+              {/* Shelf Life */}
+              {p?.shelfLife && (
+                <div className="bg-green-50 rounded-xl p-3">
+                  <div className="text-gray-500">Shelf Life</div>
+                  <div className="font-semibold text-gray-900">
+                    {p.shelfLife} days
+                  </div>
+                </div>
+              )}
+
+              {/* Description */}
+              <div>
+                <div className="font-semibold text-gray-900 mb-1">Description</div>
                 <p className="text-gray-600 leading-relaxed">
                   {p?.description || "No description available."}
                 </p>
               </div>
 
+              {/* Actions */}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -337,6 +389,7 @@ const ConsumerDashboard = () => {
                 >
                   Add to Cart
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setSelectedProduct(null)}
@@ -346,7 +399,10 @@ const ConsumerDashboard = () => {
                 </button>
               </div>
 
-              <p className="text-xs text-gray-400">Cart items: {cartCount}</p>
+              {/* Cart info */}
+              <p className="text-xs text-gray-400">
+                Cart items: {cartCount}
+              </p>
             </div>
           </div>
         </div>
@@ -354,15 +410,14 @@ const ConsumerDashboard = () => {
     );
   };
 
-  if (loading) {
+  if (loading)
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-600">
         Loading products...
       </div>
     );
-  }
 
-  if (error) {
+  if (error)
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white border rounded-xl p-6 max-w-md w-full text-center">
@@ -377,21 +432,24 @@ const ConsumerDashboard = () => {
         </div>
       </div>
     );
-  }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-extrabold text-gray-900">
-              Fresh Products
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Discover our selection of fresh produce from local farms
-            </p>
+    <>
+      <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+            <div>
+              <h1 className="text-3xl font-extrabold text-gray-900">
+                Fresh Products
+              </h1>
+              <p className="text-gray-600 mt-1">
+                Discover our selection of fresh produce from local farms
+              </p>
+            </div>
           </div>
 
+          {/* Controls */}
           <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
             <input
               value={query}
@@ -401,7 +459,7 @@ const ConsumerDashboard = () => {
             />
 
             <div className="flex gap-2 items-center">
-              <span className="text-sm text-gray-500">Sort by:</span>
+              <span className="text-sm text-gray-500">Sort by</span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
@@ -409,79 +467,81 @@ const ConsumerDashboard = () => {
               >
                 <option>Featured</option>
                 <option>Newest</option>
-                <option>Price: Low to High</option>
-                <option>Price: High to Low</option>
+                <option>Price Low to High</option>
+                <option>Price High to Low</option>
               </select>
+            </div>
 
-              <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("grid")}
-                  className={`px-3 py-2.5 text-sm ${
-                    viewMode === "grid"
-                      ? "bg-green-50 text-green-700"
-                      : "text-gray-600"
-                  }`}
-                >
-                  Grid
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("list")}
-                  className={`px-3 py-2.5 text-sm ${
-                    viewMode === "list"
-                      ? "bg-green-50 text-green-700"
-                      : "text-gray-600"
-                  }`}
-                >
-                  List
-                </button>
-              </div>
+            <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setViewMode("grid")}
+                className={`px-3 py-2.5 text-sm ${
+                  viewMode === "grid"
+                    ? "bg-green-50 text-green-700"
+                    : "text-gray-600"
+                }`}
+              >
+                Grid
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                className={`px-3 py-2.5 text-sm ${
+                  viewMode === "list"
+                    ? "bg-green-50 text-green-700"
+                    : "text-gray-600"
+                }`}
+              >
+                List
+              </button>
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-wrap gap-3 mt-6">
-          {categories.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setActiveFilter(c)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold border transition
-                ${
+          {/* Category chips */}
+          <div className="flex flex-wrap gap-3 mt-6">
+            {categories.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setActiveFilter(c)}
+                className={`px-4 py-2 rounded-full text-sm font-semibold border transition ${
                   activeFilter === c
                     ? "bg-green-100 border-green-200 text-green-700"
                     : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
+              >
+                {c}
+              </button>
+            ))}
+          </div>
 
-        <div className="mt-8">
-          {filteredProducts.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-gray-500">
-              No products match your search/filter.
-            </div>
-          ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {filteredProducts.map((p) => (
-                <ProductCard key={p._id} p={p} />
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredProducts.map((p) => (
-                <ProductRow key={p._id} p={p} />
-              ))}
-            </div>
-          )}
+          {/* Products */}
+          <div className="mt-8">
+            {filteredProducts.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-gray-500">
+                No products match your {query && "search/filter."}
+              </div>
+            ) : viewMode === "grid" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {filteredProducts.map((p) => (
+                  <ProductCard key={p.id || p._id} p={p} />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredProducts.map((p) => (
+                  <ProductRow key={p.id || p._id} p={p} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Product Modal */}
       <ProductModal p={selectedProduct} />
-    </div>
+    </>
   );
 };
 
