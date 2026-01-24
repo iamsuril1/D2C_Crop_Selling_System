@@ -13,6 +13,7 @@ import EditProfile from "./pages/EditProfile";
 import FarmerDashboard from "./pages/FarmerDashboard";
 import ProductForm from "./components/ProductForm";
 import ConsumerDashboard from "./pages/ConsumerDashboard";
+import ProductDetails from "./pages/ProductDetails";  // 👈 NEW
 import AdminDashboard from "./pages/AdminDashboard";
 
 function App() {
@@ -62,6 +63,9 @@ function App() {
             path="/register"
             element={!user ? <Register /> : <Navigate to="/" replace />}
           />
+
+          {/* Product Details - PUBLIC (no auth required) 👈 NEW */}
+          <Route path="/product/:id" element={<ProductDetails />} />
 
           {/* Farmer routes */}
           <Route
