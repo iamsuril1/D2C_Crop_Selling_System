@@ -7,11 +7,14 @@ import {
   updateOrderStatus,
   getMyOrders,
   cancelOrderConsumer,
+  estimateDeliveryMultiOrigin,
 } from "../controllers/orderController.js";
 
 const router = express.Router();
 
+router.post("/estimate", protect, authorize("consumer"), estimateDeliveryMultiOrigin);
 router.post("/", protect, authorize("consumer"), createOrder);
+
 router.get("/farmer", protect, authorize("farmer"), getFarmerOrders);
 router.put("/:id/status", protect, authorize("farmer"), updateOrderStatus);
 

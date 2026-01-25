@@ -21,6 +21,7 @@ export const createUser = async (req, res) => {
   try {
     const { firstName, lastName, email, password, role } = req.body;
 
+    // If you want admin creation from admin panel, include "admin" here
     if (!["farmer", "consumer"].includes(role)) {
       return res.status(400).json({ message: "Invalid role" });
     }
@@ -38,7 +39,13 @@ export const createUser = async (req, res) => {
       role,
     });
 
-    res.status(201).json({ _id: user._id, firstName, lastName, email, role });
+    res.status(201).json({
+      _id: user._id,
+      firstName,
+      lastName,
+      email,
+      role,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -94,8 +101,9 @@ export const deleteProductAdmin = async (req, res) => {
 export const getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find()
-      .populate("farmer", "firstName lastName email")
       .populate("consumer", "firstName lastName email")
+      .populate("farmer", "firstName lastName email") // old schema support if any docs exist
+      .populate("shipments.farmer", "firstName lastName email")
       .sort({ createdAt: -1 });
 
     res.json(orders);

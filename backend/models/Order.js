@@ -1,33 +1,49 @@
 import mongoose from "mongoose";
 
-const orderSchema = new mongoose.Schema(
+const shipmentItemSchema = new mongoose.Schema(
+  {
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
+    name: String,
+    quantity: Number,
+    price: Number,
+  },
+  { _id: false }
+);
+
+const shipmentSchema = new mongoose.Schema(
   {
     farmer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
+    items: [shipmentItemSchema],
+
+    // Fixed per shipment (per farmer)
+    deliveryFee: { type: Number, required: true, default: 200 },
+    subtotal: { type: Number, required: true, default: 0 },
+  },
+  { _id: false }
+);
+
+const orderSchema = new mongoose.Schema(
+  {
     consumer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
-    items: [
-      {
-        product: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
-          required: true,
-        },
-        name: String,
-        quantity: Number,
-        price: Number,
-      },
-    ],
-    totalAmount: {
-      type: Number,
-      required: true,
-    },
+
+    shipments: { type: [shipmentSchema], default: [] },
+
+    itemsSubtotal: { type: Number, required: true, default: 0 },
+    deliveryTotal: { type: Number, required: true, default: 0 },
+    totalAmount: { type: Number, required: true },
+
     status: {
       type: String,
       enum: ["pending", "confirmed", "shipped", "delivered", "cancelled"],

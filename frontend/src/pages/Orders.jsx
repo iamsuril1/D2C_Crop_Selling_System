@@ -2,15 +2,21 @@ import { useContext, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import CartContext from "../context/CartContext";
-import APIBASEURL from "../utils/config"; // in your paste you use APIBASEURL in many places [file:31]
+import api from "../api/axios";
+import { APIBASEURL } from "../utils/config";
+
+const DELIVERY_PER_SHIPMENT = 200;
+const PACKAGING_FEE = 10;
 
 export default function Orders() {
   const navigate = useNavigate();
   const { cartItems, removeFromCart, updateQty } = useContext(CartContext);
 
-  // Optional promo (UI only)
   const [promo, setPromo] = useState("");
   const [appliedPromo, setAppliedPromo] = useState("");
+
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [error, setError] = useState("");
 
   const subtotal = useMemo(() => {
     return (cartItems || []).reduce((sum, it) => {
@@ -20,18 +26,84 @@ export default function Orders() {
     }, 0);
   }, [cartItems]);
 
-  const packagingFee = 10;
-  const deliveryCharge = 0;
+  // Unique farmers = shipments count (per shipment delivery is 200)
+  const shipmentCount = useMemo(() => {
+    const ids = new Set();
+    for (const it of cartItems || []) {
+      const farmerId = it?.farmer?._id || it?.farmer?.id || it?.farmerId;
+      if (farmerId) ids.add(String(farmerId));
+    }
+    // If your cart items don't store farmer info, fallback to 1 so UI doesn't show 0 shipments.
+    return ids.size > 0 ? ids.size : 1;
+  }, [cartItems]);
+
+  const deliveryCharge = useMemo(() => shipmentCount * DELIVERY_PER_SHIPMENT, [shipmentCount]);
 
   const discount = useMemo(() => {
     if (appliedPromo?.toUpperCase() === "SAVE10") return Math.round(subtotal * 0.1);
     return 0;
   }, [appliedPromo, subtotal]);
 
-  const total = Math.max(0, subtotal + packagingFee + deliveryCharge - discount);
+  const total = useMemo(() => {
+    return Math.max(0, subtotal + PACKAGING_FEE + deliveryCharge - discount);
+  }, [subtotal, deliveryCharge, discount]);
 
-  const applyPromo = () => {
-    setAppliedPromo(promo.trim().toUpperCase());
+  const applyPromo = () => setAppliedPromo(promo.trim().toUpperCase());
+
+  const buildProductId = (item) => item.productId || item._id || item.id;
+
+  // Fix for images: if backend returns "/uploads/xxx.png" you must prefix APIBASEURL
+  // because otherwise the browser requests it from the frontend origin. [web:98][web:105]
+  const buildImgSrc = (item) => {
+    if (!item?.image) return "/placeholder-product.jpg";
+    const img = String(item.image);
+
+    // If already absolute URL, keep it
+    if (img.startsWith("http://") || img.startsWith("https://")) return img;
+
+    // If saved as "/uploads/..", prefix backend base URL
+    if (img.startsWith("/")) return `${APIBASEURL}${img}`;
+
+    // If saved without leading "/", normalize
+    return `${APIBASEURL}/${img}`;
+  };
+
+  const handleCheckout = async () => {
+    if (placingOrder) return;
+    setError("");
+    setPlacingOrder(true);
+
+    try {
+      const items = (cartItems || []).map((it) => ({
+        productId: buildProductId(it),
+        quantity: Math.max(1, Number(it.quantity || 1)),
+      }));
+
+      if (!items.length || items.some((x) => !x.productId)) {
+        setError("Cart items are invalid (missing productId).");
+        setPlacingOrder(false);
+        return;
+      }
+
+      // New backend expects only { items } (no deliveryAddress)
+      const res = await api.post("/api/orders", { items });
+
+      navigate("/orders/success", { state: { order: res.data } });
+    } catch (err) {
+      let message = "Checkout failed. Please try again.";
+      if (!navigator.onLine) {
+        message = "No internet connection";
+      } else if (err.response) {
+        message = err.response.data?.message || `Server error (${err.response.status})`;
+      } else if (err.request) {
+        message = "Server is not responding. Please try later.";
+      } else if (err.message) {
+        message = err.message;
+      }
+      setError(message);
+    } finally {
+      setPlacingOrder(false);
+    }
   };
 
   if (!cartItems || cartItems.length === 0) {
@@ -62,11 +134,11 @@ export default function Orders() {
           {/* Left: cart items */}
           <div className="lg:col-span-2 space-y-4">
             {cartItems.map((item) => {
-              const imgSrc = item.image ? `${APIBASEURL}${item.image}` : "/placeholder-product.jpg";
+              const imgSrc = buildImgSrc(item);
 
               return (
                 <div
-                  key={item.id}
+                  key={item.id || item._id || item.productId}
                   className="bg-white border rounded-2xl p-4 flex gap-4 items-center"
                 >
                   <img
@@ -81,11 +153,11 @@ export default function Orders() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-gray-900 truncate">
-                          {item.name}
-                        </h3>
+                        <h3 className="font-semibold text-gray-900 truncate">{item.name}</h3>
                         <p className="text-xs text-gray-500 truncate">
-                          {item?.farmer?.firstName ? `Fresh from ${item.farmer.firstName}` : "Fresh produce"}
+                          {item?.farmer?.firstName
+                            ? `Fresh from ${item.farmer.firstName}`
+                            : "Fresh produce"}
                         </p>
                       </div>
 
@@ -155,16 +227,19 @@ export default function Orders() {
                 <span>Subtotal ({cartItems.length} items)</span>
                 <span>₹{subtotal.toFixed(2)}</span>
               </div>
+
               <div className="flex justify-between">
-                <span>Delivery Charges</span>
-                <span className="text-green-700 font-semibold">
-                  {deliveryCharge === 0 ? "FREE" : `₹${deliveryCharge.toFixed(2)}`}
+                <span>
+                  Delivery Charges ({shipmentCount} shipment{shipmentCount > 1 ? "s" : ""})
                 </span>
+                <span className="text-gray-900 font-semibold">₹{deliveryCharge.toFixed(2)}</span>
               </div>
+
               <div className="flex justify-between">
                 <span>Packaging Fee</span>
-                <span>₹{packagingFee.toFixed(2)}</span>
+                <span>₹{PACKAGING_FEE.toFixed(2)}</span>
               </div>
+
               <div className="flex justify-between items-center">
                 <span>Discount</span>
                 <span className="text-green-700 font-semibold">-₹{discount.toFixed(2)}</span>
@@ -192,22 +267,15 @@ export default function Orders() {
               </button>
             </div>
 
-            <div className="mt-4 bg-green-50 border border-green-100 rounded-2xl p-4">
-              <div className="font-semibold text-green-800">Free Delivery</div>
-              <div className="text-xs text-green-700 mt-1">
-                Your order qualifies for free delivery!
-              </div>
-              <div className="text-xs text-green-600 mt-1">
-                Estimated delivery: 2-3 business days
-              </div>
-            </div>
+            {error && <p className="mt-3 text-center text-red-500 text-sm">{error}</p>}
 
             <button
               type="button"
-              className="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-2xl"
-              onClick={() => alert("Checkout not implemented yet")}
+              disabled={placingOrder}
+              className="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-2xl disabled:opacity-60"
+              onClick={handleCheckout}
             >
-              Proceed to Checkout →
+              {placingOrder ? "Placing order..." : "Proceed to Checkout →"}
             </button>
 
             <div className="mt-3 text-xs text-gray-500 flex justify-center gap-4">

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 
-
 const Register = () => {
   const navigate = useNavigate();
 
@@ -19,24 +18,19 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-    setError(""); // clear error on input change
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError("");
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
 
-    const {
-      firstName,
-      lastName,
-      email,
-      password,
-      confirmPassword,
-      role,
-    } = formData;
+    const { firstName, lastName, email, password, confirmPassword, role } =
+      formData;
 
-    // ✅ Explicit page-level validations (no UI change)
+    // Basic validations
     if (
       !firstName.trim() ||
       !lastName.trim() ||
@@ -57,18 +51,18 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const res = await api.post("/api/auth/register", {
+      const payload = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
         password,
-        confirmPassword,
-        role,
-      });
+        role, // "consumer" or "farmer"
+      };
 
-      // Optional safety check
-      if (!res || res.status !== 201) {
-        // backend may still return 200; keep flexible
+      const res = await api.post("/api/auth/register", payload);
+
+      if (!res || (res.status !== 201 && res.status !== 200)) {
+        // keep flexible
       }
 
       navigate("/login");
@@ -79,8 +73,7 @@ const Register = () => {
         message = "No internet connection";
       } else if (err.response) {
         message =
-          err.response.data?.message ||
-          `Server error (${err.response.status})`;
+          err.response.data?.message || `Server error (${err.response.status})`;
       } else if (err.request) {
         message = "Server is not responding. Please try later.";
       } else if (err.message) {
@@ -117,9 +110,9 @@ const Register = () => {
           </h1>
 
           <p className="text-base text-gray-200 leading-relaxed max-w-2xl">
-            Become part of a next-generation agricultural marketplace that ensures
-            fair pricing, direct farmer access, and fresh produce delivered with
-            accountability and trust.
+            Become part of a next-generation agricultural marketplace that
+            ensures fair pricing, direct farmer access, and fresh produce
+            delivered with accountability and trust.
           </p>
         </div>
       </div>
@@ -138,15 +131,18 @@ const Register = () => {
             <div className="relative">
               <input
                 name="firstName"
+                value={formData.firstName}
                 placeholder=" "
                 onChange={handleChange}
                 className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
               />
               <label className="floating-label text-green-700">First Name</label>
             </div>
+
             <div className="relative">
               <input
                 name="lastName"
+                value={formData.lastName}
                 placeholder=" "
                 onChange={handleChange}
                 className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
@@ -159,6 +155,7 @@ const Register = () => {
             <input
               type="email"
               name="email"
+              value={formData.email}
               placeholder=" "
               onChange={handleChange}
               className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
@@ -171,16 +168,19 @@ const Register = () => {
               <input
                 type="password"
                 name="password"
+                value={formData.password}
                 placeholder=" "
                 onChange={handleChange}
                 className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
               />
               <label className="floating-label text-green-700">Password</label>
             </div>
+
             <div className="relative">
               <input
                 type="password"
                 name="confirmPassword"
+                value={formData.confirmPassword}
                 placeholder=" "
                 onChange={handleChange}
                 className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
@@ -200,6 +200,7 @@ const Register = () => {
               />
               Consumer
             </label>
+
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
@@ -212,16 +213,13 @@ const Register = () => {
             </label>
           </div>
 
-          {/* ✅ Page-level error */}
-          {error && (
-            <p className="text-center text-red-500 text-sm">{error}</p>
-          )}
+          {error && <p className="text-center text-red-500 text-sm">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-gradient-to-r from-[#1E9C17] to-[#27AE60] text-white py-3 rounded-2xl
-                       font-semibold tracking-wide shadow-lg hover:scale-105 hover:shadow-2xl transition"
+                       font-semibold tracking-wide shadow-lg hover:scale-105 hover:shadow-2xl transition disabled:opacity-60"
           >
             {loading ? "Creating Account..." : "Register"}
           </button>
