@@ -4,6 +4,21 @@ const notExpiredFilter = () => ({
   $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
 });
 
+export const getProductById = async (req, res) => {
+  try {
+    const product = await Product.findOne({
+      _id: req.params.id,
+      isActive: true,
+      ...notExpiredFilter(),
+    }).populate("farmer", "firstName lastName email profileImage");
+
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 export const createProduct = async (req, res) => {
   try {
     const {
