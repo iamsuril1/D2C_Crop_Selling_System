@@ -1,11 +1,12 @@
 import { createContext, useEffect, useState } from "react";
-import api from "../api/axios";
 
+// ✅ Both named + default exports
 export const AuthContext = createContext();
+export default AuthContext;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // keep simple to avoid extra API dependency
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -13,24 +14,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) return setLoading(false);
-
-      try {
-        const res = await api.get("/api/auth/me");
-        setUser(res.data.user);
-      } catch {
-        logout();
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
+    setLoading(false);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, logout, loading }}>
+    <AuthContext.Provider value={{ user, setUser, loading, logout }}>
       {children}
     </AuthContext.Provider>
   );

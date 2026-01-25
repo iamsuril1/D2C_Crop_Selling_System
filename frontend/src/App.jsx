@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useContext } from "react";
-import { AuthContext } from "./context/AuthContext";
 
+import AuthContext from "./context/AuthContext";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
@@ -10,11 +10,15 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
+
 import FarmerDashboard from "./pages/FarmerDashboard";
-import ProductForm from "./components/ProductForm";
 import ConsumerDashboard from "./pages/ConsumerDashboard";
-import ProductDetails from "./pages/ProductDetails";  // 👈 NEW
+import ProductDetails from "./pages/ProductDetails";
+import ProductForm from "./components/ProductForm";
 import AdminDashboard from "./pages/AdminDashboard";
+
+// ✅ This is your CART-DESIGN page (per your message)
+import Orders from "./pages/Orders";
 
 function App() {
   const { user, loading } = useContext(AuthContext);
@@ -27,18 +31,14 @@ function App() {
     );
   }
 
-  // Central role-based redirect
   const roleRedirect = () => {
     if (!user) return <Home />;
-
     if (user.role === "farmer") return <Navigate to="/farmer" replace />;
     if (user.role === "consumer") return <Navigate to="/consumer" replace />;
     if (user.role === "admin") return <Navigate to="/admin" replace />;
-
     return <Home />;
   };
 
-  // Protected route helper
   const ProtectedRoute = ({ roles, children }) => {
     if (!user) return <Navigate to="/login" replace />;
     if (!roles.includes(user.role)) return <Navigate to="/" replace />;
@@ -51,23 +51,27 @@ function App() {
 
       <main style={{ minHeight: "80vh" }}>
         <Routes>
-          {/* Root route */}
+          {/* Root */}
           <Route path="/" element={roleRedirect()} />
 
-          {/* Auth routes */}
-          <Route
-            path="/login"
-            element={!user ? <Login /> : <Navigate to="/" replace />}
-          />
-          <Route
-            path="/register"
-            element={!user ? <Register /> : <Navigate to="/" replace />}
-          />
+          {/* Auth */}
+          <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
+          <Route path="/register" element={!user ? <Register /> : <Navigate to="/" replace />} />
 
-          {/* Product Details - PUBLIC (no auth required) 👈 NEW */}
+          {/* Public product details */}
           <Route path="/product/:id" element={<ProductDetails />} />
 
-          {/* Farmer routes */}
+          {/* ✅ Cart route (opens Orders.jsx cart design) */}
+          <Route
+            path="/cart"
+            element={
+              <ProtectedRoute roles={["consumer"]}>
+                <Orders />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Farmer */}
           <Route
             path="/farmer"
             element={
@@ -76,7 +80,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/add-product"
             element={
@@ -86,7 +89,7 @@ function App() {
             }
           />
 
-          {/* Consumer routes */}
+          {/* Consumer */}
           <Route
             path="/consumer"
             element={
@@ -96,7 +99,7 @@ function App() {
             }
           />
 
-          {/* Admin routes */}
+          {/* Admin */}
           <Route
             path="/admin"
             element={
@@ -115,7 +118,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/profile/edit"
             element={

@@ -1,14 +1,25 @@
-import { useContext, useState, useEffect } from "react";
+import { useContext, useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { CartContext } from "../context/CartContext";
 
-import { FaSearch, FaUserCircle, FaShoppingCart, FaBars, FaTimes } from "react-icons/fa";
+import {
+  FaSearch,
+  FaUserCircle,
+  FaShoppingCart,
+  FaBars,
+  FaTimes,
+} from "react-icons/fa";
 
 const Navbar = () => {
   const { user, logout } = useContext(AuthContext);
-  const { cartCount } = useContext(CartContext);
+  const { cartItems } = useContext(CartContext); 
   const navigate = useNavigate();
+
+  const cartCount = useMemo(() => {
+    if (!Array.isArray(cartItems)) return 0;
+    return cartItems.reduce((sum, it) => sum + Number(it?.quantity || 0), 0);
+  }, [cartItems]);
 
   // Mobile menu
   const [menuOpen, setMenuOpen] = useState(false);
@@ -33,35 +44,57 @@ const Navbar = () => {
   const sampleCrops = ["Tomato", "Potato", "Onion", "Carrot", "Corn", "Wheat", "Rice"];
   useEffect(() => {
     if (!search.trim()) return setSuggestions([]);
-    setSuggestions(sampleCrops.filter(c => c.toLowerCase().includes(search.toLowerCase())));
+    setSuggestions(
+      sampleCrops.filter((c) => c.toLowerCase().includes(search.toLowerCase()))
+    );
   }, [search]);
 
   // Role-based navigation
   const goToDashboard = () => {
     setDropdownOpen(false);
+    setMenuOpen(false);
     if (user?.role === "consumer") navigate("/consumer");
     if (user?.role === "farmer") navigate("/farmer");
     if (user?.role === "admin") navigate("/admin");
   };
 
+  const handleLogout = () => {
+    setDropdownOpen(false);
+    setMenuOpen(false);
+    logout?.();
+    navigate("/login");
+  };
+
   // Role-based menu item
   const roleMenuItem = () => {
     if (!user) return null;
-    if (user.role === "consumer") return (
-      <button onClick={() => navigate("/consuemr")} className="hover:text-[#1E9C17] transition">
-        View Products
-      </button>
-    );
-    if (user.role === "farmer") return (
-      <button onClick={() => navigate("/add-product")} className="hover:text-[#1E9C17] transition">
-        Add Product
-      </button>
-    );
+    if (user.role === "consumer")
+      return (
+        <button
+          onClick={() => navigate("/consumer")}
+          className="hover:text-[#1E9C17] transition"
+        >
+          View Products
+        </button>
+      );
+    if (user.role === "farmer")
+      return (
+        <button
+          onClick={() => navigate("/add-product")}
+          className="hover:text-[#1E9C17] transition"
+        >
+          Add Product
+        </button>
+      );
+    return null;
   };
 
   return (
-    <nav className={`w-full bg-white shadow-sm py-3 px-6 flex items-center justify-between z-50 transition-all ${isSticky ? "fixed top-0 shadow-lg" : "relative"}`}>
-      
+    <nav
+      className={`w-full bg-white shadow-sm py-3 px-6 flex items-center justify-between z-50 transition-all ${
+        isSticky ? "fixed top-0 shadow-lg" : "relative"
+      }`}
+    >
       {/* Logo */}
       <Link to="/" className="flex items-center">
         <img src="/logo.png" alt="Logo" className="h-10 w-auto object-contain" />
@@ -70,8 +103,12 @@ const Navbar = () => {
       {/* Desktop Navigation */}
       <div className="hidden md:flex space-x-6 font-medium text-gray-700 items-center">
         {roleMenuItem()}
-        <Link to="/about" className="hover:text-[#1E9C17] transition">About</Link>
-        <Link to="/contact" className="hover:text-[#1E9C17] transition">Contact</Link>
+        <Link to="/about" className="hover:text-[#1E9C17] transition">
+          About
+        </Link>
+        <Link to="/contact" className="hover:text-[#1E9C17] transition">
+          Contact
+        </Link>
       </div>
 
       {/* Right Section */}
@@ -89,7 +126,12 @@ const Navbar = () => {
           {suggestions.length > 0 && (
             <ul className="absolute bg-white shadow-lg w-full rounded-lg mt-2 z-50">
               {suggestions.map((item, index) => (
-                <li key={index} className="px-4 py-2 hover:bg-gray-100 cursor-pointer">{item}</li>
+                <li
+                  key={index}
+                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                >
+                  {item}
+                </li>
               ))}
             </ul>
           )}
@@ -116,12 +158,33 @@ const Navbar = () => {
             />
             {dropdownOpen && (
               <div className="absolute right-0 mt-2 bg-white shadow-lg rounded-md w-40 z-50">
-                <Link to="/profile" className="block px-4 py-2 hover:bg-gray-100">Profile</Link>
-                <button onClick={goToDashboard} className="block w-full text-left px-4 py-2 hover:bg-gray-100">
+                <Link
+                  to="/profile"
+                  className="block px-4 py-2 hover:bg-gray-100"
+                  onClick={() => setDropdownOpen(false)}
+                >
+                  Profile
+                </Link>
+
+                <button
+                  onClick={goToDashboard}
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                >
                   Dashboard
                 </button>
-                <Link to="/orders" className="block px-4 py-2 hover:bg-gray-100">Orders</Link>
-                <button onClick={logout} className="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600">
+
+                <Link
+                  to="/orders"
+                  className="block px-4 py-2 hover:bg-gray-100"
+                  onClick={() => setDropdownOpen(false)}
+                >
+                  Orders
+                </Link>
+
+                <button
+                  onClick={handleLogout}
+                  className="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600"
+                >
                   Logout
                 </button>
               </div>
@@ -129,13 +192,23 @@ const Navbar = () => {
           </div>
         ) : (
           <div className="hidden sm:flex items-center space-x-3">
-            <Link to="/login" className="hover:text-[#1E9C17] font-medium">Login</Link>
-            <Link to="/register" className="bg-[#1E9C17] text-white px-4 py-2 rounded-md hover:bg-[#158212]">Register</Link>
+            <Link to="/login" className="hover:text-[#1E9C17] font-medium">
+              Login
+            </Link>
+            <Link
+              to="/register"
+              className="bg-[#1E9C17] text-white px-4 py-2 rounded-md hover:bg-[#158212]"
+            >
+              Register
+            </Link>
           </div>
         )}
 
         {/* Mobile Button */}
-        <button className="md:hidden text-2xl text-gray-700" onClick={() => setMenuOpen(true)}>
+        <button
+          className="md:hidden text-2xl text-gray-700"
+          onClick={() => setMenuOpen(true)}
+        >
           <FaBars />
         </button>
       </div>
@@ -145,26 +218,43 @@ const Navbar = () => {
         <div className="fixed inset-0 bg-black bg-opacity-40 z-50 md:hidden">
           <div className="bg-white w-64 h-full p-6">
             <div className="flex justify-between items-center mb-6">
-              <img src="/logo.png" className="h-10" />
-              <FaTimes className="text-2xl cursor-pointer" onClick={() => setMenuOpen(false)} />
+              <img src="/logo.png" className="h-10" alt="Logo" />
+              <FaTimes
+                className="text-2xl cursor-pointer"
+                onClick={() => setMenuOpen(false)}
+              />
             </div>
 
             <div className="flex flex-col space-y-4">
               {roleMenuItem()}
-              <Link to="/about" onClick={() => setMenuOpen(false)}>About</Link>
-              <Link to="/contact" onClick={() => setMenuOpen(false)}>Contact</Link>
+              <Link to="/about" onClick={() => setMenuOpen(false)}>
+                About
+              </Link>
+              <Link to="/contact" onClick={() => setMenuOpen(false)}>
+                Contact
+              </Link>
 
               {!user ? (
                 <>
-                  <Link to="/login" onClick={() => setMenuOpen(false)}>Login</Link>
-                  <Link to="/register" onClick={() => setMenuOpen(false)}>Register</Link>
+                  <Link to="/login" onClick={() => setMenuOpen(false)}>
+                    Login
+                  </Link>
+                  <Link to="/register" onClick={() => setMenuOpen(false)}>
+                    Register
+                  </Link>
                 </>
               ) : (
                 <>
-                  <Link to="/profile" onClick={() => setMenuOpen(false)}>Profile</Link>
+                  <Link to="/profile" onClick={() => setMenuOpen(false)}>
+                    Profile
+                  </Link>
                   <button onClick={goToDashboard}>Dashboard</button>
-                  <Link to="/orders" onClick={() => setMenuOpen(false)}>Orders</Link>
-                  <button onClick={logout} className="text-red-600">Logout</button>
+                  <Link to="/orders" onClick={() => setMenuOpen(false)}>
+                    Orders
+                  </Link>
+                  <button onClick={handleLogout} className="text-red-600">
+                    Logout
+                  </button>
                 </>
               )}
             </div>
