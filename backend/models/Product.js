@@ -16,7 +16,6 @@ const productSchema = new mongoose.Schema(
     description: { type: String, default: "" },
     image: { type: String, default: "" },
 
-    // harvestDate optional, shelfLife required
     harvestDate: { type: Date, default: null },
     shelfLife: { type: Number, required: true },
 
@@ -26,32 +25,23 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-/**
- * ✅ NO next() USED
- * Mongoose runs this as synchronous document middleware. [web:19]
- */
 productSchema.pre("save", function () {
-  // Ensure shelfLife is positive (required)
   const shelf = Number(this.shelfLife);
   if (!Number.isFinite(shelf) || shelf <= 0) {
-    // `invalidate` triggers a ValidationError and stops save()
     this.invalidate("shelfLife", "Shelf life must be a positive number");
     return;
   }
 
-  // harvestDate optional: if missing/invalid => no expiry
   const hd = this.harvestDate ? new Date(this.harvestDate) : null;
   if (!hd || Number.isNaN(hd.getTime())) {
     this.expiresAt = null;
     return;
   }
 
-  // Both valid => calculate expiry
   const ms = shelf * 24 * 60 * 60 * 1000;
   this.expiresAt = new Date(hd.getTime() + ms);
 });
 
-// TTL index: MongoDB will delete when expiresAt is reached
 productSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 productSchema.set("toJSON", {

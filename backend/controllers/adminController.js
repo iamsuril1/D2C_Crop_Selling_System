@@ -21,7 +21,6 @@ export const createUser = async (req, res) => {
   try {
     const { firstName, lastName, email, password, role } = req.body;
 
-    // If you want admin creation from admin panel, include "admin" here
     if (!["farmer", "consumer"].includes(role)) {
       return res.status(400).json({ message: "Invalid role" });
     }
@@ -102,7 +101,7 @@ export const getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find()
       .populate("consumer", "firstName lastName email")
-      .populate("farmer", "firstName lastName email") // old schema support if any docs exist
+      .populate("farmer", "firstName lastName email")
       .populate("shipments.farmer", "firstName lastName email")
       .sort({ createdAt: -1 });
 

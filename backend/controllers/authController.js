@@ -55,6 +55,8 @@ export const login = async (req, res) => {
         email: user.email,
         role: user.role,
         profileImage: user.profileImage,
+        location: user.location,
+        addressText: user.addressText,
       },
     });
   } catch (err) {
@@ -84,6 +86,40 @@ export const updateProfile = async (req, res) => {
 
     await user.save();
     res.json({ message: "Profile updated", user });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const updateMyLocation = async (req, res) => {
+  try {
+    const { lat, lng, addressText } = req.body;
+
+    const latNum = Number(lat);
+    const lngNum = Number(lng);
+
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+      return res.status(400).json({ message: "lat and lng are required" });
+    }
+
+    if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) {
+      return res.status(400).json({ message: "Invalid lat/lng range" });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // GeoJSON point coordinates order: [lng, lat] [web:59]
+    user.location = { type: "Point", coordinates: [lngNum, latNum] };
+    if (addressText !== undefined) user.addressText = String(addressText);
+
+    await user.save();
+
+    res.json({
+      message: "Location updated",
+      location: user.location,
+      addressText: user.addressText,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

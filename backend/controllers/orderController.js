@@ -197,7 +197,6 @@ export const updateOrderStatus = async (req, res) => {
     );
     if (!shipment) return res.status(403).json({ message: "Unauthorized" });
 
-    // Keeping your current minimal logic: updates overall order status
     order.status = status;
     await order.save();
 

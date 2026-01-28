@@ -1,4 +1,5 @@
 import Product from "../models/Product.js";
+import User from "../models/User.js";
 
 const notExpiredFilter = () => ({
   $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
@@ -10,7 +11,7 @@ export const getProductById = async (req, res) => {
       _id: req.params.id,
       isActive: true,
       ...notExpiredFilter(),
-    }).populate("farmer", "firstName lastName email profileImage");
+    }).populate("farmer", "firstName lastName email profileImage addressText location");
 
     if (!product) return res.status(404).json({ message: "Product not found" });
     res.json(product);
@@ -169,7 +170,14 @@ export const deleteProduct = async (req, res) => {
 
 export const getPublicProducts = async (req, res) => {
   try {
-    const { category, subcategory, limit = 20 } = req.query;
+    const {
+      category,
+      subcategory,
+      limit = 20,
+      lat,
+      lng,
+      maxDistance = 5000, // meters
+    } = req.query;
 
     const filter = {
       isActive: true,
@@ -179,12 +187,43 @@ export const getPublicProducts = async (req, res) => {
     if (category) filter.category = category;
     if (subcategory) filter.subcategory = subcategory;
 
-    const products = await Product.find(filter)
-      .populate("farmer", "firstName lastName email")
+    // MODE: all products
+    if (lat === undefined || lng === undefined) {
+      const products = await Product.find(filter)
+        .populate("farmer", "firstName lastName email profileImage addressText location")
+        .limit(Number(limit))
+        .sort({ createdAt: -1 });
+
+      return res.json({ mode: "all", products });
+    }
+
+    // MODE: nearby products (via nearby farmers)
+    const latNum = Number(lat);
+    const lngNum = Number(lng);
+    const maxD = Number(maxDistance);
+
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+      return res.status(400).json({ message: "lat/lng must be numbers" });
+    }
+
+    const nearbyFarmers = await User.find({
+      role: "farmer",
+      location: {
+        $near: {
+          $geometry: { type: "Point", coordinates: [lngNum, latNum] },
+          $maxDistance: maxD,
+        },
+      },
+    }).select("_id"); // $near sorts by distance [web:40]
+
+    const farmerIds = nearbyFarmers.map((u) => u._id);
+
+    const products = await Product.find({ ...filter, farmer: { $in: farmerIds } })
+      .populate("farmer", "firstName lastName email profileImage addressText location")
       .limit(Number(limit))
       .sort({ createdAt: -1 });
 
-    res.json(products);
+    return res.json({ mode: "nearby", maxDistance: maxD, products });
   } catch (err) {
     console.error("Get public products ERROR:", err);
     res.status(500).json({ message: err.message });

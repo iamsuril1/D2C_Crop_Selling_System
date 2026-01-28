@@ -1,3 +1,4 @@
+// app.js
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -7,12 +8,12 @@ import authRoutes from "./routes/authRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import geoRoutes from "./routes/geoRoutes.js"; // NEW
 
 import { errorHandler } from "./middleware/errorMiddleware.js";
 
 const app = express();
 
-// Create uploads directory automatically
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -31,8 +32,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/admin", adminRoutes);
-
-// no /api/geo
+app.use("/api/geo", geoRoutes); // NEW
 
 app.use(errorHandler);
 

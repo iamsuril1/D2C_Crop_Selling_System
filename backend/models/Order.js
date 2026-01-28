@@ -22,8 +22,6 @@ const shipmentSchema = new mongoose.Schema(
       required: true,
     },
     items: [shipmentItemSchema],
-
-    // Fixed per shipment (per farmer)
     deliveryFee: { type: Number, required: true, default: 200 },
     subtotal: { type: Number, required: true, default: 0 },
   },
