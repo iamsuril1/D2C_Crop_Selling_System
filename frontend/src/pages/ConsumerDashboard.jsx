@@ -6,6 +6,36 @@ import { APIBASEURL } from "../utils/config";
 
 const normalize = (v) => v?.toString().toLowerCase().trim();
 
+const extractProducts = (data) => {
+  // Supports both: old backend (array) and new backend ({ mode, products })
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.products)) return data.products;
+  return [];
+};
+
+const getCoords = () =>
+  new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocation is not supported by this browser."));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      (err) => reject(err),
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  });
+
 const ConsumerDashboard = () => {
   const { addToCart, cartItems } = useContext(CartContext);
   const navigate = useNavigate();
@@ -14,26 +44,57 @@ const ConsumerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // NEW: product mode + geolocation state
+  const [productMode, setProductMode] = useState("all"); // "all" | "nearby"
+  const [coords, setCoords] = useState(null); // { lat, lng }
+  const [geoError, setGeoError] = useState("");
+
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All Products");
   const [sortBy, setSortBy] = useState("Featured");
   const [viewMode, setViewMode] = useState("grid");
 
-  const loadProducts = async () => {
+  const loadProducts = async (mode = "all") => {
     try {
       setLoading(true);
       setError("");
-      const res = await api.get("/api/products");
-      setProducts(Array.isArray(res.data) ? res.data : []);
+
+      // reset geolocation errors when changing mode
+      if (mode === "all") setGeoError("");
+
+      if (mode === "nearby") {
+        setGeoError("");
+
+        const c = coords || (await getCoords());
+        setCoords(c);
+
+        const res = await api.get("/api/products", {
+          params: { lat: c.lat, lng: c.lng, maxDistance: 5000, limit: 50 },
+        });
+
+        setProducts(extractProducts(res.data));
+        return;
+      }
+
+      // mode === "all"
+      const res = await api.get("/api/products", { params: { limit: 50 } });
+      setProducts(extractProducts(res.data));
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load products");
+      // Geolocation-specific errors (code: 1 permission denied, 2 unavailable, 3 timeout)
+      if (mode === "nearby" && typeof err?.code === "number") {
+        if (err.code === 1) setGeoError("Location permission denied. Please allow location access.");
+        if (err.code === 2) setGeoError("Location unavailable. Try again.");
+        if (err.code === 3) setGeoError("Location request timed out. Try again.");
+      }
+
+      setError(err.response?.data?.message || err.message || "Failed to load products");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadProducts();
+    loadProducts("all");
   }, []);
 
   const categories = useMemo(
@@ -60,10 +121,12 @@ const ConsumerDashboard = () => {
 
   const filteredProducts = useMemo(() => {
     const q = normalize(query);
+
     let list = [...products].filter((p) => {
       const hay = [p?.name, p?.category, p?.farmer?.firstName, p?.farmer?.lastName]
         .join(" ")
         .toLowerCase();
+
       const matchesSearch = !q || hay.includes(q);
 
       let matchesChip = true;
@@ -80,9 +143,7 @@ const ConsumerDashboard = () => {
 
     if (sortBy === "Price Low to High") list.sort((a, b) => (a?.price || 0) - (b?.price || 0));
     if (sortBy === "Price High to Low") list.sort((a, b) => (b?.price || 0) - (a?.price || 0));
-    if (sortBy === "Newest") {
-      list.sort((a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0));
-    }
+    if (sortBy === "Newest") list.sort((a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0));
 
     return list;
   }, [products, query, activeFilter, sortBy]);
@@ -246,7 +307,7 @@ const ConsumerDashboard = () => {
           <p className="text-red-600 font-semibold">{error}</p>
           <button
             type="button"
-            onClick={loadProducts}
+            onClick={() => loadProducts(productMode)}
             className="mt-4 bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded-xl"
           >
             Retry
@@ -266,6 +327,41 @@ const ConsumerDashboard = () => {
               Discover our selection of fresh produce from local farms
             </p>
           </div>
+        </div>
+
+        {/* NEW: All/Nearby toggle */}
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setProductMode("all");
+              loadProducts("all");
+            }}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${
+              productMode === "all"
+                ? "bg-green-100 border-green-200 text-green-700"
+                : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            All
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setProductMode("nearby");
+              loadProducts("nearby");
+            }}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${
+              productMode === "nearby"
+                ? "bg-green-100 border-green-200 text-green-700"
+                : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            Nearby
+          </button>
+
+          {geoError && <span className="text-xs text-amber-700">{geoError}</span>}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center mt-6">

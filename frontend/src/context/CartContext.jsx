@@ -1,22 +1,39 @@
-import { createContext, useEffect, useMemo, useState } from "react";
+// src/context/CartContext.jsx
+import { createContext, useEffect, useMemo, useState, useContext } from "react";
+import AuthContext from "./AuthContext.jsx";
 
-// ✅ both named + default exports
-export const CartContext = createContext();
+export const CartContext = createContext(null);
 export default CartContext;
 
-export const CartProvider = ({ children }) => {
-  const [cartItems, setCartItems] = useState(() => {
-    try {
-      const raw = localStorage.getItem("cartItems");
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
+const readCart = (key) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
 
+const writeCart = (key, cartItems) => {
+  localStorage.setItem(key, JSON.stringify(cartItems));
+};
+
+export const CartProvider = ({ children }) => {
+  const { user } = useContext(AuthContext); // depends on your existing AuthProvider [file:47]
+
+  const cartKey = user?._id ? `cartItems:${user._id}` : "cartItems:guest";
+
+  const [cartItems, setCartItems] = useState(() => readCart(cartKey));
+
+  // When user changes (login/logout), switch to that user's cart
   useEffect(() => {
-    localStorage.setItem("cartItems", JSON.stringify(cartItems));
-  }, [cartItems]);
+    setCartItems(readCart(cartKey));
+  }, [cartKey]);
+
+  // Persist cart
+  useEffect(() => {
+    writeCart(cartKey, cartItems);
+  }, [cartKey, cartItems]);
 
   const addToCart = (item) => {
     if (!item?.id) return;
@@ -32,6 +49,7 @@ export const CartProvider = ({ children }) => {
             : x
         );
       }
+
       return [...prev, { ...item, quantity: addQty }];
     });
   };

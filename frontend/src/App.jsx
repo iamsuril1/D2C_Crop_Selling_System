@@ -1,7 +1,8 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useContext } from "react";
 
-import AuthContext from "./context/AuthContext";
+import { AuthContext } from "./context/AuthContext.jsx"; // ✅ Option B import
+
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
@@ -17,7 +18,7 @@ import ProductDetails from "./pages/ProductDetails";
 import ProductForm from "./components/ProductForm";
 import AdminDashboard from "./pages/AdminDashboard";
 
-// ✅ This is your CART-DESIGN page (per your message)
+// ✅ CART page
 import Orders from "./pages/Orders";
 
 function App() {
@@ -55,13 +56,19 @@ function App() {
           <Route path="/" element={roleRedirect()} />
 
           {/* Auth */}
-          <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
-          <Route path="/register" element={!user ? <Register /> : <Navigate to="/" replace />} />
+          <Route
+            path="/login"
+            element={!user ? <Login /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/register"
+            element={!user ? <Register /> : <Navigate to="/" replace />}
+          />
 
-          {/* Public product details */}
+          {/* Public */}
           <Route path="/product/:id" element={<ProductDetails />} />
 
-          {/* ✅ Cart route (opens Orders.jsx cart design) */}
+          {/* Consumer Cart */}
           <Route
             path="/cart"
             element={
