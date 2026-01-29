@@ -8,7 +8,9 @@ import authRoutes from "./routes/authRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
-import geoRoutes from "./routes/geoRoutes.js"; // NEW
+import geoRoutes from "./routes/geoRoutes.js"; 
+import notificationRoutes from "./routes/notificationRoutes.js";
+
 
 import { errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -32,7 +34,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/geo", geoRoutes); // NEW
+app.use("/api/geo", geoRoutes); 
+app.use("/api/notifications", notificationRoutes);
+
 
 app.use(errorHandler);
 

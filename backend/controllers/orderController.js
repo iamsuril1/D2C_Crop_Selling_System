@@ -1,5 +1,6 @@
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import { sendNotification } from "../utils/notificationHelpers.js"; // ✅ NEW
 
 const toNum = (v) => Number(v);
 
@@ -87,6 +88,7 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
   }
 };
 
+// ✅ FIXED: Complete createOrder with notifications
 export const createOrder = async (req, res) => {
   try {
     const { items } = req.body;
@@ -149,6 +151,26 @@ export const createOrder = async (req, res) => {
       totalAmount,
     });
 
+    // ✅ NOTIFICATIONS: Notify consumer + all farmers
+    await sendNotification(
+      req.user._id, // consumer
+      "order_placed",
+      `Order #${order._id.slice(-6)} placed!`,
+      "Your order is being processed by farmers",
+      { orderId: order._id }
+    );
+
+    // Notify each farmer
+    for (const shipment of shipments) {
+      await sendNotification(
+        shipment.farmer,
+        "order_placed",
+        `New order #${order._id.slice(-6)}`,
+        `${req.user.firstName || "Consumer"} ordered ${shipment.items.length} items`,
+        { orderId: order._id }
+      );
+    }
+
     res.status(201).json(order);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -180,6 +202,7 @@ export const getMyOrders = async (req, res) => {
   }
 };
 
+// ✅ FIXED: updateOrderStatus with notifications
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -197,8 +220,18 @@ export const updateOrderStatus = async (req, res) => {
     );
     if (!shipment) return res.status(403).json({ message: "Unauthorized" });
 
+    const oldStatus = order.status;
     order.status = status;
     await order.save();
+
+    // ✅ NOTIFICATION: Notify consumer of status change
+    await sendNotification(
+      order.consumer._id,
+      `order_${status}`,
+      `Order #${order._id.slice(-6)} ${status}`,
+      `Your order has been ${status}`,
+      { orderId: order._id, status }
+    );
 
     res.json(order);
   } catch (err) {
@@ -223,8 +256,19 @@ export const cancelOrderConsumer = async (req, res) => {
     order.status = "cancelled";
     order.cancelledBy = "consumer";
     order.cancelledAt = new Date();
-
     await order.save();
+
+    // ✅ NOTIFY FARMERS
+    for (const shipment of order.shipments) {
+      await sendNotification(
+        shipment.farmer,
+        "order_cancelled",
+        `Order #${order._id.slice(-6)} cancelled`,
+        "Consumer cancelled their order",
+        { orderId: order._id }
+      );
+    }
+
     res.json(order);
   } catch (err) {
     res.status(500).json({ message: "Failed to cancel order" });

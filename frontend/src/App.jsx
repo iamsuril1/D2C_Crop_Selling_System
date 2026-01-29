@@ -9,145 +9,166 @@ import Footer from "./components/Footer";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 
-import ConsumerDashboard from "./pages/ConsumerDashboard";
-import Orders from "./pages/Orders"; // ✅ Multi-user cart (fixed)
-
 import FarmerDashboard from "./pages/FarmerDashboard";
+import ConsumerDashboard from "./pages/ConsumerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
-import ProductForm from "./components/ProductForm";
 
 import ProductDetails from "./pages/ProductDetails";
+import ProductForm from "./components/ProductForm";
+
+import Orders from "./pages/Orders";
+import Notifications from "./pages/Notifications";
 
 function App() {
   const { user, loading } = useContext(AuthContext);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-lg text-gray-600 animate-pulse">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">
+        Loading...
       </div>
     );
   }
 
-  // ✅ EXPLICIT: Role-based home redirect
   const roleRedirect = () => {
     if (!user) return <Home />;
-    switch (user.role) {
-      case "farmer": return <Navigate to="/farmer" replace />;
-      case "consumer": return <Navigate to="/consumer" replace />;
-      case "admin": return <Navigate to="/admin" replace />;
-      default: return <Home />;
-    }
+    if (user.role === "farmer") return <Navigate to="/farmer" replace />;
+    if (user.role === "consumer") return <Navigate to="/consumer" replace />;
+    if (user.role === "admin") return <Navigate to="/admin" replace />;
+    return <Home />;
   };
 
-  // ✅ EXPLICIT: Protected route wrapper
   const ProtectedRoute = ({ roles, children }) => {
     if (!user) return <Navigate to="/login" replace />;
-    if (roles && !roles.includes(user.role)) {
-      return <Navigate to="/" replace />;
-    }
+    if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
     return children;
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <>
       <Navbar />
-      
-      <main className="flex-1">
+
+      <main style={{ minHeight: "80vh" }}>
         <Routes>
-          {/* Root/Home */}
+          {/* Root */}
           <Route path="/" element={roleRedirect()} />
 
           {/* Auth */}
-          <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
-          <Route path="/register" element={!user ? <Register /> : <Navigate to="/" replace />} />
+          <Route
+            path="/login"
+            element={!user ? <Login /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/register"
+            element={!user ? <Register /> : <Navigate to="/" replace />}
+          />
 
           {/* Public */}
           <Route path="/product/:id" element={<ProductDetails />} />
 
-          {/* ✅ CONSUMER */}
-          <Route path="/consumer" element={
-            <ProtectedRoute roles={["consumer"]}>
-              <ConsumerDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/cart" element={
-            <ProtectedRoute roles={["consumer"]}>
-              <Orders />
-            </ProtectedRoute>
-          } />
+          {/* Consumer */}
+          <Route
+            path="/consumer"
+            element={
+              <ProtectedRoute roles={["consumer"]}>
+                <ConsumerDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cart"
+            element={
+              <ProtectedRoute roles={["consumer"]}>
+                <Orders />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Farmer */}
-          <Route path="/farmer" element={
-            <ProtectedRoute roles={["farmer"]}>
-              <FarmerDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/add-product" element={
-            <ProtectedRoute roles={["farmer"]}>
-              <ProductForm />
-            </ProtectedRoute>
-          } />
+          <Route
+            path="/farmer"
+            element={
+              <ProtectedRoute roles={["farmer"]}>
+                <FarmerDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/add-product"
+            element={
+              <ProtectedRoute roles={["farmer"]}>
+                <ProductForm />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Admin */}
-          <Route path="/admin" element={
-            <ProtectedRoute roles={["admin"]}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Profile */}
-          <Route path="/profile" element={
-            <ProtectedRoute roles={["consumer", "farmer", "admin"]}>
-              <Profile />
-            </ProtectedRoute>
-          } />
-          <Route path="/profile/edit" element={
-            <ProtectedRoute roles={["consumer", "farmer", "admin"]}>
-              <EditProfile />
-            </ProtectedRoute>
-          } />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute roles={["consumer", "farmer", "admin"]}>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile/edit"
+            element={
+              <ProtectedRoute roles={["consumer", "farmer", "admin"]}>
+                <EditProfile />
+              </ProtectedRoute>
+            }
+          />
 
-          {/* Navbar static pages */}
-          <Route path="/about" element={
-            <div className="min-h-screen bg-gray-50 p-8 md:p-12">
-              <div className="max-w-4xl mx-auto">
-                <h1 className="text-4xl font-bold text-gray-900 mb-8">About Us</h1>
-                <p className="text-lg text-gray-600 leading-relaxed">
-                  Connecting farmers directly to consumers. Fresh produce, fair prices.
-                </p>
-              </div>
-            </div>
-          } />
-          <Route path="/contact" element={
-            <div className="min-h-screen bg-gray-50 p-8 md:p-12">
-              <div className="max-w-4xl mx-auto">
-                <h1 className="text-4xl font-bold text-gray-900 mb-8">Contact</h1>
-                <p className="text-lg text-gray-600 leading-relaxed">
-                  Get in touch with us for support or partnerships.
-                </p>
-              </div>
-            </div>
-          } />
+          {/* Notifications */}
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute roles={["consumer", "farmer", "admin"]}>
+                <Notifications />
+              </ProtectedRoute>
+            }
+          />
 
-          {/* ✅ EXPLICIT: 404 fallback */}
-          <Route path="*" element={
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
-              <div className="text-center max-w-md">
-                <h1 className="text-4xl font-bold text-gray-900 mb-4">Page Not Found</h1>
-                <p className="text-lg text-gray-600 mb-8">The page you're looking for doesn't exist.</p>
-                <Navigate to="/" replace />
+          {/* Optional static pages */}
+          <Route
+            path="/about"
+            element={
+              <div className="min-h-screen bg-gray-50 p-8">
+                <h1 className="text-3xl font-bold">About</h1>
               </div>
-            </div>
-          } />
+            }
+          />
+          <Route
+            path="/contact"
+            element={
+              <div className="min-h-screen bg-gray-50 p-8">
+                <h1 className="text-3xl font-bold">Contact</h1>
+              </div>
+            }
+          />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
       <Footer />
-    </div>
+    </>
   );
 }
 
