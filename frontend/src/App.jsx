@@ -23,6 +23,10 @@ import ProductForm from "./components/ProductForm";
 import Orders from "./pages/Orders";
 import Notifications from "./pages/Notifications";
 
+// NEW IMPORTS
+import FarmerPaymentSettings from "./pages/FarmerPaymentSettings";
+import PaymentSelection from "./pages/PaymentSelection";
+
 function App() {
   const { user, loading } = useContext(AuthContext);
 
@@ -87,6 +91,16 @@ function App() {
               </ProtectedRoute>
             }
           />
+          
+          {/* NEW: Payment Route */}
+          <Route
+            path="/payment"
+            element={
+              <ProtectedRoute roles={["consumer"]}>
+                <PaymentSelection />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Farmer */}
           <Route
@@ -102,6 +116,16 @@ function App() {
             element={
               <ProtectedRoute roles={["farmer"]}>
                 <ProductForm />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* NEW: Farmer Payment Settings */}
+          <Route
+            path="/farmer/payment-settings"
+            element={
+              <ProtectedRoute roles={["farmer"]}>
+                <FarmerPaymentSettings />
               </ProtectedRoute>
             }
           />

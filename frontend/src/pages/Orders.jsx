@@ -87,7 +87,8 @@ const Orders = () => {
       // ✅ Clear THIS user's cart only
       clearCart();
       
-      navigate("/orders-success", { 
+      // ✅ Redirect to payment page
+      navigate("/payment", { 
         state: { order: res.data } 
       });
     } catch (err) {
@@ -256,13 +257,14 @@ const Orders = () => {
                   ? "Placing Order..." 
                   : loadingEstimate 
                     ? "Calculating Delivery..." 
-                    : "Place Order"
+                    : "Proceed to Payment"
                 }
               </button>
 
               <div className="text-xs text-gray-500 text-center space-y-1">
-                <div>🛡️ Secure checkout</div>
-                <div>📱 Order tracking enabled</div>
+                <div>Secure checkout</div>
+                <div>Order tracking enabled</div>
+                <div>Multiple payment options</div>
               </div>
             </div>
           </div>

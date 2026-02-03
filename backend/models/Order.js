@@ -24,6 +24,31 @@ const shipmentSchema = new mongoose.Schema(
     items: [shipmentItemSchema],
     deliveryFee: { type: Number, required: true, default: 200 },
     subtotal: { type: Number, required: true, default: 0 },
+    
+    // Payment tracking per shipment
+    paymentMethod: {
+      type: String,
+      enum: ["esewa", "bank_qr", "bank_transfer", "cash_on_delivery", "pending"],
+      default: "pending"
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "paid", "failed", "refunded"],
+      default: "pending"
+    },
+    paymentProof: String, // path to uploaded payment screenshot
+    paymentDate: Date,
+    transactionId: String, // for eSewa or bank transactions
+    
+    // Farmer payment details (snapshot at order time)
+    farmerPaymentInfo: {
+      esewaId: String,
+      bankName: String,
+      accountNumber: String,
+      accountName: String,
+      bankBranch: String,
+      qrCodeImage: String
+    }
   },
   { _id: false }
 );

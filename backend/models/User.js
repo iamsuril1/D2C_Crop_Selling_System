@@ -8,6 +8,30 @@ const pointSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const paymentMethodSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ["esewa", "bank_qr", "bank_transfer", "cash_on_delivery"],
+      required: true
+    },
+    enabled: { type: Boolean, default: false },
+    
+    // For eSewa
+    esewaId: String,
+    
+    // For Bank QR
+    bankName: String,
+    qrCodeImage: String, // path to uploaded QR image
+    
+    // For Bank Transfer
+    accountNumber: String,
+    accountName: String,
+    bankBranch: String,
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     firstName: { type: String, required: true, trim: true },
@@ -27,15 +51,28 @@ const userSchema = new mongoose.Schema(
     },
     profileImage: { type: String, default: "" },
 
-    // NEW: used for farmer location (and can be used for consumer too)
+    // Location (for farmer and consumer)
     location: { type: pointSchema, default: null },
     addressText: { type: String, default: "" },
+    
+    // Payment information (farmer only)
+    paymentMethods: {
+      type: [paymentMethodSchema],
+      default: []
+    },
+    
+    // Default payment preference
+    preferredPaymentMethod: {
+      type: String,
+      enum: ["esewa", "bank_qr", "bank_transfer", "cash_on_delivery"],
+      default: "cash_on_delivery"
+    }
   },
   { timestamps: true }
 );
 
-// Required for $near / proximity queries [web:40]
-userSchema.index({ location: "2dsphere" }); // [web:34]
+// Required for $near / proximity queries
+userSchema.index({ location: "2dsphere" });
 
 userSchema.set("toJSON", {
   virtuals: true,

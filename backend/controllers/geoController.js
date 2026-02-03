@@ -6,7 +6,7 @@ const notExpiredFilter = () => ({
   $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
 });
 
-// GET /api/geo/nearby-farmers?maxDistance=5000
+
 export const getNearbyFarmersForMe = async (req, res) => {
   try {
     const { maxDistance = 5000, limit = 50 } = req.query;

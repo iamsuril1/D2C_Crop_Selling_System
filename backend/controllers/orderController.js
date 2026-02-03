@@ -1,6 +1,7 @@
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
-import { sendNotification } from "../utils/notificationHelpers.js"; // ✅ NEW
+import User from "../models/User.js";
+import { sendNotification } from "../utils/notificationHelpers.js";
 
 const toNum = (v) => Number(v);
 
@@ -88,7 +89,7 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
   }
 };
 
-// ✅ FIXED: Complete createOrder with notifications
+// UPDATED: Complete createOrder with payment info snapshot
 export const createOrder = async (req, res) => {
   try {
     const { items } = req.body;
@@ -127,6 +128,20 @@ export const createOrder = async (req, res) => {
       const sub = arr.reduce((s, it) => s + it.price * it.quantity, 0);
       itemsSubtotal += sub;
 
+      // Fetch farmer payment info
+      const farmer = await User.findById(farmerId).select(
+        "paymentMethods preferredPaymentMethod firstName lastName"
+      );
+      
+      const farmerPaymentInfo = {
+        esewaId: farmer.paymentMethods?.find(p => p.type === "esewa" && p.enabled)?.esewaId || null,
+        bankName: farmer.paymentMethods?.find(p => (p.type === "bank_qr" || p.type === "bank_transfer") && p.enabled)?.bankName || null,
+        accountNumber: farmer.paymentMethods?.find(p => p.type === "bank_transfer" && p.enabled)?.accountNumber || null,
+        accountName: farmer.paymentMethods?.find(p => p.type === "bank_transfer" && p.enabled)?.accountName || null,
+        bankBranch: farmer.paymentMethods?.find(p => p.type === "bank_transfer" && p.enabled)?.bankBranch || null,
+        qrCodeImage: farmer.paymentMethods?.find(p => p.type === "bank_qr" && p.enabled)?.qrCodeImage || null,
+      };
+
       shipments.push({
         farmer: farmerId,
         items: arr.map((x) => ({
@@ -137,6 +152,9 @@ export const createOrder = async (req, res) => {
         })),
         deliveryFee: DELIVERY_FEE_PER_SHIPMENT,
         subtotal: sub,
+        paymentMethod: "pending",
+        paymentStatus: "pending",
+        farmerPaymentInfo
       });
     }
 
@@ -151,21 +169,20 @@ export const createOrder = async (req, res) => {
       totalAmount,
     });
 
-    // ✅ NOTIFICATIONS: Notify consumer + all farmers
+    // Notifications
     await sendNotification(
-      req.user._id, // consumer
+      req.user._id,
       "order_placed",
-      `Order #${order._id.slice(-6)} placed!`,
+      `Order #${order._id.toString().slice(-6)} placed!`,
       "Your order is being processed by farmers",
       { orderId: order._id }
     );
 
-    // Notify each farmer
     for (const shipment of shipments) {
       await sendNotification(
         shipment.farmer,
         "order_placed",
-        `New order #${order._id.slice(-6)}`,
+        `New order #${order._id.toString().slice(-6)}`,
         `${req.user.firstName || "Consumer"} ordered ${shipment.items.length} items`,
         { orderId: order._id }
       );
@@ -173,6 +190,7 @@ export const createOrder = async (req, res) => {
 
     res.status(201).json(order);
   } catch (err) {
+    console.error("Create order error:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -202,7 +220,6 @@ export const getMyOrders = async (req, res) => {
   }
 };
 
-// ✅ FIXED: updateOrderStatus with notifications
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -220,15 +237,14 @@ export const updateOrderStatus = async (req, res) => {
     );
     if (!shipment) return res.status(403).json({ message: "Unauthorized" });
 
-    const oldStatus = order.status;
     order.status = status;
     await order.save();
 
-    // ✅ NOTIFICATION: Notify consumer of status change
+    // Notification
     await sendNotification(
-      order.consumer._id,
+      order.consumer,
       `order_${status}`,
-      `Order #${order._id.slice(-6)} ${status}`,
+      `Order #${order._id.toString().slice(-6)} ${status}`,
       `Your order has been ${status}`,
       { orderId: order._id, status }
     );
@@ -258,12 +274,12 @@ export const cancelOrderConsumer = async (req, res) => {
     order.cancelledAt = new Date();
     await order.save();
 
-    // ✅ NOTIFY FARMERS
+    // Notify farmers
     for (const shipment of order.shipments) {
       await sendNotification(
         shipment.farmer,
         "order_cancelled",
-        `Order #${order._id.slice(-6)} cancelled`,
+        `Order #${order._id.toString().slice(-6)} cancelled`,
         "Consumer cancelled their order",
         { orderId: order._id }
       );

@@ -6,7 +6,8 @@ import {
   FaBell, 
   FaCheckCircle, 
   FaExclamationCircle,
-  FaSpinner 
+  FaSpinner,
+  FaTruck  // ← ADDED THIS
 } from "react-icons/fa";
 
 const Notifications = () => {

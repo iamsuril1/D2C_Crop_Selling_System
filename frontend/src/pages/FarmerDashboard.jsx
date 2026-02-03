@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
-import APIBASEURL from "../utils/config";
+import { APIBASEURL } from "../utils/config";
 
 const FarmerDashboard = () => {
   const navigate = useNavigate();
@@ -113,12 +113,21 @@ const FarmerDashboard = () => {
           <p className="text-sm text-gray-500">Welcome back, Farmer</p>
         </div>
 
-        <button
-          onClick={() => navigate("/add-product")}
-          className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
-        >
-          Add Product
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => navigate("/farmer/payment-settings")}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+          >
+            Payment Settings
+          </button>
+          
+          <button
+            onClick={() => navigate("/add-product")}
+            className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+          >
+            Add Product
+          </button>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -300,22 +309,52 @@ const FarmerDashboard = () => {
               <p className="text-xs text-gray-500">No active orders at the moment.</p>
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {activeOrders.map((o) => (
-                  <div
-                    key={o.id || o._id}
-                    className="border border-gray-100 rounded-lg px-3 py-2 text-xs flex justify-between items-center"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-800">
-                        Order {(o.id || o._id)?.toString().slice(-6)}
-                      </p>
-                      <p className="text-gray-500 capitalize">Status: {o.status}</p>
+                {activeOrders.map((o) => {
+                  // Find my shipment in this order
+                  const myShipment = o.shipments?.find(
+                    s => s.farmer?._id === o.farmer?._id || s.farmer?.toString() === o.farmer?.toString()
+                  );
+                  
+                  return (
+                    <div
+                      key={o.id || o._id}
+                      className="border border-gray-100 rounded-lg px-3 py-2 text-xs"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="font-medium text-gray-800">
+                            Order #{(o.id || o._id)?.toString().slice(-6)}
+                          </p>
+                          <p className="text-gray-500 capitalize">Status: {o.status}</p>
+                        </div>
+                        <span className="text-[11px] px-2 py-1 rounded-full bg-yellow-50 text-yellow-700">
+                          In progress
+                        </span>
+                      </div>
+                      
+                      {myShipment && (
+                        <div className="mt-2 pt-2 border-t border-gray-100">
+                          <p className="text-[11px] text-gray-600">
+                            Payment: <span className="font-semibold capitalize">
+                              {myShipment.paymentMethod || "pending"}
+                            </span>
+                          </p>
+                          <p className="text-[11px] text-gray-600">
+                            Status: <span className={`font-semibold capitalize ${
+                              myShipment.paymentStatus === "paid" 
+                                ? "text-green-600" 
+                                : myShipment.paymentStatus === "failed"
+                                ? "text-red-600"
+                                : "text-yellow-600"
+                            }`}>
+                              {myShipment.paymentStatus || "pending"}
+                            </span>
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <span className="text-[11px] px-2 py-1 rounded-full bg-yellow-50 text-yellow-700">
-                      In progress
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -339,7 +378,7 @@ const FarmerDashboard = () => {
                   >
                     <div>
                       <p className="font-medium text-gray-800">
-                        Order {(o.id || o._id)?.toString().slice(-6)}
+                        Order #{(o.id || o._id)?.toString().slice(-6)}
                       </p>
                       <p className="text-gray-500">Status: Delivered</p>
                     </div>
