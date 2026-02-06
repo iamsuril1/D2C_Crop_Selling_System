@@ -12,6 +12,8 @@ import {
   FaBars,
   FaTimes,
   FaBell,
+  FaClipboardList,
+  FaBox,
 } from "react-icons/fa";
 
 const Navbar = () => {
@@ -100,31 +102,63 @@ const Navbar = () => {
 
     if (user.role === "consumer") {
       return (
-        <button
-          type="button"
-          onClick={() => {
-            closeAll();
-            navigate("/consumer");
-          }}
-          className="hover:text-[#1E9C17] transition"
-        >
-          View Products
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              closeAll();
+              navigate("/consumer");
+            }}
+            className="hover:text-[#1E9C17] transition"
+          >
+            View Products
+          </button>
+          
+          {/* NEW: My Orders for Consumer */}
+          <button
+            type="button"
+            onClick={() => {
+              closeAll();
+              navigate("/my-orders");
+            }}
+            className="hover:text-[#1E9C17] transition flex items-center gap-2"
+            title="Track your orders"
+          >
+            <FaClipboardList className="text-lg" />
+            <span>My Orders</span>
+          </button>
+        </>
       );
     }
 
     if (user.role === "farmer") {
       return (
-        <button
-          type="button"
-          onClick={() => {
-            closeAll();
-            navigate("/add-product");
-          }}
-          className="hover:text-[#1E9C17] transition"
-        >
-          Add Product
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              closeAll();
+              navigate("/add-product");
+            }}
+            className="hover:text-[#1E9C17] transition"
+          >
+            Add Product
+          </button>
+          
+          {/* NEW: Manage Orders for Farmer */}
+          <button
+            type="button"
+            onClick={() => {
+              closeAll();
+              navigate("/farmer/orders");
+            }}
+            className="hover:text-[#1E9C17] transition flex items-center gap-2"
+            title="Manage your orders"
+          >
+            <FaBox className="text-lg" />
+            <span>Manage Orders</span>
+          </button>
+        </>
       );
     }
 
@@ -245,8 +279,13 @@ const Navbar = () => {
                         onClick={() => {
                           if (!n.isRead) markAsRead?.(n._id);
                           closeAll();
-                          // Optional later:
-                          // if (n?.data?.orderId) navigate(`/order/${n.data.orderId}`);
+                          if (n?.data?.orderId) {
+                            if (user?.role === "consumer") {
+                              navigate("/my-orders");
+                            } else if (user?.role === "farmer") {
+                              navigate("/farmer/orders");
+                            }
+                          }
                         }}
                         className={`w-full text-left px-4 py-3 border-b hover:bg-gray-50 ${
                           !n.isRead ? "bg-blue-50" : "bg-white"
@@ -282,7 +321,7 @@ const Navbar = () => {
 
         {/* Cart (consumer only) */}
         {user?.role === "consumer" && (
-          <Link to="/cart" className="relative" onClick={closeAll}>
+          <Link to="/cart" className="relative" onClick={closeAll} title="Shopping Cart">
             <FaShoppingCart className="text-2xl text-gray-700 hover:text-[#1E9C17]" />
             {cartCount > 0 && (
               <span className="absolute -top-2 -right-2 bg-[#FDB933] text-white text-xs px-2 py-0.5 rounded-full">
@@ -321,6 +360,28 @@ const Navbar = () => {
                 >
                   Dashboard
                 </button>
+
+                {/* Consumer: My Orders */}
+                {user.role === "consumer" && (
+                  <Link
+                    to="/my-orders"
+                    className="block px-4 py-2 hover:bg-gray-100"
+                    onClick={closeAll}
+                  >
+                    My Orders
+                  </Link>
+                )}
+
+                {/* Farmer: Manage Orders */}
+                {user.role === "farmer" && (
+                  <Link
+                    to="/farmer/orders"
+                    className="block px-4 py-2 hover:bg-gray-100"
+                    onClick={closeAll}
+                  >
+                    Manage Orders
+                  </Link>
+                )}
 
                 <Link
                   to="/notifications"
@@ -376,7 +437,7 @@ const Navbar = () => {
       {/* Mobile Menu */}
       {menuOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-40 z-50 md:hidden">
-          <div className="bg-white w-64 h-full p-6">
+          <div className="bg-white w-64 h-full p-6 overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <img src="/logo.png" className="h-10" alt="Logo" />
               <FaTimes
@@ -386,7 +447,57 @@ const Navbar = () => {
             </div>
 
             <div className="flex flex-col space-y-4">
-              {roleMenuItem()}
+              {/* Consumer mobile menu */}
+              {user?.role === "consumer" && (
+                <>
+                  <Link 
+                    to="/consumer" 
+                    onClick={closeAll}
+                    className="flex items-center gap-2"
+                  >
+                    View Products
+                  </Link>
+                  <Link 
+                    to="/my-orders" 
+                    onClick={closeAll}
+                    className="flex items-center gap-2 font-medium"
+                  >
+                    <FaClipboardList className="text-lg" />
+                    My Orders
+                  </Link>
+                  <Link 
+                    to="/cart" 
+                    onClick={closeAll}
+                    className="flex items-center gap-2"
+                  >
+                    <FaShoppingCart className="text-lg" />
+                    Cart {cartCount > 0 && `(${cartCount})`}
+                  </Link>
+                </>
+              )}
+
+              {/* Farmer mobile menu */}
+              {user?.role === "farmer" && (
+                <>
+                  <Link 
+                    to="/add-product" 
+                    onClick={closeAll}
+                    className="flex items-center gap-2"
+                  >
+                    Add Product
+                  </Link>
+                  <Link 
+                    to="/farmer/orders" 
+                    onClick={closeAll}
+                    className="flex items-center gap-2 font-medium"
+                  >
+                    <FaBox className="text-lg" />
+                    Manage Orders
+                  </Link>
+                </>
+              )}
+
+              {/* Common links */}
               <Link to="/about" onClick={closeAll}>
                 About
               </Link>
@@ -411,14 +522,14 @@ const Navbar = () => {
                   <button type="button" onClick={goToDashboard}>
                     Dashboard
                   </button>
-                  <Link to="/notifications" onClick={closeAll}>
-                    Notifications
+                  <Link to="/notifications" onClick={closeAll} className="flex items-center justify-between">
+                    <span>Notifications</span>
+                    {hasUnread && (
+                      <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                        {unreadCount}
+                      </span>
+                    )}
                   </Link>
-                  {user.role === "consumer" && (
-                    <Link to="/cart" onClick={closeAll}>
-                      Cart
-                    </Link>
-                  )}
                   <button type="button" onClick={handleLogout} className="text-red-600">
                     Logout
                   </button>

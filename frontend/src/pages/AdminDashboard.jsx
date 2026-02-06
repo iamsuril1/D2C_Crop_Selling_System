@@ -1,338 +1,321 @@
-import { useEffect, useState, useCallback } from "react";
-import api from "../api/axios";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import { APIBASEURL } from "../utils/config";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../api/axios';
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [users, setUsers] = useState([]);
-
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("active");
+  const [error, setError] = useState('');
 
-  const orderTabs = ["active", "pending", "received", "cancelled"];
+  // Chart Data States - SIMPLIFIED
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    farmers: 0,
+    consumers: 0,
+    activeProducts: 0,
+    totalProducts: 0,
+    totalOrders: 0,
+    totalRevenue: 0,
+    orderStatuses: {}
+  });
 
-  // ✅ robust product id getter
-  const getPid = (p) => p?.id || p?._id;
-
-  const loadAdminData = useCallback(async () => {
+  const loadDashboard = async () => {
     try {
       setLoading(true);
-      const [pRes, oRes, uRes] = await Promise.all([
-        api.get("/api/admin/products"),
-        api.get("/api/admin/orders"),
-        api.get("/api/admin/users"),
+      setError('');
+
+      const [usersRes, productsRes, ordersRes] = await Promise.all([
+        api.get('/api/admin/users').catch(() => ({ data: [] })),
+        api.get('/api/admin/products').catch(() => ({ data: [] })),
+        api.get('/api/admin/orders').catch(() => ({ data: [] }))
       ]);
 
-      setProducts(Array.isArray(pRes.data) ? pRes.data : []);
-      setOrders(Array.isArray(oRes.data) ? oRes.data : []);
-      setUsers(Array.isArray(uRes.data) ? uRes.data : []);
+      const usersData = usersRes.data || [];
+      const productsData = productsRes.data || [];
+      const ordersData = ordersRes.data || [];
+
+      setUsers(usersData);
+      setProducts(productsData);
+      setOrders(ordersData);
+
+      // Calculate stats
+      const farmers = usersData.filter(u => u.role === 'farmer').length;
+      const consumers = usersData.filter(u => u.role === 'consumer').length;
+      const activeProducts = productsData.filter(p => p.isActive).length;
+      const totalRevenue = ordersData.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+
+      // Order status breakdown
+      const orderStatuses = ordersData.reduce((acc, order) => {
+        const status = order.status || 'pending';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {});
+
+      setStats({
+        totalUsers: usersData.length,
+        farmers,
+        consumers,
+        activeProducts,
+        totalProducts: productsData.length,
+        totalOrders: ordersData.length,
+        totalRevenue,
+        orderStatuses
+      });
+
     } catch (err) {
-      console.error(err);
-      setError("Failed to load admin dashboard");
+      console.error('Dashboard load error:', err);
+      setError('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    loadAdminData();
-  }, [loadAdminData]);
+    loadDashboard();
+  }, []);
 
-  const deleteProduct = async (id) => {
-    const pid = id;
-    if (!pid) {
-      alert("Product id missing");
-      return;
-    }
-
-    if (!window.confirm("Delete this product permanently?")) return;
-
-    try {
-      await api.delete(`/api/admin/products/${pid}`);
-      setProducts((prev) => prev.filter((p) => getPid(p) !== pid));
-      loadAdminData();
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete product");
-    }
-  };
-
-  // CHART DATA
-  const consumerCount = users.filter((u) => u.role === "consumer").length;
-  const farmerCount = users.filter((u) => u.role === "farmer").length;
-  const userPieData = [
-    { name: "Consumers", value: consumerCount },
-    { name: "Farmers", value: farmerCount },
-  ];
-
-  const deliveredOrders = orders.filter((o) => o.status === "delivered").length;
-  const cancelledOrders = orders.filter((o) => o.status === "cancelled").length;
-  const orderBarData = [
-    { status: "Delivered", count: deliveredOrders },
-    { status: "Cancelled", count: cancelledOrders },
-  ];
-
-  const COLORS = ["#16a34a", "#2563eb"];
-
-  // FILTER ORDERS
-  const filteredOrders = orders.filter((o) => {
-    if (activeTab === "pending") return o.status === "pending";
-    if (activeTab === "active") return ["confirmed", "shipped"].includes(o.status);
-    if (activeTab === "received") return o.status === "delivered";
-    if (activeTab === "cancelled") return o.status === "cancelled";
-    return true;
-  });
-
-  const statusBadge = {
-    pending: "bg-yellow-100 text-yellow-700",
-    confirmed: "bg-green-100 text-green-700",
-    shipped: "bg-green-100 text-green-700",
-    delivered: "bg-emerald-100 text-emerald-700",
-    cancelled: "bg-red-100 text-red-700",
-  };
-
-  if (loading)
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-600">
-        Loading dashboard...
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50 flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <h2 className="text-2xl font-bold text-gray-900">Loading Dashboard...</h2>
+        </div>
       </div>
     );
-
-  if (error)
-    return (
-      <div className="min-h-screen flex items-center justify-center text-red-600">
-        {error}
-      </div>
-    );
-
-  // SEARCH FILTER
-  const filteredProducts = products.filter((p) =>
-    p.name?.toLowerCase().includes(search.toLowerCase()) ||
-    p.category?.toLowerCase().includes(search.toLowerCase())
-  );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8 space-y-10">
-      {/* ANALYTICS */}
-      <section className="bg-white rounded-xl shadow-sm p-6">
-        <h2 className="text-xl font-semibold mb-6">Analytics</h2>
-        <div className="grid md:grid-cols-2 gap-8">
-          <div className="h-80">
-            <h3 className="text-sm font-medium text-gray-600 mb-4">User Distribution</h3>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={userPieData}
-                  dataKey="value"
-                  nameKey="name"
-                  outerRadius={100}
-                  label
-                >
-                  {userPieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="h-80">
-            <h3 className="text-sm font-medium text-gray-600 mb-4">
-              Delivered vs Cancelled Orders
-            </h3>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={orderBarData}>
-                <XAxis dataKey="status" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="#16a34a" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </section>
-
-      {/* USERS */}
-      <section className="bg-white rounded-xl shadow-sm p-6">
-        <h2 className="text-xl font-semibold mb-4">Users</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b text-gray-500">
-              <tr>
-                <th className="text-left py-2">Name</th>
-                <th className="text-left">Email</th>
-                <th className="text-left">Role</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id || u._id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 font-medium">
-                    {u.firstName} {u.lastName}
-                  </td>
-                  <td>{u.email}</td>
-                  <td className="capitalize">{u.role}</td>
-                </tr>
-              ))}
-              {users.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="py-6 text-center text-gray-400">
-                    No users found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* PRODUCTS WITH SEARCH */}
-      <section className="bg-white rounded-xl shadow-sm p-6">
-        <h2 className="text-xl font-semibold mb-6">Products</h2>
-
-        {/* SEARCH INPUT */}
-        <div className="mb-6">
-          <input
-            type="text"
-            placeholder="Search products by name or category..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-1E9C17 focus:border-transparent"
-          />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50 p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8 text-center lg:text-left">
+          <h1 className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 to-green-900 bg-clip-text text-transparent mb-4">
+            Admin Dashboard
+          </h1>
+          <p className="text-xl text-gray-600">Real-time analytics for MeroBari marketplace</p>
         </div>
 
-        <h3 className="text-lg font-medium mb-4">
-          Showing {filteredProducts.length} of {products.length} products
-        </h3>
-
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {filteredProducts.map((p) => {
-            const pid = getPid(p);
-            const imgSrc = p.image ? `${APIBASEURL}${p.image}` : "";
-
-            return (
-              <div
-                key={pid || `${p.name}-${Math.random()}`}
-                className="border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
-              >
-                {p.image ? (
-                  <img
-                    src={imgSrc}
-                    alt={p.name}
-                    className="h-44 w-full object-cover"
-                    onError={(e) => {
-                      e.target.src = "placeholder.jpg";
-                    }}
-                  />
-                ) : null}
-
-                <div className="p-4 space-y-2">
-                  <h3 className="font-semibold truncate">{p.name}</h3>
-                  <p className="text-xs text-gray-500">{p.category}</p>
-
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-green-700">
-                      Rs. {p.price} / {p.unit}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {p.farmer?.firstName || "N/A"}
-                    </span>
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
-                    <button className="flex-1 bg-green-600 text-white py-1 rounded text-xs hover:bg-green-700">
-                      View
-                    </button>
-
-                    <button
-                      onClick={() => deleteProduct(pid)}
-                      className="flex-1 bg-red-500 text-white py-1 rounded text-xs hover:bg-red-600"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {filteredProducts.length === 0 && (
-            <div className="col-span-full text-center py-12 text-gray-400">
-              {search ? "No products match your search" : "No products found"}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* ORDERS */}
-      <section className="bg-white rounded-xl shadow-sm p-6">
-        <h2 className="text-xl font-semibold mb-4">Orders</h2>
-
-        <div className="flex gap-3 mb-6 flex-wrap">
-          {orderTabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                activeTab === tab
-                  ? "bg-green-600 text-white shadow-md"
-                  : "bg-gray-200 hover:bg-gray-300"
-              }`}
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-8 rounded">
+            <p className="text-red-700 font-medium">{error}</p>
+            <button 
+              onClick={loadDashboard}
+              className="text-red-600 hover:underline mt-1"
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              Retry
             </button>
-          ))}
-        </div>
+          </div>
+        )}
 
-        <div className="space-y-3 max-h-96 overflow-y-auto">
-          {filteredOrders.map((o) => {
-            const oid = o.id || o._id;
-
-            return (
-              <div
-                key={oid}
-                className="border rounded-lg p-4 flex flex-col md:flex-row md:justify-between md:items-center hover:shadow-sm transition-shadow"
-              >
-                <div className="mb-2 md:mb-0">
-                  <p className="font-medium text-sm">
-                    Order {oid?.toString().slice(-6)}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {o.items.map((i) => i.name).join(", ")}
-                  </p>
-                  <p className="text-xs text-gray-400">{o.consumer?.email}</p>
-                </div>
-
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge[o.status]}`}
-                >
-                  {o.status.charAt(0).toUpperCase() + o.status.slice(1)}
-                </span>
+        {/* 🔥 STATS CARDS - ALWAYS VISIBLE */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-all">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Users</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.totalUsers}</p>
               </div>
-            );
-          })}
-
-          {filteredOrders.length === 0 && (
-            <div className="text-center py-12 text-gray-400">
-              No orders in this status
+              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                </svg>
+              </div>
             </div>
-          )}
+            <p className="text-sm text-gray-500 mt-2">{stats.farmers} Farmers | {stats.consumers} Consumers</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-all">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Active Products</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.activeProducts}</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                </svg>
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 mt-2">Total: {stats.totalProducts}</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-all">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Orders</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.totalOrders}</p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-all">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Revenue</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">Rs. {stats.totalRevenue.toLocaleString()}</p>
+              </div>
+              <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd"/>
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
-      </section>
+
+        {/* 🔥 VISUAL ORDER STATUS CHART - BAR STYLE */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div className="bg-white p-8 rounded-xl shadow-sm border">
+            <h3 className="text-xl font-semibold text-gray-900 mb-6">Order Status Breakdown</h3>
+            <div className="space-y-4">
+              {Object.entries(stats.orderStatuses).map(([status, count]) => (
+                <div key={status} className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <div className="flex justify-between mb-1">
+                      <span className="font-medium text-gray-900 capitalize">{status}</span>
+                      <span className="font-semibold text-gray-900">{count}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div 
+                        className="h-3 rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.max((count / stats.totalOrders) * 100, 5)}%`,
+                          backgroundColor: status === 'delivered' ? '#10B981' : 
+                                         status === 'cancelled' ? '#EF4444' : 
+                                         status === 'confirmed' ? '#3B82F6' : '#F59E0B'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {Object.keys(stats.orderStatuses).length === 0 && (
+                <p className="text-gray-500 text-center py-8">No orders yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* 🔥 USER ROLES VISUALIZATION */}
+          <div className="bg-white p-8 rounded-xl shadow-sm border">
+            <h3 className="text-xl font-semibold text-gray-900 mb-6">User Distribution</h3>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">Farmers</p>
+                    <p className="text-2xl font-bold text-green-600">{stats.farmers}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500">{((stats.farmers/stats.totalUsers)*100 || 0).toFixed(1)}%</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">Consumers</p>
+                    <p className="text-2xl font-bold text-blue-600">{stats.consumers}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500">{((stats.consumers/stats.totalUsers)*100 || 0).toFixed(1)}%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 🔥 RECENT ORDERS TABLE */}
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 className="text-xl font-semibold text-gray-900">Recent Orders ({stats.totalOrders})</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {orders.slice(0, 10).map((order) => (
+                  <tr key={order._id || order.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        #{order._id?.toString().slice(-6) || order.id?.slice(-6) || 'N/A'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center">
+                          <span className="text-white font-semibold text-xs">
+                            {(order.consumer?.firstName || '')[0] || 'N/A'}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm text-gray-900">
+                            {order.consumer?.firstName || 'N/A'} {order.consumer?.lastName || ''}
+                          </div>
+                          <div className="text-sm text-gray-500">{order.consumer?.email || 'N/A'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-gray-900">
+                        Rs. {(order.totalAmount || 0).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                        order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                        order.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                        order.status === 'shipped' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {order.status?.toUpperCase() || 'PENDING'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+                {orders.length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                      No recent orders
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

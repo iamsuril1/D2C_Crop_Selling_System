@@ -14,7 +14,6 @@ const PaymentSelection = () => {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // ✅ FIX: Redirect if no order - do this BEFORE any rendering
   useEffect(() => {
     if (!order) {
       console.error("No order data found, redirecting to cart");
@@ -22,7 +21,6 @@ const PaymentSelection = () => {
     }
   }, [order, navigate]);
 
-  // ✅ FIX: Early return to prevent rendering with invalid order
   if (!order) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -33,8 +31,7 @@ const PaymentSelection = () => {
       </div>
     );
   }
-
-  // ✅ FIX: Add safety checks for order properties
+  
   const orderId = order?._id || order?.id;
   const orderShipments = Array.isArray(order?.shipments) ? order.shipments : [];
 

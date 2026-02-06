@@ -23,7 +23,11 @@ import ProductForm from "./components/ProductForm";
 import Orders from "./pages/Orders";
 import Notifications from "./pages/Notifications";
 
-// NEW IMPORTS
+// Order Management
+import FarmerOrders from "./pages/FarmerOrders";
+import ConsumerOrderTracking from "./pages/ConsumerOrdertracking";
+
+// Payment
 import FarmerPaymentSettings from "./pages/FarmerPaymentSettings";
 import PaymentSelection from "./pages/PaymentSelection";
 
@@ -92,7 +96,17 @@ function App() {
             }
           />
           
-          {/* NEW: Payment Route */}
+          {/* Consumer Order Tracking */}
+          <Route
+            path="/my-orders"
+            element={
+              <ProtectedRoute roles={["consumer"]}>
+                <ConsumerOrderTracking />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Payment Route */}
           <Route
             path="/payment"
             element={
@@ -120,7 +134,17 @@ function App() {
             }
           />
           
-          {/* NEW: Farmer Payment Settings */}
+          {/* Farmer Order Management */}
+          <Route
+            path="/farmer/orders"
+            element={
+              <ProtectedRoute roles={["farmer"]}>
+                <FarmerOrders />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Farmer Payment Settings */}
           <Route
             path="/farmer/payment-settings"
             element={
