@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { APIBASEURL } from "../utils/config";
+import AlertModal from "../components/AlertModal";
+import ConfirmModal from "../components/ConfirmModal";
 
 const FarmerDashboard = () => {
   const navigate = useNavigate();
@@ -20,6 +22,10 @@ const FarmerDashboard = () => {
     unit: "kg",
     description: "",
   });
+
+  // Alert and Confirm modals
+  const [alert, setAlert] = useState({ isOpen: false, type: '', title: '', message: '' });
+  const [confirm, setConfirm] = useState({ isOpen: false, action: null, title: '', message: '' });
 
   // ✅ robust product id getter: works whether backend sends `id` or `_id`
   const getPid = (p) => p?.id || p?._id;
@@ -51,7 +57,15 @@ const FarmerDashboard = () => {
 
   const startEdit = (product) => {
     const pid = getPid(product);
-    if (!pid) return alert("Product id missing");
+    if (!pid) {
+      setAlert({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Product id missing'
+      });
+      return;
+    }
 
     setEditingProduct(pid);
     setEditForm({
@@ -70,7 +84,15 @@ const FarmerDashboard = () => {
 
   const submitEdit = async (id) => {
     const pid = id;
-    if (!pid) return alert("Product id missing");
+    if (!pid) {
+      setAlert({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Product id missing'
+      });
+      return;
+    }
 
     try {
       await api.put(`/api/products/${pid}`, editForm);
@@ -78,23 +100,53 @@ const FarmerDashboard = () => {
       await loadDashboard();
     } catch (err) {
       console.error(err.response?.data || err);
-      alert(err.response?.data?.message || "Failed to update product");
+      setAlert({
+        isOpen: true,
+        type: 'error',
+        title: 'Update Failed',
+        message: err.response?.data?.message || "Failed to update product"
+      });
     }
   };
 
   const deleteProduct = async (id) => {
     const pid = id;
-    if (!pid) return alert("Product id missing");
-
-    if (!window.confirm("Delete this product?")) return;
-
-    try {
-      await api.delete(`/api/products/${pid}`);
-      await loadDashboard();
-    } catch (err) {
-      console.error(err.response?.data || err);
-      alert(err.response?.data?.message || "Failed to delete product");
+    if (!pid) {
+      setAlert({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Product id missing'
+      });
+      return;
     }
+
+    setConfirm({
+      isOpen: true,
+      type: 'danger',
+      title: 'Delete Product',
+      message: 'Are you sure you want to delete this product? This action cannot be undone.',
+      action: async () => {
+        try {
+          await api.delete(`/api/products/${pid}`);
+          await loadDashboard();
+          setAlert({
+            isOpen: true,
+            type: 'success',
+            title: 'Success',
+            message: 'Product deleted successfully'
+          });
+        } catch (err) {
+          console.error(err.response?.data || err);
+          setAlert({
+            isOpen: true,
+            type: 'error',
+            title: 'Delete Failed',
+            message: err.response?.data?.message || "Failed to delete product"
+          });
+        }
+      }
+    });
   };
 
   if (loading)
@@ -392,6 +444,25 @@ const FarmerDashboard = () => {
           </div>
         </div>
       </section>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alert.isOpen}
+        onClose={() => setAlert({ ...alert, isOpen: false })}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirm.isOpen}
+        onClose={() => setConfirm({ ...confirm, isOpen: false })}
+        onConfirm={confirm.action}
+        type={confirm.type}
+        title={confirm.title}
+        message={confirm.message}
+      />
     </div>
   );
 };

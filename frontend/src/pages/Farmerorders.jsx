@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import { APIBASEURL } from "../utils/config";
+import AlertModal from "../components/AlertModal";
+import ConfirmModal from "../components/ConfirmModal";
 
 const FarmerOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all"); // all, pending, confirmed, shipped, delivered
+  const [filter, setFilter] = useState("all");
   const [error, setError] = useState("");
   const [updatingOrder, setUpdatingOrder] = useState(null);
+
+  // Alert and Confirm modals
+  const [alert, setAlert] = useState({ isOpen: false, type: '', title: '', message: '' });
+  const [confirm, setConfirm] = useState({ isOpen: false, action: null, title: '', message: '', confirmText: '' });
 
   const loadOrders = async () => {
     try {
@@ -26,45 +32,74 @@ const FarmerOrders = () => {
     loadOrders();
   }, []);
 
-  const getMyShipment = (order, farmerId) => {
-    return order.shipments?.find(
-      (s) => s.farmer?._id?.toString() === farmerId || s.farmer?.toString() === farmerId
-    );
-  };
-
   const updateOrderStatus = async (orderId, newStatus) => {
     if (!orderId || updatingOrder) return;
 
-    if (!window.confirm(`Update order status to ${newStatus}?`)) return;
-
-    try {
-      setUpdatingOrder(orderId);
-      await api.put(`/api/orders/${orderId}/status`, { status: newStatus });
-      await loadOrders();
-      alert(`Order status updated to ${newStatus}`);
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to update order status");
-    } finally {
-      setUpdatingOrder(null);
-    }
+    setConfirm({
+      isOpen: true,
+      type: 'warning',
+      title: 'Update Order Status',
+      message: `Are you sure you want to update this order status to ${newStatus}?`,
+      confirmText: 'Yes, Update',
+      action: async () => {
+        try {
+          setUpdatingOrder(orderId);
+          await api.put(`/api/orders/${orderId}/status`, { status: newStatus });
+          await loadOrders();
+          setAlert({
+            isOpen: true,
+            type: 'success',
+            title: 'Success',
+            message: `Order status updated to ${newStatus}`
+          });
+        } catch (err) {
+          setAlert({
+            isOpen: true,
+            type: 'error',
+            title: 'Update Failed',
+            message: err.response?.data?.message || "Failed to update order status"
+          });
+        } finally {
+          setUpdatingOrder(null);
+        }
+      }
+    });
   };
 
   const verifyPayment = async (orderId, status) => {
     if (!orderId || updatingOrder) return;
 
     const action = status === "paid" ? "verify" : "reject";
-    if (!window.confirm(`Are you sure you want to ${action} this payment?`)) return;
-
-    try {
-      setUpdatingOrder(orderId);
-      await api.put("/api/payments/verify", { orderId, status });
-      await loadOrders();
-      alert(`Payment ${status === "paid" ? "verified" : "rejected"} successfully`);
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to verify payment");
-    } finally {
-      setUpdatingOrder(null);
-    }
+    
+    setConfirm({
+      isOpen: true,
+      type: status === "paid" ? "warning" : "danger",
+      title: `${action === "verify" ? "Verify" : "Reject"} Payment`,
+      message: `Are you sure you want to ${action} this payment?`,
+      confirmText: `Yes, ${action === "verify" ? "Verify" : "Reject"}`,
+      action: async () => {
+        try {
+          setUpdatingOrder(orderId);
+          await api.put("/api/payments/verify", { orderId, status });
+          await loadOrders();
+          setAlert({
+            isOpen: true,
+            type: status === "paid" ? "success" : "warning",
+            title: status === "paid" ? "Payment Verified" : "Payment Rejected",
+            message: `Payment ${status === "paid" ? "verified" : "rejected"} successfully`
+          });
+        } catch (err) {
+          setAlert({
+            isOpen: true,
+            type: 'error',
+            title: 'Verification Failed',
+            message: err.response?.data?.message || "Failed to verify payment"
+          });
+        } finally {
+          setUpdatingOrder(null);
+        }
+      }
+    });
   };
 
   const filteredOrders = orders.filter((o) => {
@@ -461,6 +496,26 @@ const FarmerOrders = () => {
           </div>
         )}
       </div>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alert.isOpen}
+        onClose={() => setAlert({ ...alert, isOpen: false })}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirm.isOpen}
+        onClose={() => setConfirm({ ...confirm, isOpen: false })}
+        onConfirm={confirm.action}
+        type={confirm.type}
+        title={confirm.title}
+        message={confirm.message}
+        confirmText={confirm.confirmText}
+      />
     </div>
   );
 };
