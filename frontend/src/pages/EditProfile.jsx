@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
 import { API_BASE_URL } from "../utils/config";
+import AlertModal from "../components/AlertModal"; // Add this import
 
 const getCoords = () =>
   new Promise((resolve, reject) => {
@@ -33,6 +34,14 @@ const EditProfile = () => {
     lat: "",
     lng: "",
     addressText: "",
+  });
+
+  // Alert modal state
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info",
   });
 
   const isFarmer = useMemo(() => user?.role === "farmer", [user]);
@@ -159,7 +168,13 @@ const EditProfile = () => {
       setUser(res.data.user);
       navigate("/profile");
     } catch {
-      alert("Failed to update profile");
+      // Replace alert with AlertModal
+      setAlertModal({
+        isOpen: true,
+        title: "Update Failed",
+        message: "Failed to update profile. Please try again.",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -278,6 +293,15 @@ const EditProfile = () => {
           </div>
         </form>
       </div>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
     </div>
   );
 };

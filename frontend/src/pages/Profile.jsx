@@ -2,6 +2,8 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { AuthContext } from "../context/AuthContext.jsx";
+import AlertModal from "../components/AlertModal";
+import ConfirmModal from "../components/ConfirmModal";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -10,7 +12,10 @@ const Profile = () => {
   const navigate = useNavigate();
 
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [showDeleteBox, setShowDeleteBox] = useState(false);
+
+  // Alert and Confirm modals
+  const [alert, setAlert] = useState({ isOpen: false, type: '', title: '', message: '' });
+  const [confirm, setConfirm] = useState({ isOpen: false, action: null, title: '', message: '' });
 
   // ✅ Important: only redirect AFTER auth boot finished
   useEffect(() => {
@@ -29,7 +34,8 @@ const Profile = () => {
       }
     };
     refreshMe();
-  }, [setUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   const coords = user?.location?.coordinates;
   const hasCoords = useMemo(
@@ -52,16 +58,38 @@ const Profile = () => {
   if (!user) return null;
 
   const handleDeleteAccount = async () => {
-    try {
-      setDeleteLoading(true);
-      await api.delete("/api/auth/me");
-      logout();
-    } catch {
-      alert("Failed to delete account");
-    } finally {
-      setDeleteLoading(false);
-      setShowDeleteBox(false);
-    }
+    setConfirm({
+      isOpen: true,
+      type: 'danger',
+      title: 'Delete Account',
+      message: 'This action will permanently delete your account and all associated data. Are you sure you want to continue?',
+      action: async () => {
+        try {
+          setDeleteLoading(true);
+          await api.delete("/api/auth/me");
+          
+          setAlert({
+            isOpen: true,
+            type: 'success',
+            title: 'Account Deleted',
+            message: 'Your account has been successfully deleted.',
+            onConfirm: () => {
+              logout();
+              navigate("/login", { replace: true });
+            }
+          });
+        } catch (err) {
+          setAlert({
+            isOpen: true,
+            type: 'error',
+            title: 'Deletion Failed',
+            message: err.response?.data?.message || 'Failed to delete account. Please try again.'
+          });
+        } finally {
+          setDeleteLoading(false);
+        }
+      }
+    });
   };
 
   const profileImageUrl = user.profileImage
@@ -108,7 +136,6 @@ const Profile = () => {
           </div>
 
           <div className="flex flex-wrap gap-4">
-            {/* ✅ Make sure it's a button, not submit */}
             <button
               type="button"
               onClick={() => navigate("/profile/edit")}
@@ -119,45 +146,35 @@ const Profile = () => {
 
             <button
               type="button"
-              onClick={() => setShowDeleteBox(true)}
-              className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition"
+              onClick={handleDeleteAccount}
+              disabled={deleteLoading}
+              className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition disabled:opacity-60"
             >
-              Delete Account
+              {deleteLoading ? "Deleting..." : "Delete Account"}
             </button>
           </div>
-
-          {showDeleteBox && (
-            <div className="border border-red-300 bg-red-50 rounded-lg p-6">
-              <h3 className="text-red-700 font-semibold text-lg">
-                Confirm Account Deletion
-              </h3>
-
-              <p className="text-sm text-red-600 mt-2">
-                This action will permanently delete your account and all associated data.
-              </p>
-
-              <div className="flex gap-4 mt-6">
-                <button
-                  type="button"
-                  onClick={handleDeleteAccount}
-                  disabled={deleteLoading}
-                  className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition disabled:opacity-60"
-                >
-                  {deleteLoading ? "Deleting..." : "Yes, Delete"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteBox(false)}
-                  className="border px-6 py-2 rounded-md hover:bg-gray-100 transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alert.isOpen}
+        onClose={() => setAlert({ ...alert, isOpen: false })}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        onConfirm={alert.onConfirm}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirm.isOpen}
+        onClose={() => setConfirm({ ...confirm, isOpen: false })}
+        onConfirm={confirm.action}
+        type={confirm.type}
+        title={confirm.title}
+        message={confirm.message}
+      />
     </div>
   );
 };
