@@ -10,10 +10,10 @@ const FarmerOrders = () => {
   const [filter, setFilter] = useState("all");
   const [error, setError] = useState("");
   const [updatingOrder, setUpdatingOrder] = useState(null);
+  const [expandedOrder, setExpandedOrder] = useState(null);
 
-  // Alert and Confirm modals
-  const [alert, setAlert] = useState({ isOpen: false, type: '', title: '', message: '' });
-  const [confirm, setConfirm] = useState({ isOpen: false, action: null, title: '', message: '', confirmText: '' });
+  const [alert, setAlert] = useState({ isOpen: false, type: "", title: "", message: "" });
+  const [confirm, setConfirm] = useState({ isOpen: false, action: null, title: "", message: "", confirmText: "" });
 
   const loadOrders = async () => {
     try {
@@ -28,37 +28,48 @@ const FarmerOrders = () => {
     }
   };
 
-  useEffect(() => {
-    loadOrders();
-  }, []);
+  useEffect(() => { loadOrders(); }, []);
 
   const updateOrderStatus = async (orderId, newStatus) => {
     if (!orderId || updatingOrder) return;
-
     setConfirm({
       isOpen: true,
-      type: 'warning',
-      title: 'Update Order Status',
-      message: `Are you sure you want to update this order status to ${newStatus}?`,
-      confirmText: 'Yes, Update',
+      type: "warning",
+      title: "Update Order Status",
+      message: `Update this order to "${newStatus}"?`,
+      confirmText: "Yes, Update",
       action: async () => {
         try {
           setUpdatingOrder(orderId);
           await api.put(`/api/orders/${orderId}/status`, { status: newStatus });
           await loadOrders();
-          setAlert({
-            isOpen: true,
-            type: 'success',
-            title: 'Success',
-            message: `Order status updated to ${newStatus}`
-          });
+          setAlert({ isOpen: true, type: "success", title: "Updated", message: `Order updated to ${newStatus}` });
         } catch (err) {
-          setAlert({
-            isOpen: true,
-            type: 'error',
-            title: 'Update Failed',
-            message: err.response?.data?.message || "Failed to update order status"
-          });
+          setAlert({ isOpen: true, type: "error", title: "Failed", message: err.response?.data?.message || "Failed to update" });
+        } finally {
+          setUpdatingOrder(null);
+        }
+      }
+    });
+  };
+
+  const cancelOrderByFarmer = (orderId, e) => {
+    e?.stopPropagation();
+    if (!orderId || updatingOrder) return;
+    setConfirm({
+      isOpen: true,
+      type: "danger",
+      title: "Cancel Order",
+      message: "Are you sure you want to cancel this order? This cannot be undone.",
+      confirmText: "Yes, Cancel",
+      action: async () => {
+        try {
+          setUpdatingOrder(orderId);
+          await api.put(`/api/orders/${orderId}/cancel`);
+          await loadOrders();
+          setAlert({ isOpen: true, type: "success", title: "Cancelled", message: "Order cancelled successfully" });
+        } catch (err) {
+          setAlert({ isOpen: true, type: "error", title: "Failed", message: err.response?.data?.message || "Failed to cancel order" });
         } finally {
           setUpdatingOrder(null);
         }
@@ -68,9 +79,7 @@ const FarmerOrders = () => {
 
   const verifyPayment = async (orderId, status) => {
     if (!orderId || updatingOrder) return;
-
     const action = status === "paid" ? "verify" : "reject";
-    
     setConfirm({
       isOpen: true,
       type: status === "paid" ? "warning" : "danger",
@@ -82,19 +91,9 @@ const FarmerOrders = () => {
           setUpdatingOrder(orderId);
           await api.put("/api/payments/verify", { orderId, status });
           await loadOrders();
-          setAlert({
-            isOpen: true,
-            type: status === "paid" ? "success" : "warning",
-            title: status === "paid" ? "Payment Verified" : "Payment Rejected",
-            message: `Payment ${status === "paid" ? "verified" : "rejected"} successfully`
-          });
+          setAlert({ isOpen: true, type: status === "paid" ? "success" : "warning", title: status === "paid" ? "Verified" : "Rejected", message: `Payment ${status === "paid" ? "verified" : "rejected"}` });
         } catch (err) {
-          setAlert({
-            isOpen: true,
-            type: 'error',
-            title: 'Verification Failed',
-            message: err.response?.data?.message || "Failed to verify payment"
-          });
+          setAlert({ isOpen: true, type: "error", title: "Failed", message: err.response?.data?.message || "Failed" });
         } finally {
           setUpdatingOrder(null);
         }
@@ -102,420 +101,330 @@ const FarmerOrders = () => {
     });
   };
 
-  const filteredOrders = orders.filter((o) => {
-    if (filter === "all") return true;
-    return o.status === filter;
-  });
+  const filteredOrders = orders.filter(o => filter === "all" ? true : o.status === filter);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-300";
-      case "confirmed":
-        return "bg-blue-100 text-blue-800 border-blue-300";
-      case "shipped":
-        return "bg-purple-100 text-purple-800 border-purple-300";
-      case "delivered":
-        return "bg-green-100 text-green-800 border-green-300";
-      case "cancelled":
-        return "bg-red-100 text-red-800 border-red-300";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-300";
-    }
+  const getStatusDot = (status) => {
+    const map = { pending: "bg-yellow-400", confirmed: "bg-blue-500", shipped: "bg-purple-500", delivered: "bg-green-500", cancelled: "bg-red-400" };
+    return map[status] || "bg-gray-400";
+  };
+
+  const getStatusBadge = (status) => {
+    const map = {
+      pending:   "bg-yellow-100 text-yellow-800",
+      confirmed: "bg-blue-100 text-blue-800",
+      shipped:   "bg-purple-100 text-purple-800",
+      delivered: "bg-green-100 text-green-800",
+      cancelled: "bg-red-100 text-red-800",
+    };
+    return map[status] || "bg-gray-100 text-gray-800";
   };
 
   const getPaymentStatusColor = (status) => {
     switch (status) {
-      case "paid":
-        return "bg-green-100 text-green-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "failed":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+      case "paid":    return "bg-green-100 text-green-800";
+      case "pending": return "bg-yellow-100 text-yellow-800";
+      case "failed":  return "bg-red-100 text-red-800";
+      default:        return "bg-gray-100 text-gray-800";
     }
   };
+
+  const statusSteps = ["pending", "confirmed", "shipped", "delivered"];
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading orders...</p>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Order Management</h1>
-          <p className="text-gray-600">Manage your orders, verify payments, and update delivery status</p>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">Order Management</h1>
+          <p className="text-gray-500 text-sm">Click any order card to manage it</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-yellow-500">
-            <p className="text-sm text-gray-500 mb-1">Pending Orders</p>
-            <p className="text-3xl font-bold text-gray-900">
-              {orders.filter((o) => o.status === "pending").length}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-blue-500">
-            <p className="text-sm text-gray-500 mb-1">Confirmed</p>
-            <p className="text-3xl font-bold text-gray-900">
-              {orders.filter((o) => o.status === "confirmed").length}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-purple-500">
-            <p className="text-sm text-gray-500 mb-1">Shipped</p>
-            <p className="text-3xl font-bold text-gray-900">
-              {orders.filter((o) => o.status === "shipped").length}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-green-500">
-            <p className="text-sm text-gray-500 mb-1">Delivered</p>
-            <p className="text-3xl font-bold text-gray-900">
-              {orders.filter((o) => o.status === "delivered").length}
-            </p>
-          </div>
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-3 mb-6">
+          {[
+            { label: "Pending",   value: orders.filter(o => o.status === "pending").length,   color: "text-yellow-600", border: "border-l-yellow-400" },
+            { label: "Confirmed", value: orders.filter(o => o.status === "confirmed").length, color: "text-blue-600",   border: "border-l-blue-500"   },
+            { label: "Shipped",   value: orders.filter(o => o.status === "shipped").length,   color: "text-purple-600", border: "border-l-purple-500"  },
+            { label: "Delivered", value: orders.filter(o => o.status === "delivered").length, color: "text-green-600",  border: "border-l-green-500"   },
+          ].map(s => (
+            <div key={s.label} className={`bg-white rounded-xl shadow-sm p-3 text-center border border-gray-100 border-l-4 ${s.border}`}>
+              <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+            </div>
+          ))}
         </div>
 
         {/* Filter Tabs */}
-        <div className="bg-white rounded-xl shadow-sm p-2 mb-6 flex gap-2 overflow-x-auto">
-          {["all", "pending", "confirmed", "shipped", "delivered", "cancelled"].map((status) => (
+        <div className="bg-white rounded-xl shadow-sm p-1.5 mb-6 flex gap-1 overflow-x-auto border border-gray-100">
+          {["all", "pending", "confirmed", "shipped", "delivered", "cancelled"].map(status => (
             <button
               key={status}
               onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition ${
-                filter === status
-                  ? "bg-green-600 text-white"
-                  : "text-gray-600 hover:bg-gray-100"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap flex-1 transition ${
+                filter === status ? "bg-green-600 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
               }`}
             >
               {status.charAt(0).toUpperCase() + status.slice(1)}
-              {status === "all" && ` (${orders.length})`}
             </button>
           ))}
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            {error}
-          </div>
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
         )}
 
-        {/* Orders List */}
         {filteredOrders.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-            <div className="text-gray-400 text-6xl mb-4">📦</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Orders Found</h3>
-            <p className="text-gray-600">
-              {filter === "all"
-                ? "You haven't received any orders yet"
-                : `No ${filter} orders at the moment`}
-            </p>
+          <div className="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
+            <div className="text-5xl mb-3">📦</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">No Orders Found</h3>
+            <p className="text-gray-500 text-sm">{filter === "all" ? "No orders received yet" : `No ${filter} orders`}</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredOrders.map((order) => {
-              const orderId = order._id || order.id;
-              const orderDisplayId = orderId?.toString().slice(-6);
-              
-              // Find this farmer's shipment in the order
-              const myShipment = order.shipments?.find(
-                (s) => s.farmer?._id || s.farmer
-              );
+          <>
+            {/* ── Square Cards Grid: 4 per row ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {filteredOrders.map((order) => {
+                const orderId = order._id || order.id;
+                const orderDisplayId = orderId?.toString().slice(-6);
+                const isSelected = expandedOrder === orderId;
+                const myShipment = order.shipments?.find(s => s.farmer?._id || s.farmer);
+                const consumer = order.consumer;
+                const consumerName = consumer ? `${consumer.firstName || ""} ${consumer.lastName || ""}`.trim() : "Customer";
+                const canCancel = !["delivered", "cancelled"].includes(order.status);
+                const needsPaymentVerification = myShipment?.paymentStatus === "pending" && myShipment?.paymentMethod !== "cash_on_delivery";
 
+                return (
+                  <div key={orderId} className="relative">
+                    <button
+                      onClick={() => setExpandedOrder(isSelected ? null : orderId)}
+                      className={`w-full aspect-square flex flex-col justify-between rounded-2xl p-4 text-left transition-all duration-200 border-2 ${
+                        isSelected
+                          ? "border-green-500 shadow-lg bg-white"
+                          : "border-gray-100 bg-white hover:border-green-300 hover:shadow-md"
+                      }`}
+                    >
+                      {/* Top */}
+                      <div className="flex items-start justify-between gap-1">
+                        <div className={`w-2.5 h-2.5 rounded-full mt-0.5 flex-shrink-0 ${getStatusDot(order.status)}`} />
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getStatusBadge(order.status)}`}>
+                            {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
+                          </span>
+                          {needsPaymentVerification && (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 animate-pulse">⚡ Pay</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Middle */}
+                      <div>
+                        <div className="text-xl font-bold text-gray-900">#{orderDisplayId}</div>
+                        <div className="text-xs text-gray-500 truncate mt-0.5">{consumerName}</div>
+                        <div className="text-xs text-gray-400">
+                          {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                        </div>
+                      </div>
+
+                      {/* Bottom */}
+                      <div>
+                        <div className="text-base font-bold text-gray-900">Rs.{order.totalAmount?.toFixed(0)}</div>
+                        <div className="text-xs text-gray-400">
+                          {myShipment?.items?.length || 0} item{(myShipment?.items?.length || 0) !== 1 ? "s" : ""}
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Cancel button */}
+                    {canCancel && (
+                      <button
+                        onClick={(e) => cancelOrderByFarmer(orderId, e)}
+                        disabled={updatingOrder === orderId}
+                        className="absolute bottom-3 right-3 text-xs bg-red-50 hover:bg-red-100 text-red-600 font-semibold px-2 py-1 rounded-lg transition disabled:opacity-50"
+                      >
+                        {updatingOrder === orderId ? "..." : "Cancel"}
+                      </button>
+                    )}
+
+                    {/* Arrow pointer */}
+                    {isSelected && (
+                      <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[10px] border-l-transparent border-r-transparent border-t-green-500 z-10" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── Expanded Detail Panel ── */}
+            {expandedOrder && (() => {
+              const order = filteredOrders.find(o => (o._id || o.id) === expandedOrder);
+              if (!order) return null;
+              const orderId = order._id || order.id;
+              const myShipment = order.shipments?.find(s => s.farmer?._id || s.farmer);
               const consumer = order.consumer;
-              const consumerName = consumer
-                ? `${consumer.firstName || ""} ${consumer.lastName || ""}`.trim()
-                : "Customer";
+              const consumerName = consumer ? `${consumer.firstName || ""} ${consumer.lastName || ""}`.trim() : "Customer";
+              const stepIndex = statusSteps.indexOf(order.status);
+              const canCancel = !["delivered", "cancelled"].includes(order.status);
+              const needsPaymentVerification = myShipment?.paymentStatus === "pending" && myShipment?.paymentMethod !== "cash_on_delivery";
 
               return (
-                <div
-                  key={orderId}
-                  className="bg-white rounded-xl shadow-sm border hover:shadow-md transition overflow-hidden"
-                >
-                  {/* Order Header */}
-                  <div className="bg-gray-50 px-6 py-4 border-b flex flex-wrap items-center justify-between gap-4">
+                <div className="bg-white rounded-2xl border-2 border-green-500 shadow-xl overflow-hidden mt-2">
+                  {/* Header */}
+                  <div className="bg-gray-50 px-6 py-5 border-b flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-3 mb-1">
-                        <h3 className="text-lg font-bold text-gray-900">
-                          Order #{orderDisplayId}
-                        </h3>
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(
-                            order.status
-                          )}`}
-                        >
+                        <h3 className="text-xl font-bold text-gray-900">Order #{orderId?.toString().slice(-6)}</h3>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusBadge(order.status)}`}>
                           {order.status?.toUpperCase()}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600">
-                        Customer: <span className="font-medium">{consumerName}</span>
-                        {consumer?.email && (
-                          <span className="ml-2 text-gray-500">({consumer.email})</span>
-                        )}
+                      <p className="text-sm text-gray-500">
+                        Customer: <span className="font-medium text-gray-700">{consumerName}</span>
+                        {consumer?.email && <span className="ml-1 text-gray-400">({consumer.email})</span>}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Placed: {new Date(order.createdAt).toLocaleString()}
-                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">{new Date(order.createdAt).toLocaleString()}</p>
                     </div>
-
-                    <div className="text-right">
-                      <div className="text-sm text-gray-500">Total Amount</div>
-                      <div className="text-2xl font-bold text-gray-900">
-                        Rs. {order.totalAmount?.toFixed(0)}
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className="text-xs text-gray-500">Total</div>
+                        <div className="text-2xl font-bold text-gray-900">Rs. {order.totalAmount?.toFixed(0)}</div>
                       </div>
+                      <button
+                        onClick={() => setExpandedOrder(null)}
+                        className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-sm transition"
+                      >
+                        ✕
+                      </button>
                     </div>
                   </div>
 
-                  {/* Order Content */}
-                  <div className="p-6">
+                  {/* Progress bar */}
+                  {order.status !== "cancelled" && (
+                    <div className="px-6 py-4 bg-gray-50 border-b">
+                      <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                        {statusSteps.map(s => (
+                          <span key={s} className={`capitalize font-medium ${statusSteps.indexOf(order.status) >= statusSteps.indexOf(s) ? "text-gray-800" : ""}`}>{s}</span>
+                        ))}
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                        <div className="h-full rounded-full bg-green-500 transition-all duration-500" style={{ width: `${Math.max(5, (stepIndex / (statusSteps.length - 1)) * 100)}%` }} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-6 space-y-4">
+                    {/* Items */}
                     {myShipment && (
                       <>
-                        {/* Items */}
-                        <div className="mb-6">
-                          <h4 className="font-semibold text-gray-900 mb-3">Order Items:</h4>
-                          <div className="space-y-2">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Order Items</p>
+                          <div className="space-y-1.5">
                             {myShipment.items?.map((item, idx) => (
-                              <div
-                                key={idx}
-                                className="flex items-center justify-between bg-gray-50 rounded-lg p-3"
-                              >
+                              <div key={idx} className="flex justify-between items-center bg-gray-50 rounded-lg px-3 py-2.5 text-sm">
                                 <div>
-                                  <p className="font-medium text-gray-900">{item.name}</p>
-                                  <p className="text-sm text-gray-500">
-                                    Quantity: {item.quantity}
-                                  </p>
+                                  <span className="font-medium text-gray-900">{item.name}</span>
+                                  <span className="text-gray-400 text-xs ml-2">×{item.quantity} · Rs.{item.price} each</span>
                                 </div>
-                                <div className="text-right">
-                                  <p className="font-semibold text-gray-900">
-                                    Rs. {item.price} each
-                                  </p>
-                                  <p className="text-sm text-gray-600">
-                                    Total: Rs. {(item.price * item.quantity).toFixed(0)}
-                                  </p>
-                                </div>
+                                <span className="font-semibold text-gray-900">Rs. {(item.price * item.quantity).toFixed(0)}</span>
                               </div>
                             ))}
                           </div>
-
-                          {/* Shipment Total */}
-                          <div className="mt-3 pt-3 border-t flex justify-between items-center">
-                            <span className="text-gray-600">Subtotal + Delivery:</span>
-                            <span className="text-lg font-bold text-gray-900">
-                              Rs. {((myShipment.subtotal || 0) + (myShipment.deliveryFee || 0)).toFixed(0)}
-                            </span>
+                          <div className="flex justify-between text-sm font-semibold text-gray-700 mt-2 pt-2 border-t border-gray-100">
+                            <span>Subtotal + Delivery</span>
+                            <span>Rs. {((myShipment.subtotal || 0) + (myShipment.deliveryFee || 0)).toFixed(0)}</span>
                           </div>
                         </div>
 
-                        {/* Payment Info */}
-                        <div className="mb-6 bg-blue-50 rounded-xl p-4 border border-blue-200">
-                          <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                            💳 Payment Information
-                          </h4>
-                          <div className="grid md:grid-cols-2 gap-4 text-sm">
+                        {/* Payment */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-3">💳 Payment Info</p>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
                             <div>
-                              <span className="text-blue-700">Method:</span>
-                              <span className="ml-2 font-semibold text-blue-900 capitalize">
-                                {myShipment.paymentMethod || "Not selected"}
-                              </span>
+                              <span className="text-xs text-gray-500">Method</span>
+                              <p className="font-semibold text-gray-900 capitalize">{myShipment.paymentMethod || "Not selected"}</p>
                             </div>
                             <div>
-                              <span className="text-blue-700">Status:</span>
-                              <span
-                                className={`ml-2 px-2 py-1 rounded-full text-xs font-semibold ${getPaymentStatusColor(
-                                  myShipment.paymentStatus
-                                )}`}
-                              >
-                                {myShipment.paymentStatus?.toUpperCase() || "PENDING"}
-                              </span>
+                              <span className="text-xs text-gray-500">Status</span>
+                              <p><span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getPaymentStatusColor(myShipment.paymentStatus)}`}>{myShipment.paymentStatus?.toUpperCase() || "PENDING"}</span></p>
                             </div>
-
                             {myShipment.transactionId && (
-                              <div className="md:col-span-2">
-                                <span className="text-blue-700">Transaction ID:</span>
-                                <span className="ml-2 font-semibold text-blue-900">
-                                  {myShipment.transactionId}
-                                </span>
+                              <div className="col-span-2">
+                                <span className="text-xs text-gray-500">Transaction ID</span>
+                                <p className="font-semibold text-gray-900 text-sm">{myShipment.transactionId}</p>
                               </div>
                             )}
-
                             {myShipment.paymentDate && (
-                              <div className="md:col-span-2">
-                                <span className="text-blue-700">Payment Date:</span>
-                                <span className="ml-2 font-medium text-blue-900">
-                                  {new Date(myShipment.paymentDate).toLocaleString()}
-                                </span>
-                              </div>
-                            )}
-
-                            {myShipment.paymentProof && (
-                              <div className="md:col-span-2">
-                                <span className="text-blue-700 block mb-2">Payment Proof:</span>
-                                <a
-                                  href={`${APIBASEURL}${myShipment.paymentProof}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-block"
-                                >
-                                  <img
-                                    src={`${APIBASEURL}${myShipment.paymentProof}`}
-                                    alt="Payment proof"
-                                    className="max-w-xs rounded-lg border-2 border-blue-300 hover:border-blue-500 transition cursor-pointer"
-                                  />
-                                </a>
+                              <div className="col-span-2">
+                                <span className="text-xs text-gray-500">Payment Date</span>
+                                <p className="font-medium text-gray-800 text-sm">{new Date(myShipment.paymentDate).toLocaleString()}</p>
                               </div>
                             )}
                           </div>
 
-                          {/* Payment Verification Buttons */}
-                          {myShipment.paymentStatus === "pending" &&
-                            myShipment.paymentMethod !== "cash_on_delivery" && (
-                              <div className="mt-4 pt-4 border-t border-blue-200 flex gap-3">
-                                <button
-                                  onClick={() => verifyPayment(orderId, "paid")}
-                                  disabled={updatingOrder === orderId}
-                                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold px-4 py-2 rounded-lg transition"
-                                >
-                                  ✓ Verify Payment
-                                </button>
-                                <button
-                                  onClick={() => verifyPayment(orderId, "failed")}
-                                  disabled={updatingOrder === orderId}
-                                  className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold px-4 py-2 rounded-lg transition"
-                                >
-                                  ✗ Reject Payment
-                                </button>
-                              </div>
-                            )}
-                        </div>
-
-                        {/* Order Status Actions */}
-                        <div className="bg-gray-50 rounded-xl p-4">
-                          <h4 className="font-semibold text-gray-900 mb-3">Update Order Status:</h4>
-                          
-                          {order.status === "cancelled" ? (
-                            <div className="text-red-600 font-medium">
-                              This order has been cancelled
-                            </div>
-                          ) : (
-                            <div className="flex flex-wrap gap-2">
-                              {order.status === "pending" && (
-                                <button
-                                  onClick={() => updateOrderStatus(orderId, "confirmed")}
-                                  disabled={updatingOrder === orderId}
-                                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold px-6 py-2 rounded-lg transition"
-                                >
-                                  ✓ Confirm Order
-                                </button>
-                              )}
-
-                              {order.status === "confirmed" && (
-                                <button
-                                  onClick={() => updateOrderStatus(orderId, "shipped")}
-                                  disabled={updatingOrder === orderId}
-                                  className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-semibold px-6 py-2 rounded-lg transition"
-                                >
-                                  📦 Mark as Shipped
-                                </button>
-                              )}
-
-                              {order.status === "shipped" && (
-                                <button
-                                  onClick={() => updateOrderStatus(orderId, "delivered")}
-                                  disabled={updatingOrder === orderId}
-                                  className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold px-6 py-2 rounded-lg transition"
-                                >
-                                  ✓ Mark as Delivered
-                                </button>
-                              )}
-
-                              {updatingOrder === orderId && (
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
-                                  <span>Updating...</span>
-                                </div>
-                              )}
+                          {myShipment.paymentProof && (
+                            <div className="mt-3">
+                              <p className="text-xs text-gray-500 mb-1">Payment Proof</p>
+                              <a href={`${APIBASEURL}${myShipment.paymentProof}`} target="_blank" rel="noopener noreferrer">
+                                <img src={`${APIBASEURL}${myShipment.paymentProof}`} alt="Payment proof" className="max-w-xs rounded-lg border-2 border-blue-300 hover:border-blue-500 transition cursor-pointer" />
+                              </a>
                             </div>
                           )}
 
-                          {/* Status Timeline */}
-                          <div className="mt-4 pt-4 border-t">
-                            <p className="text-xs text-gray-500 mb-2">Order Progress:</p>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className={`flex-1 h-2 rounded-full ${
-                                  ["pending", "confirmed", "shipped", "delivered"].includes(
-                                    order.status
-                                  )
-                                    ? "bg-green-500"
-                                    : "bg-gray-200"
-                                }`}
-                              ></div>
-                              <div
-                                className={`flex-1 h-2 rounded-full ${
-                                  ["confirmed", "shipped", "delivered"].includes(order.status)
-                                    ? "bg-green-500"
-                                    : "bg-gray-200"
-                                }`}
-                              ></div>
-                              <div
-                                className={`flex-1 h-2 rounded-full ${
-                                  ["shipped", "delivered"].includes(order.status)
-                                    ? "bg-green-500"
-                                    : "bg-gray-200"
-                                }`}
-                              ></div>
-                              <div
-                                className={`flex-1 h-2 rounded-full ${
-                                  order.status === "delivered" ? "bg-green-500" : "bg-gray-200"
-                                }`}
-                              ></div>
+                          {needsPaymentVerification && (
+                            <div className="flex gap-2 mt-3 pt-3 border-t border-blue-200">
+                              <button onClick={() => verifyPayment(orderId, "paid")} disabled={updatingOrder === orderId} className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">✓ Verify Payment</button>
+                              <button onClick={() => verifyPayment(orderId, "failed")} disabled={updatingOrder === orderId} className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">✗ Reject</button>
                             </div>
-                            <div className="flex justify-between text-xs text-gray-500 mt-1">
-                              <span>Pending</span>
-                              <span>Confirmed</span>
-                              <span>Shipped</span>
-                              <span>Delivered</span>
-                            </div>
-                          </div>
+                          )}
                         </div>
                       </>
                     )}
+
+                    {/* Status Actions */}
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Actions</p>
+                      {order.status === "cancelled" ? (
+                        <p className="text-red-600 text-sm font-medium">This order has been cancelled.</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {order.status === "pending" && (
+                            <button onClick={() => updateOrderStatus(orderId, "confirmed")} disabled={updatingOrder === orderId} className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold px-5 py-2 rounded-lg text-sm transition">✓ Confirm Order</button>
+                          )}
+                          {order.status === "confirmed" && (
+                            <button onClick={() => updateOrderStatus(orderId, "shipped")} disabled={updatingOrder === orderId} className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-semibold px-5 py-2 rounded-lg text-sm transition">📦 Mark as Shipped</button>
+                          )}
+                          {order.status === "shipped" && (
+                            <button onClick={() => updateOrderStatus(orderId, "delivered")} disabled={updatingOrder === orderId} className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold px-5 py-2 rounded-lg text-sm transition">✓ Mark as Delivered</button>
+                          )}
+                          {canCancel && (
+                            <button onClick={() => cancelOrderByFarmer(orderId)} disabled={updatingOrder === orderId} className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold px-5 py-2 rounded-lg text-sm transition">✗ Cancel Order</button>
+                          )}
+                          {updatingOrder === orderId && (
+                            <div className="flex items-center gap-2 text-gray-500 text-sm">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                              Updating...
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
-            })}
-          </div>
+            })()}
+          </>
         )}
       </div>
 
-      {/* Alert Modal */}
-      <AlertModal
-        isOpen={alert.isOpen}
-        onClose={() => setAlert({ ...alert, isOpen: false })}
-        type={alert.type}
-        title={alert.title}
-        message={alert.message}
-      />
-
-      {/* Confirm Modal */}
-      <ConfirmModal
-        isOpen={confirm.isOpen}
-        onClose={() => setConfirm({ ...confirm, isOpen: false })}
-        onConfirm={confirm.action}
-        type={confirm.type}
-        title={confirm.title}
-        message={confirm.message}
-        confirmText={confirm.confirmText}
-      />
+      <AlertModal isOpen={alert.isOpen} onClose={() => setAlert({ ...alert, isOpen: false })} type={alert.type} title={alert.title} message={alert.message} />
+      <ConfirmModal isOpen={confirm.isOpen} onClose={() => setConfirm({ ...confirm, isOpen: false })} onConfirm={confirm.action} type={confirm.type} title={confirm.title} message={confirm.message} confirmText={confirm.confirmText} />
     </div>
   );
 };
