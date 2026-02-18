@@ -8,7 +8,7 @@ export const getAllUsers = async (req, res) => {
     const users = await User.find({}).select('-password').sort({ createdAt: -1 });
     res.json(users);
   } catch (err) {
-    console.error('❌ Admin getAllUsers ERROR:', err);
+    console.error(' Admin getAllUsers ERROR:', err);
     res.status(500).json({ message: err.message });
   }
 };

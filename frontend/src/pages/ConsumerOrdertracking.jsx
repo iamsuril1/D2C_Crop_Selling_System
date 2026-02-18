@@ -26,8 +26,6 @@ const ConsumerOrderTracking = () => {
 
   useEffect(() => {
     loadOrders();
-    
-    // Auto-refresh every 30 seconds
     const interval = setInterval(loadOrders, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -53,27 +51,22 @@ const ConsumerOrderTracking = () => {
     const statusMap = {
       pending: {
         color: "bg-yellow-100 text-yellow-800 border-yellow-300",
-        icon: "⏳",
         message: "Order is being processed by farmer",
       },
       confirmed: {
         color: "bg-blue-100 text-blue-800 border-blue-300",
-        icon: "✓",
         message: "Order confirmed! Farmer is preparing your items",
       },
       shipped: {
         color: "bg-purple-100 text-purple-800 border-purple-300",
-        icon: "📦",
         message: "Your order is on the way!",
       },
       delivered: {
         color: "bg-green-100 text-green-800 border-green-300",
-        icon: "✓✓",
         message: "Order delivered successfully",
       },
       cancelled: {
         color: "bg-red-100 text-red-800 border-red-300",
-        icon: "✗",
         message: "Order was cancelled",
       },
     };

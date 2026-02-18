@@ -89,7 +89,7 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
   }
 };
 
-// UPDATED: Complete createOrder with payment info snapshot
+// ✅ UPDATED: Complete createOrder with stock decrease
 export const createOrder = async (req, res) => {
   try {
     const { items } = req.body;
@@ -105,10 +105,12 @@ export const createOrder = async (req, res) => {
       if (!p) return null;
 
       const qty = Math.max(1, toNum(it.quantity || 1));
+      
       return {
         farmerId: p.farmer?._id?.toString(),
         farmerDoc: p.farmer,
         product: p._id,
+        productDoc: p, // Keep product doc for stock check
         name: p.name,
         price: toNum(p.price || 0),
         quantity: qty,
@@ -117,6 +119,15 @@ export const createOrder = async (req, res) => {
 
     if (normalized.some((x) => !x || !x.farmerId)) {
       return res.status(400).json({ message: "Invalid products/farmers" });
+    }
+
+    // ✅ Check stock availability for all products
+    for (const item of normalized) {
+      if (item.productDoc.quantity < item.quantity) {
+        return res.status(400).json({ 
+          message: `Insufficient stock for ${item.name}. Available: ${item.productDoc.quantity} ${item.productDoc.unit}` 
+        });
+      }
     }
 
     const grouped = groupBy(normalized, (x) => x.farmerId);
@@ -161,6 +172,7 @@ export const createOrder = async (req, res) => {
     const deliveryTotal = shipments.length * DELIVERY_FEE_PER_SHIPMENT;
     const totalAmount = itemsSubtotal + deliveryTotal;
 
+    // ✅ Create order
     const order = await Order.create({
       consumer: req.user._id,
       shipments,
@@ -168,6 +180,25 @@ export const createOrder = async (req, res) => {
       deliveryTotal,
       totalAmount,
     });
+
+    // ✅ DECREASE PRODUCT QUANTITIES (Atomic operation)
+    const stockUpdatePromises = normalized.map(async (item) => {
+      const result = await Product.findByIdAndUpdate(
+        item.product,
+        { $inc: { quantity: -item.quantity } },
+        { new: true }
+      );
+      
+      if (!result) {
+        console.error(`Failed to update stock for product ${item.product}`);
+      }
+      
+      return result;
+    });
+
+    await Promise.all(stockUpdatePromises);
+    
+    console.log(`✅ Stock updated for ${stockUpdatePromises.length} products in order #${order._id.toString().slice(-6)}`);
 
     // Notifications
     await sendNotification(
@@ -190,7 +221,7 @@ export const createOrder = async (req, res) => {
 
     res.status(201).json(order);
   } catch (err) {
-    console.error("Create order error:", err);
+    console.error("❌ Create order error:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -269,6 +300,31 @@ export const cancelOrderConsumer = async (req, res) => {
         .json({ message: "Delivered orders cannot be cancelled" });
     }
 
+    // ✅ RESTORE PRODUCT QUANTITIES when order is cancelled
+    try {
+      const restorePromises = order.shipments.flatMap(shipment => 
+        shipment.items.map(async (item) => {
+          const result = await Product.findByIdAndUpdate(
+            item.product,
+            { $inc: { quantity: item.quantity } }, // Add back the quantity
+            { new: true }
+          );
+          
+          if (result) {
+            console.log(`✅ Restored ${item.quantity} ${result.unit} of ${result.name}`);
+          }
+          
+          return result;
+        })
+      );
+      
+      await Promise.all(restorePromises);
+      console.log(`✅ Stock restored for cancelled order #${order._id.toString().slice(-6)}`);
+    } catch (restoreError) {
+      console.error("❌ Error restoring stock:", restoreError);
+      // Continue with cancellation even if stock restore fails
+    }
+
     order.status = "cancelled";
     order.cancelledBy = "consumer";
     order.cancelledAt = new Date();
@@ -287,6 +343,7 @@ export const cancelOrderConsumer = async (req, res) => {
 
     res.json(order);
   } catch (err) {
+    console.error("Cancel order error:", err);
     res.status(500).json({ message: "Failed to cancel order" });
   }
 };
