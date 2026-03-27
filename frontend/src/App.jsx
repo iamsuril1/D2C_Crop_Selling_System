@@ -31,6 +31,9 @@ import ConsumerOrderTracking from "./pages/ConsumerOrdertracking";
 import FarmerPaymentSettings from "./pages/FarmerPaymentSettings";
 import PaymentSelection from "./pages/PaymentSelection";
 
+import ForgotPassword from "./pages/ForgotPassword";
+
+
 function App() {
   const { user, loading } = useContext(AuthContext);
 
@@ -212,6 +215,8 @@ function App() {
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+
         </Routes>
       </main>
 

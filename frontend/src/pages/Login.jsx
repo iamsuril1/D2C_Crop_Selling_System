@@ -124,6 +124,15 @@ const Login = () => {
             <label className="floating-label text-green-700">Password</label>
           </div>
 
+          <div className="text-right -mt-4">
+  <span
+    onClick={() => navigate("/forgot-password")}
+    className="text-sm text-[#1E9C17] cursor-pointer hover:underline"
+  >
+    Forgot password?
+  </span>
+</div>
+
           {/* ✅ Page-level error */}
           {error && (
             <p className="text-red-500 text-sm text-center">{error}</p>
