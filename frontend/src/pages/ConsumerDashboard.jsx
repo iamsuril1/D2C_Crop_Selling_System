@@ -3,11 +3,11 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { CartContext } from "../context/CartContext";
 import { APIBASEURL } from "../utils/config";
+import AlertModal from "../components/AlertModal";
 
 const normalize = (v) => v?.toString().toLowerCase().trim();
 
 const extractProducts = (data) => {
-  // Supports both: old backend (array) and new backend ({ mode, products })
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.products)) return data.products;
   return [];
@@ -42,36 +42,56 @@ const ConsumerDashboard = () => {
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  // NEW: product mode + geolocation state
-  const [productMode, setProductMode] = useState("all"); // "all" | "nearby"
-  const [coords, setCoords] = useState(null); // { lat, lng }
-  const [geoError, setGeoError] = useState("");
+  const [productMode, setProductMode] = useState("all");
+  const [coords, setCoords] = useState(null);
 
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All Products");
   const [sortBy, setSortBy] = useState("Featured");
   const [viewMode, setViewMode] = useState("grid");
 
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title, message, type = "error") => {
+    setAlertModal({ isOpen: true, title, message, type });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, isOpen: false }));
+  };
+
   const loadProducts = async (mode = "all") => {
     try {
       setLoading(true);
-      setError("");
-
-      // reset geolocation errors when changing mode
-      if (mode === "all") setGeoError("");
 
       if (mode === "nearby") {
-        setGeoError("");
-
-        const c = coords || (await getCoords());
-        setCoords(c);
+        let c;
+        try {
+          c = coords || (await getCoords());
+          setCoords(c);
+        } catch (geoErr) {
+          if (geoErr?.code === 1) {
+            showAlert("Location Permission Denied", "Please allow location access to view nearby products.", "warning");
+          } else if (geoErr?.code === 2) {
+            showAlert("Location Unavailable", "Your location could not be determined. Please try again.", "warning");
+          } else if (geoErr?.code === 3) {
+            showAlert("Location Timeout", "The location request timed out. Please try again.", "warning");
+          } else {
+            showAlert("Location Error", geoErr?.message || "Failed to get your location.", "error");
+          }
+          setLoading(false);
+          return;
+        }
 
         const res = await api.get("/api/products", {
           params: { lat: c.lat, lng: c.lng, maxDistance: 5000, limit: 50 },
         });
-
         setProducts(extractProducts(res.data));
         return;
       }
@@ -80,14 +100,11 @@ const ConsumerDashboard = () => {
       const res = await api.get("/api/products", { params: { limit: 50 } });
       setProducts(extractProducts(res.data));
     } catch (err) {
-      // Geolocation-specific errors (code: 1 permission denied, 2 unavailable, 3 timeout)
-      if (mode === "nearby" && typeof err?.code === "number") {
-        if (err.code === 1) setGeoError("Location permission denied. Please allow location access.");
-        if (err.code === 2) setGeoError("Location unavailable. Try again.");
-        if (err.code === 3) setGeoError("Location request timed out. Try again.");
-      }
-
-      setError(err.response?.data?.message || err.message || "Failed to load products");
+      showAlert(
+        "Failed to Load Products",
+        err.response?.data?.message || err.message || "Something went wrong. Please try again.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
@@ -300,25 +317,18 @@ const ConsumerDashboard = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white border rounded-xl p-6 max-w-md w-full text-center">
-          <p className="text-red-600 font-semibold">{error}</p>
-          <button
-            type="button"
-            onClick={() => loadProducts(productMode)}
-            className="mt-4 bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded-xl"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+        confirmText="OK"
+      />
+
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
           <div>
@@ -329,7 +339,7 @@ const ConsumerDashboard = () => {
           </div>
         </div>
 
-        {/* NEW: All/Nearby toggle */}
+        {/* All / Nearby toggle */}
         <div className="mt-5 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -360,8 +370,6 @@ const ConsumerDashboard = () => {
           >
             Nearby
           </button>
-
-          {geoError && <span className="text-xs text-amber-700">{geoError}</span>}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center mt-6">

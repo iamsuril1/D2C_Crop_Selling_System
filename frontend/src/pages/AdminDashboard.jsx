@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+import AlertModal from '../components/AlertModal';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -8,7 +9,13 @@ const AdminDashboard = () => {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
 
   // Chart Data States - SIMPLIFIED
   const [stats, setStats] = useState({
@@ -22,10 +29,17 @@ const AdminDashboard = () => {
     orderStatuses: {}
   });
 
+  const showAlert = (title, message, type = 'error') => {
+    setAlertModal({ isOpen: true, title, message, type });
+  };
+
+  const closeAlert = () => {
+    setAlertModal(prev => ({ ...prev, isOpen: false }));
+  };
+
   const loadDashboard = async () => {
     try {
       setLoading(true);
-      setError('');
 
       const [usersRes, productsRes, ordersRes] = await Promise.all([
         api.get('/api/admin/users').catch(() => ({ data: [] })),
@@ -67,7 +81,7 @@ const AdminDashboard = () => {
 
     } catch (err) {
       console.error('Dashboard load error:', err);
-      setError('Failed to load dashboard data');
+      showAlert('Load Failed', 'Failed to load dashboard data. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -91,6 +105,17 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50 p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
+
+        {/* Alert Modal */}
+        <AlertModal
+          isOpen={alertModal.isOpen}
+          onClose={closeAlert}
+          title={alertModal.title}
+          message={alertModal.message}
+          type={alertModal.type}
+          confirmText="OK"
+        />
+
         {/* Header */}
         <div className="mb-8 text-center lg:text-left">
           <h1 className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 to-green-900 bg-clip-text text-transparent mb-4">
@@ -99,19 +124,7 @@ const AdminDashboard = () => {
           <p className="text-xl text-gray-600">Real-time analytics for MeroBari marketplace</p>
         </div>
 
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-8 rounded">
-            <p className="text-red-700 font-medium">{error}</p>
-            <button 
-              onClick={loadDashboard}
-              className="text-red-600 hover:underline mt-1"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* 🔥 STATS CARDS - ALWAYS VISIBLE */}
+        {/* STATS CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-all">
             <div className="flex items-center justify-between">
@@ -172,7 +185,7 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* 🔥 VISUAL ORDER STATUS CHART - BAR STYLE */}
+        {/* ORDER STATUS CHART & USER DISTRIBUTION */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-white p-8 rounded-xl shadow-sm border">
             <h3 className="text-xl font-semibold text-gray-900 mb-6">Order Status Breakdown</h3>
@@ -185,12 +198,12 @@ const AdminDashboard = () => {
                       <span className="font-semibold text-gray-900">{count}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div 
+                      <div
                         className="h-3 rounded-full transition-all duration-500"
                         style={{
                           width: `${Math.max((count / stats.totalOrders) * 100, 5)}%`,
-                          backgroundColor: status === 'delivered' ? '#10B981' : 
-                                         status === 'cancelled' ? '#EF4444' : 
+                          backgroundColor: status === 'delivered' ? '#10B981' :
+                                         status === 'cancelled' ? '#EF4444' :
                                          status === 'confirmed' ? '#3B82F6' : '#F59E0B'
                         }}
                       />
@@ -204,7 +217,7 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* 🔥 USER ROLES VISUALIZATION */}
+          {/* USER ROLES VISUALIZATION */}
           <div className="bg-white p-8 rounded-xl shadow-sm border">
             <h3 className="text-xl font-semibold text-gray-900 mb-6">User Distribution</h3>
             <div className="space-y-6">
@@ -221,7 +234,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-500">{((stats.farmers/stats.totalUsers)*100 || 0).toFixed(1)}%</p>
+                  <p className="text-sm text-gray-500">{((stats.farmers / stats.totalUsers) * 100 || 0).toFixed(1)}%</p>
                 </div>
               </div>
               <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl">
@@ -237,14 +250,14 @@ const AdminDashboard = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-500">{((stats.consumers/stats.totalUsers)*100 || 0).toFixed(1)}%</p>
+                  <p className="text-sm text-gray-500">{((stats.consumers / stats.totalUsers) * 100 || 0).toFixed(1)}%</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 🔥 RECENT ORDERS TABLE */}
+        {/* RECENT ORDERS TABLE */}
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
             <h3 className="text-xl font-semibold text-gray-900">Recent Orders ({stats.totalOrders})</h3>
@@ -315,6 +328,7 @@ const AdminDashboard = () => {
             </table>
           </div>
         </div>
+
       </div>
     </div>
   );
