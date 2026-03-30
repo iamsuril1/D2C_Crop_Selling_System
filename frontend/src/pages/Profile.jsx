@@ -13,16 +13,27 @@ const Profile = () => {
 
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Alert and Confirm modals
-  const [alert, setAlert] = useState({ isOpen: false, type: '', title: '', message: '' });
-  const [confirm, setConfirm] = useState({ isOpen: false, action: null, title: '', message: '' });
+  const [alertModal, setAlertModal] = useState({ isOpen: false, type: "", title: "", message: "", onConfirm: null });
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, action: null, type: "", title: "", message: "" });
 
-  // ✅ Important: only redirect AFTER auth boot finished
+  const showAlert = (title, message, type = "error", onConfirm = null) => {
+    setAlertModal({ isOpen: true, title, message, type, onConfirm });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, isOpen: false, onConfirm: null }));
+  };
+
+  const closeConfirm = () => {
+    setConfirmModal((prev) => ({ ...prev, isOpen: false, action: null }));
+  };
+
+  // Only redirect after auth boot finishes
   useEffect(() => {
     if (!loading && !user) navigate("/login", { replace: true });
   }, [loading, user, navigate]);
 
-  // Optional: refresh /me when entering profile (keeps location updated)
+  // Refresh /me on mount to keep location updated
   useEffect(() => {
     const refreshMe = async () => {
       try {
@@ -35,7 +46,7 @@ const Profile = () => {
     };
     refreshMe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, []);
 
   const coords = user?.location?.coordinates;
   const hasCoords = useMemo(
@@ -57,38 +68,35 @@ const Profile = () => {
 
   if (!user) return null;
 
-  const handleDeleteAccount = async () => {
-    setConfirm({
+  const handleDeleteAccount = () => {
+    setConfirmModal({
       isOpen: true,
-      type: 'danger',
-      title: 'Delete Account',
-      message: 'This action will permanently delete your account and all associated data. Are you sure you want to continue?',
+      type: "danger",
+      title: "Delete Account",
+      message: "This action will permanently delete your account and all associated data. Are you sure you want to continue?",
       action: async () => {
         try {
           setDeleteLoading(true);
           await api.delete("/api/auth/me");
-          
-          setAlert({
-            isOpen: true,
-            type: 'success',
-            title: 'Account Deleted',
-            message: 'Your account has been successfully deleted.',
-            onConfirm: () => {
+          showAlert(
+            "Account Deleted",
+            "Your account has been successfully deleted.",
+            "success",
+            () => {
               logout();
               navigate("/login", { replace: true });
             }
-          });
+          );
         } catch (err) {
-          setAlert({
-            isOpen: true,
-            type: 'error',
-            title: 'Deletion Failed',
-            message: err.response?.data?.message || 'Failed to delete account. Please try again.'
-          });
+          showAlert(
+            "Deletion Failed",
+            err.response?.data?.message || "Failed to delete account. Please try again.",
+            "error"
+          );
         } finally {
           setDeleteLoading(false);
         }
-      }
+      },
     });
   };
 
@@ -98,6 +106,28 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-4">
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+        onConfirm={alertModal.onConfirm}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmModal.action}
+        type={confirmModal.type}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText="Confirm"
+        cancelText="Cancel"
+      />
+
       <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden">
         <div className="bg-gradient-to-r from-[#1E9C17] to-[#27AE60] p-8 text-white">
           <div className="flex items-center gap-6">
@@ -123,12 +153,11 @@ const Profile = () => {
 
         <div className="p-8 space-y-10">
           <div className="grid sm:grid-cols-2 gap-6">
-            <Info label="User ID" value={user.id || user._id} />
-            <Info label="Email" value={user.email} />
-            <Info label="Role" value={user.role} />
-            <Info label="Status" value="Active" green />
-
-            <Info label="Address" value={user.addressText || "Not set"} />
+            <Info label="User ID"   value={user.id || user._id} />
+            <Info label="Email"     value={user.email} />
+            <Info label="Role"      value={user.role} />
+            <Info label="Status"    value="Active" green />
+            <Info label="Address"   value={user.addressText || "Not set"} />
             <Info
               label="Location"
               value={hasCoords ? `Lat: ${lat}, Lng: ${lng}` : "Not set"}
@@ -155,26 +184,6 @@ const Profile = () => {
           </div>
         </div>
       </div>
-
-      {/* Alert Modal */}
-      <AlertModal
-        isOpen={alert.isOpen}
-        onClose={() => setAlert({ ...alert, isOpen: false })}
-        type={alert.type}
-        title={alert.title}
-        message={alert.message}
-        onConfirm={alert.onConfirm}
-      />
-
-      {/* Confirm Modal */}
-      <ConfirmModal
-        isOpen={confirm.isOpen}
-        onClose={() => setConfirm({ ...confirm, isOpen: false })}
-        onConfirm={confirm.action}
-        type={confirm.type}
-        title={confirm.title}
-        message={confirm.message}
-      />
     </div>
   );
 };

@@ -1,24 +1,44 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
+import AlertModal from "../components/AlertModal";
+import ConfirmModal from "../components/ConfirmModal";
 
 const ConsumerOrderTracking = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
-  const [error, setError] = useState("");
   const [cancellingOrder, setCancellingOrder] = useState(null);
   const [expandedOrder, setExpandedOrder] = useState(null);
+
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    orderId: null,
+  });
+
+  const showAlert = (title, message, type = "error") => {
+    setAlertModal({ isOpen: true, title, message, type });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, isOpen: false }));
+  };
 
   const loadOrders = async () => {
     try {
       setLoading(true);
-      setError("");
       const res = await api.get("/api/orders/my");
       setOrders(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load orders");
+      showAlert("Failed to Load Orders", err.response?.data?.message || "Failed to load orders", "error");
     } finally {
       setLoading(false);
     }
@@ -30,28 +50,34 @@ const ConsumerOrderTracking = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const cancelOrder = async (orderId, e) => {
+  const requestCancel = (orderId, e) => {
     e.stopPropagation();
     if (!orderId || cancellingOrder) return;
-    if (!window.confirm("Cancel this order?")) return;
+    setConfirmModal({ isOpen: true, orderId });
+  };
+
+  const confirmCancel = async () => {
+    const orderId = confirmModal.orderId;
+    if (!orderId) return;
     try {
       setCancellingOrder(orderId);
       await api.put(`/api/orders/${orderId}/cancel`);
       await loadOrders();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to cancel order");
+      showAlert("Cancel Failed", err.response?.data?.message || "Failed to cancel order", "error");
     } finally {
       setCancellingOrder(null);
+      setConfirmModal({ isOpen: false, orderId: null });
     }
   };
 
   const getStatusInfo = (status) => {
     const map = {
-      pending:   { color: "bg-yellow-100 text-yellow-800", dot: "bg-yellow-400", label: "Pending",   icon: "⏳" },
-      confirmed: { color: "bg-blue-100 text-blue-800",     dot: "bg-blue-500",   label: "Confirmed", icon: "✓"  },
-      shipped:   { color: "bg-purple-100 text-purple-800", dot: "bg-purple-500", label: "Shipped",   icon: "📦" },
-      delivered: { color: "bg-green-100 text-green-800",   dot: "bg-green-500",  label: "Delivered", icon: "✓✓" },
-      cancelled: { color: "bg-red-100 text-red-800",       dot: "bg-red-400",    label: "Cancelled", icon: "✗"  },
+      pending:   { color: "bg-yellow-100 text-yellow-800", dot: "bg-yellow-400", label: "Pending"   },
+      confirmed: { color: "bg-blue-100 text-blue-800",     dot: "bg-blue-500",   label: "Confirmed" },
+      shipped:   { color: "bg-purple-100 text-purple-800", dot: "bg-purple-500", label: "Shipped"   },
+      delivered: { color: "bg-green-100 text-green-800",   dot: "bg-green-500",  label: "Delivered" },
+      cancelled: { color: "bg-red-100 text-red-800",       dot: "bg-red-400",    label: "Cancelled" },
     };
     return map[status] || map.pending;
   };
@@ -83,6 +109,27 @@ const ConsumerOrderTracking = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+        confirmText="OK"
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, orderId: null })}
+        onConfirm={confirmCancel}
+        title="Cancel Order"
+        message="Are you sure you want to cancel this order? This action cannot be undone."
+        confirmText="Yes, Cancel"
+        cancelText="Keep Order"
+        type="danger"
+      />
+
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -93,10 +140,10 @@ const ConsumerOrderTracking = () => {
         {/* Stats */}
         <div className="grid grid-cols-4 gap-3 mb-6">
           {[
-            { label: "Total",     value: orders.length,                                                             color: "text-gray-900"   },
-            { label: "Active",    value: orders.filter(o => !["delivered","cancelled"].includes(o.status)).length,  color: "text-yellow-600" },
-            { label: "Delivered", value: orders.filter(o => o.status === "delivered").length,                       color: "text-green-600"  },
-            { label: "Cancelled", value: orders.filter(o => o.status === "cancelled").length,                       color: "text-red-600"    },
+            { label: "Total",     value: orders.length,                                                            color: "text-gray-900"   },
+            { label: "Active",    value: orders.filter(o => !["delivered","cancelled"].includes(o.status)).length, color: "text-yellow-600" },
+            { label: "Delivered", value: orders.filter(o => o.status === "delivered").length,                      color: "text-green-600"  },
+            { label: "Cancelled", value: orders.filter(o => o.status === "cancelled").length,                      color: "text-red-600"    },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl shadow-sm p-3 text-center border border-gray-100">
               <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -125,24 +172,22 @@ const ConsumerOrderTracking = () => {
           ))}
         </div>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
-        )}
-
         {filteredOrders.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
-            <div className="text-5xl mb-3">📦</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-1">No Orders Found</h3>
             <p className="text-gray-500 text-sm mb-5">
               {filter === "all" ? "You haven't placed any orders yet" : `No ${filter} orders`}
             </p>
-            <button onClick={() => navigate("/consumer")} className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition">
+            <button
+              onClick={() => navigate("/consumer")}
+              className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition"
+            >
               Start Shopping
             </button>
           </div>
         ) : (
           <>
-            {/* ── Square Cards Grid: 4 per row ── */}
+            {/* Square Cards Grid: 4 per row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {filteredOrders.map((order) => {
                 const orderId = order._id || order.id;
@@ -189,7 +234,7 @@ const ConsumerOrderTracking = () => {
                     {/* Cancel button overlaid at bottom */}
                     {canCancel && (
                       <button
-                        onClick={(e) => cancelOrder(orderId, e)}
+                        onClick={(e) => requestCancel(orderId, e)}
                         disabled={cancellingOrder === orderId}
                         className="absolute bottom-3 right-3 text-xs bg-red-50 hover:bg-red-100 text-red-600 font-semibold px-2 py-1 rounded-lg transition disabled:opacity-50"
                       >
@@ -206,7 +251,7 @@ const ConsumerOrderTracking = () => {
               })}
             </div>
 
-            {/* ── Expanded Detail Panel (below the grid) ── */}
+            {/* Expanded Detail Panel */}
             {expandedOrder && (() => {
               const order = filteredOrders.find(o => (o._id || o.id) === expandedOrder);
               if (!order) return null;
@@ -223,7 +268,7 @@ const ConsumerOrderTracking = () => {
                       <div className="flex items-center gap-3 mb-1">
                         <h3 className="text-xl font-bold text-gray-900">Order #{orderId?.toString().slice(-6)}</h3>
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${si.color}`}>
-                          {si.icon} {order.status?.toUpperCase()}
+                          {order.status?.toUpperCase()}
                         </span>
                       </div>
                       <p className="text-sm text-gray-500">
@@ -237,9 +282,9 @@ const ConsumerOrderTracking = () => {
                       </div>
                       <button
                         onClick={() => setExpandedOrder(null)}
-                        className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-sm transition"
+                        className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-sm font-bold transition"
                       >
-                        ✕
+                        X
                       </button>
                     </div>
                   </div>
@@ -262,7 +307,13 @@ const ConsumerOrderTracking = () => {
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                                 active ? "bg-green-500 text-white" : "bg-gray-200 text-gray-400"
                               } ${current ? "ring-4 ring-green-100 scale-110" : ""}`}>
-                                {active ? "✓" : idx + 1}
+                                {active ? (
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                ) : (
+                                  idx + 1
+                                )}
                               </div>
                               <div className={`text-xs mt-1.5 font-medium capitalize ${active ? "text-gray-800" : "text-gray-400"}`}>{step}</div>
                             </div>
@@ -282,7 +333,9 @@ const ConsumerOrderTracking = () => {
                       return (
                         <div key={idx} className="border border-gray-200 rounded-xl p-4">
                           <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100">
-                            <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">{farmerName.charAt(0)}</div>
+                            <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
+                              {farmerName.charAt(0)}
+                            </div>
                             <div>
                               <p className="font-semibold text-sm text-gray-900">{farmerName}</p>
                               <p className="text-xs text-gray-400">Shipment {idx + 1} of {order.shipments.length}</p>
@@ -291,7 +344,9 @@ const ConsumerOrderTracking = () => {
                           <div className="space-y-1.5 mb-3">
                             {shipment.items?.map((item, i) => (
                               <div key={i} className="flex justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
-                                <span className="font-medium text-gray-900">{item.name} <span className="text-gray-400 font-normal">×{item.quantity}</span></span>
+                                <span className="font-medium text-gray-900">
+                                  {item.name} <span className="text-gray-400 font-normal">x{item.quantity}</span>
+                                </span>
                                 <span className="font-semibold">Rs. {(item.price * item.quantity).toFixed(0)}</span>
                               </div>
                             ))}
@@ -321,7 +376,7 @@ const ConsumerOrderTracking = () => {
                     <div className="flex gap-2">
                       {canCancel && (
                         <button
-                          onClick={(e) => cancelOrder(orderId, e)}
+                          onClick={(e) => requestCancel(orderId, e)}
                           disabled={cancellingOrder === orderId}
                           className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition"
                         >

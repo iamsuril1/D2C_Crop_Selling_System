@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
 import { API_BASE_URL } from "../utils/config";
-import AlertModal from "../components/AlertModal"; // Add this import
+import AlertModal from "../components/AlertModal";
 
 const getCoords = () =>
   new Promise((resolve, reject) => {
@@ -26,17 +26,13 @@ const EditProfile = () => {
 
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState(null);
-
-  // Location state
   const [locLoading, setLocLoading] = useState(false);
-  const [locError, setLocError] = useState("");
   const [location, setLocation] = useState({
     lat: "",
     lng: "",
     addressText: "",
   });
 
-  // Alert modal state
   const [alertModal, setAlertModal] = useState({
     isOpen: false,
     title: "",
@@ -54,6 +50,14 @@ const EditProfile = () => {
     profileImage: null,
   });
 
+  const showAlert = (title, message, type = "error") => {
+    setAlertModal({ isOpen: true, title, message, type });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, isOpen: false }));
+  };
+
   useEffect(() => {
     if (!user) {
       navigate("/login");
@@ -69,7 +73,6 @@ const EditProfile = () => {
 
     if (user.profileImage) setPreview(`${API_BASE_URL}${user.profileImage}`);
 
-    // Prefill saved location (GeoJSON: [lng, lat]) [web:59]
     const coords = user?.location?.coordinates;
     if (Array.isArray(coords) && coords.length === 2) {
       const [lng, lat] = coords;
@@ -98,22 +101,19 @@ const EditProfile = () => {
 
   const handleLocationChange = (e) => {
     const { name, value } = e.target;
-    setLocError("");
     setLocation((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleUseCurrentLocation = async () => {
     try {
       setLocLoading(true);
-      setLocError("");
-
       const c = await getCoords();
       setLocation((prev) => ({ ...prev, lat: String(c.lat), lng: String(c.lng) }));
     } catch (err) {
-      if (err?.code === 1) setLocError("Location permission denied. Please allow location access.");
-      else if (err?.code === 2) setLocError("Location unavailable. Try again.");
-      else if (err?.code === 3) setLocError("Location timeout. Try again.");
-      else setLocError(err?.message || "Failed to get current location");
+      if (err?.code === 1)      showAlert("Permission Denied", "Location permission denied. Please allow location access.", "warning");
+      else if (err?.code === 2) showAlert("Location Unavailable", "Location unavailable. Please try again.", "warning");
+      else if (err?.code === 3) showAlert("Location Timeout", "Location request timed out. Please try again.", "warning");
+      else                      showAlert("Location Error", err?.message || "Failed to get current location.", "error");
     } finally {
       setLocLoading(false);
     }
@@ -122,13 +122,12 @@ const EditProfile = () => {
   const handleSaveLocation = async () => {
     try {
       setLocLoading(true);
-      setLocError("");
 
       const latNum = Number(location.lat);
       const lngNum = Number(location.lng);
 
       if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
-        setLocError("Latitude and longitude are required");
+        showAlert("Invalid Coordinates", "Latitude and longitude are required.", "warning");
         return;
       }
 
@@ -138,13 +137,12 @@ const EditProfile = () => {
         addressText: location.addressText,
       });
 
-      // Refresh user and go to profile
       const meRes = await api.get("/api/auth/me");
       setUser(meRes.data.user);
 
       navigate("/profile", { replace: true });
     } catch (err) {
-      setLocError(err.response?.data?.message || "Failed to update location");
+      showAlert("Save Failed", err.response?.data?.message || "Failed to update location.", "error");
     } finally {
       setLocLoading(false);
     }
@@ -168,13 +166,7 @@ const EditProfile = () => {
       setUser(res.data.user);
       navigate("/profile");
     } catch {
-      // Replace alert with AlertModal
-      setAlertModal({
-        isOpen: true,
-        title: "Update Failed",
-        message: "Failed to update profile. Please try again.",
-        type: "error",
-      });
+      showAlert("Update Failed", "Failed to update profile. Please try again.", "error");
     } finally {
       setLoading(false);
     }
@@ -184,18 +176,27 @@ const EditProfile = () => {
 
   return (
     <div className="min-h-screen bg-[#E0E0E0] py-12 px-4">
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+        confirmText="OK"
+      />
+
       <div className="max-w-2xl mx-auto bg-[#FFFFFF] rounded-2xl shadow-lg p-8">
         <h2 className="text-2xl font-bold mb-6 text-[#1D1D1D]">Edit Profile</h2>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* IMAGE */}
+          {/* Image */}
           <div className="flex items-center gap-6">
             <img
               src={preview || "/avatar.png"}
               alt="Preview"
               className="w-24 h-24 rounded-full border border-[#BDBDBD] object-cover"
             />
-
             <label className="cursor-pointer text-sm font-medium text-[#1E9C17]">
               Change Photo
               <input
@@ -208,9 +209,9 @@ const EditProfile = () => {
             </label>
           </div>
 
-          <Input label="First Name" name="firstName" value={formData.firstName} onChange={handleChange} />
-          <Input label="Last Name" name="lastName" value={formData.lastName} onChange={handleChange} />
-          <Input label="Email" name="email" type="email" value={formData.email} onChange={handleChange} />
+          <Input label="First Name"    name="firstName" value={formData.firstName} onChange={handleChange} />
+          <Input label="Last Name"     name="lastName"  value={formData.lastName}  onChange={handleChange} />
+          <Input label="Email"         name="email"     type="email"    value={formData.email}    onChange={handleChange} />
           <Input
             label="New Password"
             name="password"
@@ -220,12 +221,11 @@ const EditProfile = () => {
             placeholder="Leave blank to keep current password"
           />
 
-          {/* FARMER LOCATION */}
+          {/* Farmer Location */}
           {isFarmer && (
             <div className="border border-gray-200 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <h3 className="font-semibold text-gray-900">Farm Location</h3>
-
                 <button
                   type="button"
                   onClick={handleUseCurrentLocation}
@@ -261,8 +261,6 @@ const EditProfile = () => {
                 placeholder="Patan, Lalitpur"
               />
 
-              {locError && <p className="text-sm text-red-600">{locError}</p>}
-
               <button
                 type="button"
                 onClick={handleSaveLocation}
@@ -293,15 +291,6 @@ const EditProfile = () => {
           </div>
         </form>
       </div>
-
-      {/* Alert Modal */}
-      <AlertModal
-        isOpen={alertModal.isOpen}
-        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
-        title={alertModal.title}
-        message={alertModal.message}
-        type={alertModal.type}
-      />
     </div>
   );
 };

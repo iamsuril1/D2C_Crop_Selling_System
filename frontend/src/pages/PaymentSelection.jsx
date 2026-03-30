@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/axios";
 import { APIBASEURL } from "../utils/config";
+import AlertModal from "../components/AlertModal";
 
 const PaymentSelection = () => {
   const navigate = useNavigate();
@@ -13,6 +14,16 @@ const PaymentSelection = () => {
   const [proofPreviews, setProofPreviews] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+
+  const [alertModal, setAlertModal] = useState({ isOpen: false, type: "", title: "", message: "" });
+
+  const showAlert = (title, message, type = "error") => {
+    setAlertModal({ isOpen: true, title, message, type });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, isOpen: false }));
+  };
 
   useEffect(() => {
     if (!order) {
@@ -31,35 +42,32 @@ const PaymentSelection = () => {
       </div>
     );
   }
-  
+
   const orderId = order?._id || order?.id;
-  const orderShipments = Array.isArray(order?.shipments) ? order.shipments : [];
 
   useEffect(() => {
     if (!order || !Array.isArray(order.shipments)) return;
 
-    // Initialize payment selection for each shipment
     const initial = order.shipments.map(s => {
       const farmerPaymentInfo = s.farmerPaymentInfo || {};
-      
-      // Determine available methods for this farmer
+
       const availableMethods = ["cash_on_delivery"];
-      if (farmerPaymentInfo.esewaId) availableMethods.push("esewa");
-      if (farmerPaymentInfo.qrCodeImage) availableMethods.push("bank_qr");
+      if (farmerPaymentInfo.esewaId)       availableMethods.push("esewa");
+      if (farmerPaymentInfo.qrCodeImage)   availableMethods.push("bank_qr");
       if (farmerPaymentInfo.accountNumber) availableMethods.push("bank_transfer");
-      
+
       return {
         farmerId: s.farmer?._id || s.farmer,
         farmerName: s.farmer?.firstName ? `${s.farmer.firstName} ${s.farmer.lastName}` : "Farmer",
         amount: (s.subtotal || 0) + (s.deliveryFee || 0),
-        selectedMethod: "cash_on_delivery", // default
+        selectedMethod: "cash_on_delivery",
         availableMethods,
         farmerPaymentInfo,
         transactionId: "",
-        items: s.items || []
+        items: s.items || [],
       };
     });
-    
+
     setShipmentPayments(initial);
   }, [order]);
 
@@ -67,7 +75,6 @@ const PaymentSelection = () => {
     setShipmentPayments(prev =>
       prev.map(sp => sp.farmerId === farmerId ? { ...sp, selectedMethod: method } : sp)
     );
-    // Clear errors for this farmer
     setErrors(prev => {
       const newErrors = { ...prev };
       delete newErrors[farmerId];
@@ -90,18 +97,17 @@ const PaymentSelection = () => {
 
   const handleProofUpload = (farmerId, file) => {
     if (!file) return;
-    
-    // Validate file
+
     if (file.size > 5 * 1024 * 1024) {
       setErrors(prev => ({ ...prev, [`${farmerId}_proof`]: "File size must be less than 5MB" }));
       return;
     }
-    
-    if (!file.type.startsWith('image/')) {
+
+    if (!file.type.startsWith("image/")) {
       setErrors(prev => ({ ...prev, [`${farmerId}_proof`]: "Please upload an image file" }));
       return;
     }
-    
+
     setPaymentProofs(prev => ({ ...prev, [farmerId]: file }));
     setProofPreviews(prev => ({ ...prev, [farmerId]: URL.createObjectURL(file) }));
     setErrors(prev => {
@@ -113,9 +119,8 @@ const PaymentSelection = () => {
 
   const validatePayments = () => {
     const newErrors = {};
-    
+
     shipmentPayments.forEach(sp => {
-      // For online payments, require transaction ID and proof
       if (sp.selectedMethod !== "cash_on_delivery") {
         if (!sp.transactionId || sp.transactionId.trim() === "") {
           newErrors[`${sp.farmerId}_transactionId`] = "Transaction ID is required for online payment";
@@ -125,64 +130,56 @@ const PaymentSelection = () => {
         }
       }
     });
-    
+
     return newErrors;
   };
 
   const handleSubmitPayments = async () => {
-    // Validate
     const validationErrors = validatePayments();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      alert("Please complete all required payment information");
+      showAlert("Incomplete Payment Info", "Please complete all required payment information.", "warning");
       return;
     }
-    
+
     setSubmitting(true);
-    
+
     try {
-      // Group farmers by payment method for efficient submission
       const byMethod = shipmentPayments.reduce((acc, sp) => {
         if (!acc[sp.selectedMethod]) acc[sp.selectedMethod] = [];
         acc[sp.selectedMethod].push(sp);
         return acc;
       }, {});
 
-      // Submit payment for each method group
       for (const [method, shipments] of Object.entries(byMethod)) {
         if (method === "cash_on_delivery") {
-          // No proof needed for COD - batch submit
           await api.post("/api/payments/submit-proof", {
-            orderId: orderId,
+            orderId,
             farmerIds: shipments.map(s => s.farmerId),
-            paymentMethod: "cash_on_delivery"
+            paymentMethod: "cash_on_delivery",
           });
         } else {
-          // For online payments, submit individually with proof
           for (const shipment of shipments) {
             const formData = new FormData();
             formData.append("orderId", orderId);
             formData.append("farmerIds", JSON.stringify([shipment.farmerId]));
             formData.append("paymentMethod", method);
             formData.append("transactionId", shipment.transactionId || "");
-            
+
             const proof = paymentProofs[shipment.farmerId];
             if (proof) formData.append("paymentProof", proof);
-            
+
             await api.post("/api/payments/submit-proof", formData);
           }
         }
       }
 
-      // Success - redirect to dashboard
-      navigate("/consumer", { replace: true });
-      
-      // Show success message
       const orderDisplayId = orderId?.toString().slice(-6) || "unknown";
-      alert(`Payment submitted successfully! Order #${orderDisplayId} is being processed.`);
+      navigate("/consumer", { replace: true });
+      showAlert("Payment Submitted", `Order #${orderDisplayId} has been placed and is being processed.`, "success");
     } catch (err) {
       console.error("Payment submission error:", err);
-      alert(err.response?.data?.message || "Failed to submit payment. Please try again.");
+      showAlert("Payment Failed", err.response?.data?.message || "Failed to submit payment. Please try again.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -191,12 +188,20 @@ const PaymentSelection = () => {
   const totalAmount = shipmentPayments.reduce((sum, sp) => sum + sp.amount, 0);
   const hasCOD = shipmentPayments.some(sp => sp.selectedMethod === "cash_on_delivery");
   const hasOnline = shipmentPayments.some(sp => sp.selectedMethod !== "cash_on_delivery");
-
-  // ✅ FIX: Safe order ID display
   const orderDisplayId = orderId?.toString().slice(-6) || "N/A";
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+      />
+
       <div className="max-w-5xl mx-auto">
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           {/* Header */}
@@ -205,7 +210,7 @@ const PaymentSelection = () => {
             <div className="flex items-center gap-4 text-sm opacity-90">
               <span>Order #{orderDisplayId}</span>
               <span>•</span>
-              <span>{shipmentPayments.length} farmer{shipmentPayments.length > 1 ? 's' : ''}</span>
+              <span>{shipmentPayments.length} farmer{shipmentPayments.length > 1 ? "s" : ""}</span>
               <span>•</span>
               <span>Total: Rs. {totalAmount.toFixed(0)}</span>
             </div>
@@ -214,7 +219,7 @@ const PaymentSelection = () => {
           <div className="p-6 md:p-8">
             {/* Instructions */}
             <div className="mb-8 bg-blue-50 border border-blue-200 rounded-xl p-4">
-              <h3 className="font-semibold text-blue-900 mb-2">📋 Payment Instructions</h3>
+              <h3 className="font-semibold text-blue-900 mb-2">Payment Instructions</h3>
               <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
                 <li>Select your preferred payment method for each farmer</li>
                 <li>For online payments: Complete the payment and upload proof</li>
@@ -226,8 +231,16 @@ const PaymentSelection = () => {
             {/* Payment Summary */}
             <div className="mb-6 flex items-center justify-between p-4 bg-gray-50 rounded-xl">
               <div className="text-sm text-gray-600">
-                {hasCOD && <span className="mr-4">💵 {shipmentPayments.filter(sp => sp.selectedMethod === "cash_on_delivery").length} COD</span>}
-                {hasOnline && <span>💳 {shipmentPayments.filter(sp => sp.selectedMethod !== "cash_on_delivery").length} Online</span>}
+                {hasCOD && (
+                  <span className="mr-4">
+                    {shipmentPayments.filter(sp => sp.selectedMethod === "cash_on_delivery").length} COD
+                  </span>
+                )}
+                {hasOnline && (
+                  <span>
+                    {shipmentPayments.filter(sp => sp.selectedMethod !== "cash_on_delivery").length} Online
+                  </span>
+                )}
               </div>
               <div className="text-right">
                 <div className="text-sm text-gray-500">Total Amount</div>
@@ -244,7 +257,7 @@ const PaymentSelection = () => {
                     <div>
                       <h3 className="font-semibold text-lg text-gray-900">{sp.farmerName}</h3>
                       <p className="text-sm text-gray-500">
-                        {sp.items.length} item{sp.items.length !== 1 ? 's' : ''} • Shipment {index + 1}
+                        {sp.items.length} item{sp.items.length !== 1 ? "s" : ""} • Shipment {index + 1}
                       </p>
                     </div>
                     <div className="text-right">
@@ -283,15 +296,15 @@ const PaymentSelection = () => {
                         >
                           <div className="flex items-center gap-3 mb-2">
                             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                              sp.selectedMethod === "cash_on_delivery" 
-                                ? "border-green-500 bg-green-500" 
+                              sp.selectedMethod === "cash_on_delivery"
+                                ? "border-green-500 bg-green-500"
                                 : "border-gray-300"
                             }`}>
                               {sp.selectedMethod === "cash_on_delivery" && (
-                                <div className="w-2 h-2 bg-white rounded-full"></div>
+                                <div className="w-2 h-2 bg-white rounded-full" />
                               )}
                             </div>
-                            <div className="font-semibold">💵 Cash on Delivery</div>
+                            <div className="font-semibold">Cash on Delivery</div>
                           </div>
                           <div className="text-xs text-gray-500 ml-8">
                             Pay Rs. {sp.amount.toFixed(0)} when you receive
@@ -311,15 +324,15 @@ const PaymentSelection = () => {
                           >
                             <div className="flex items-center gap-3 mb-2">
                               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                                sp.selectedMethod === "esewa" 
-                                  ? "border-blue-500 bg-blue-500" 
+                                sp.selectedMethod === "esewa"
+                                  ? "border-blue-500 bg-blue-500"
                                   : "border-gray-300"
                               }`}>
                                 {sp.selectedMethod === "esewa" && (
-                                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                                  <div className="w-2 h-2 bg-white rounded-full" />
                                 )}
                               </div>
-                              <div className="font-semibold">📱 eSewa</div>
+                              <div className="font-semibold">eSewa</div>
                             </div>
                             <div className="text-xs text-gray-500 ml-8">
                               ID: {sp.farmerPaymentInfo.esewaId}
@@ -340,15 +353,15 @@ const PaymentSelection = () => {
                           >
                             <div className="flex items-center gap-3 mb-2">
                               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                                sp.selectedMethod === "bank_qr" 
-                                  ? "border-purple-500 bg-purple-500" 
+                                sp.selectedMethod === "bank_qr"
+                                  ? "border-purple-500 bg-purple-500"
                                   : "border-gray-300"
                               }`}>
                                 {sp.selectedMethod === "bank_qr" && (
-                                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                                  <div className="w-2 h-2 bg-white rounded-full" />
                                 )}
                               </div>
-                              <div className="font-semibold">📷 Bank QR</div>
+                              <div className="font-semibold">Bank QR</div>
                             </div>
                             <div className="text-xs text-gray-500 ml-8">
                               {sp.farmerPaymentInfo.bankName}
@@ -369,15 +382,15 @@ const PaymentSelection = () => {
                           >
                             <div className="flex items-center gap-3 mb-2">
                               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                                sp.selectedMethod === "bank_transfer" 
-                                  ? "border-green-500 bg-green-500" 
+                                sp.selectedMethod === "bank_transfer"
+                                  ? "border-green-500 bg-green-500"
                                   : "border-gray-300"
                               }`}>
                                 {sp.selectedMethod === "bank_transfer" && (
-                                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                                  <div className="w-2 h-2 bg-white rounded-full" />
                                 )}
                               </div>
-                              <div className="font-semibold">🏦 Bank Transfer</div>
+                              <div className="font-semibold">Bank Transfer</div>
                             </div>
                             <div className="text-xs text-gray-500 ml-8">
                               {sp.farmerPaymentInfo.bankName}
@@ -387,10 +400,10 @@ const PaymentSelection = () => {
                       </div>
                     </div>
 
-                    {/* Payment Instructions Based on Selected Method */}
+                    {/* eSewa Instructions */}
                     {sp.selectedMethod === "esewa" && sp.farmerPaymentInfo?.esewaId && (
                       <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
-                        <h4 className="font-semibold text-blue-900 mb-3">📱 eSewa Payment Instructions:</h4>
+                        <h4 className="font-semibold text-blue-900 mb-3">eSewa Payment Instructions:</h4>
                         <ol className="text-sm space-y-2 list-decimal list-inside text-blue-800 mb-4">
                           <li>Open eSewa app on your phone</li>
                           <li>Go to "Send Money" or "Transfer"</li>
@@ -399,7 +412,7 @@ const PaymentSelection = () => {
                           <li>Complete the payment</li>
                           <li>Enter transaction ID and upload screenshot below</li>
                         </ol>
-                        
+
                         <div className="space-y-3">
                           <div>
                             <label className="block text-sm font-medium mb-2 text-blue-900">
@@ -411,14 +424,14 @@ const PaymentSelection = () => {
                               value={sp.transactionId}
                               onChange={(e) => updateTransactionId(sp.farmerId, e.target.value)}
                               className={`w-full border rounded-lg px-4 py-2 ${
-                                errors[`${sp.farmerId}_transactionId`] ? 'border-red-500' : 'border-gray-300'
+                                errors[`${sp.farmerId}_transactionId`] ? "border-red-500" : "border-gray-300"
                               }`}
                             />
                             {errors[`${sp.farmerId}_transactionId`] && (
                               <p className="text-red-500 text-xs mt-1">{errors[`${sp.farmerId}_transactionId`]}</p>
                             )}
                           </div>
-                          
+
                           <div>
                             <label className="block text-sm font-medium mb-2 text-blue-900">
                               Payment Screenshot <span className="text-red-500">*</span>
@@ -432,14 +445,9 @@ const PaymentSelection = () => {
                             {errors[`${sp.farmerId}_proof`] && (
                               <p className="text-red-500 text-xs mt-1">{errors[`${sp.farmerId}_proof`]}</p>
                             )}
-                            
                             {proofPreviews[sp.farmerId] && (
                               <div className="mt-3">
-                                <img
-                                  src={proofPreviews[sp.farmerId]}
-                                  alt="Payment proof"
-                                  className="w-full max-w-sm rounded-lg border"
-                                />
+                                <img src={proofPreviews[sp.farmerId]} alt="Payment proof" className="w-full max-w-sm rounded-lg border" />
                               </div>
                             )}
                           </div>
@@ -447,10 +455,11 @@ const PaymentSelection = () => {
                       </div>
                     )}
 
+                    {/* Bank QR Instructions */}
                     {sp.selectedMethod === "bank_qr" && sp.farmerPaymentInfo?.qrCodeImage && (
                       <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
-                        <h4 className="font-semibold text-purple-900 mb-3">📷 Scan QR Code to Pay:</h4>
-                        
+                        <h4 className="font-semibold text-purple-900 mb-3">Scan QR Code to Pay:</h4>
+
                         <div className="flex flex-col md:flex-row gap-4 mb-4">
                           <div className="flex-shrink-0">
                             <img
@@ -459,22 +468,19 @@ const PaymentSelection = () => {
                               className="w-48 h-48 object-contain border-2 border-purple-300 rounded-lg bg-white p-2"
                             />
                           </div>
-                          
                           <div className="flex-1">
-                            <p className="text-sm text-purple-800 mb-3">
-                              <strong>Instructions:</strong>
-                            </p>
+                            <p className="text-sm text-purple-800 mb-3 font-medium">Instructions:</p>
                             <ol className="text-sm space-y-2 list-decimal list-inside text-purple-800">
                               <li>Open {sp.farmerPaymentInfo.bankName} mobile banking app</li>
                               <li>Find "Scan QR" or "QR Payment" option</li>
-                              <li>Scan the QR code shown on left</li>
+                              <li>Scan the QR code shown on the left</li>
                               <li>Verify amount: <strong>Rs. {sp.amount.toFixed(0)}</strong></li>
                               <li>Complete the payment</li>
                               <li>Upload screenshot and transaction ID below</li>
                             </ol>
                           </div>
                         </div>
-                        
+
                         <div className="space-y-3">
                           <div>
                             <label className="block text-sm font-medium mb-2 text-purple-900">
@@ -488,7 +494,7 @@ const PaymentSelection = () => {
                               className="w-full border border-gray-300 rounded-lg px-4 py-2"
                             />
                           </div>
-                          
+
                           <div>
                             <label className="block text-sm font-medium mb-2 text-purple-900">
                               Payment Screenshot <span className="text-red-500">*</span>
@@ -502,14 +508,9 @@ const PaymentSelection = () => {
                             {errors[`${sp.farmerId}_proof`] && (
                               <p className="text-red-500 text-xs mt-1">{errors[`${sp.farmerId}_proof`]}</p>
                             )}
-                            
                             {proofPreviews[sp.farmerId] && (
                               <div className="mt-3">
-                                <img
-                                  src={proofPreviews[sp.farmerId]}
-                                  alt="Payment proof"
-                                  className="w-full max-w-sm rounded-lg border"
-                                />
+                                <img src={proofPreviews[sp.farmerId]} alt="Payment proof" className="w-full max-w-sm rounded-lg border" />
                               </div>
                             )}
                           </div>
@@ -517,10 +518,11 @@ const PaymentSelection = () => {
                       </div>
                     )}
 
+                    {/* Bank Transfer Instructions */}
                     {sp.selectedMethod === "bank_transfer" && sp.farmerPaymentInfo?.accountNumber && (
                       <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
-                        <h4 className="font-semibold text-green-900 mb-3">🏦 Bank Transfer Details:</h4>
-                        
+                        <h4 className="font-semibold text-green-900 mb-3">Bank Transfer Details:</h4>
+
                         <div className="bg-white rounded-lg p-4 mb-4 space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-gray-600">Bank Name:</span>
@@ -545,7 +547,7 @@ const PaymentSelection = () => {
                             <span className="font-bold text-green-700 text-lg">Rs. {sp.amount.toFixed(0)}</span>
                           </div>
                         </div>
-                        
+
                         <div className="space-y-3">
                           <div>
                             <label className="block text-sm font-medium mb-2 text-green-900">
@@ -557,14 +559,14 @@ const PaymentSelection = () => {
                               value={sp.transactionId}
                               onChange={(e) => updateTransactionId(sp.farmerId, e.target.value)}
                               className={`w-full border rounded-lg px-4 py-2 ${
-                                errors[`${sp.farmerId}_transactionId`] ? 'border-red-500' : 'border-gray-300'
+                                errors[`${sp.farmerId}_transactionId`] ? "border-red-500" : "border-gray-300"
                               }`}
                             />
                             {errors[`${sp.farmerId}_transactionId`] && (
                               <p className="text-red-500 text-xs mt-1">{errors[`${sp.farmerId}_transactionId`]}</p>
                             )}
                           </div>
-                          
+
                           <div>
                             <label className="block text-sm font-medium mb-2 text-green-900">
                               Transfer Screenshot <span className="text-red-500">*</span>
@@ -578,14 +580,9 @@ const PaymentSelection = () => {
                             {errors[`${sp.farmerId}_proof`] && (
                               <p className="text-red-500 text-xs mt-1">{errors[`${sp.farmerId}_proof`]}</p>
                             )}
-                            
                             {proofPreviews[sp.farmerId] && (
                               <div className="mt-3">
-                                <img
-                                  src={proofPreviews[sp.farmerId]}
-                                  alt="Payment proof"
-                                  className="w-full max-w-sm rounded-lg border"
-                                />
+                                <img src={proofPreviews[sp.farmerId]} alt="Payment proof" className="w-full max-w-sm rounded-lg border" />
                               </div>
                             )}
                           </div>
@@ -593,17 +590,18 @@ const PaymentSelection = () => {
                       </div>
                     )}
 
+                    {/* COD Confirmation */}
                     {sp.selectedMethod === "cash_on_delivery" && (
                       <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
-                        <h4 className="font-semibold text-green-900 mb-2">💵 Cash on Delivery</h4>
+                        <h4 className="font-semibold text-green-900 mb-2">Cash on Delivery</h4>
                         <p className="text-sm text-green-800">
-                          You will pay <strong>Rs. {sp.amount.toFixed(0)}</strong> to the farmer when you receive your order. 
+                          You will pay <strong>Rs. {sp.amount.toFixed(0)}</strong> to the farmer when you receive your order.
                           Please have exact change ready for a smooth transaction.
                         </p>
-                        <div className="mt-3 text-xs text-green-700">
-                          ✓ No online payment needed<br/>
-                          ✓ Verify products before payment<br/>
-                          ✓ Most trusted method
+                        <div className="mt-3 text-xs text-green-700 space-y-0.5">
+                          <p>No online payment needed</p>
+                          <p>Verify products before payment</p>
+                          <p>Most trusted method</p>
                         </div>
                       </div>
                     )}
@@ -617,14 +615,16 @@ const PaymentSelection = () => {
               <div className="flex items-center justify-between mb-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl">
                 <div>
                   <div className="text-sm text-gray-600 mb-1">Total Order Amount</div>
-                  <div className="text-4xl font-bold text-gray-900">
-                    Rs. {totalAmount.toFixed(0)}
-                  </div>
+                  <div className="text-4xl font-bold text-gray-900">Rs. {totalAmount.toFixed(0)}</div>
                 </div>
                 <div className="text-right text-sm text-gray-600">
-                  <div>{shipmentPayments.length} shipment{shipmentPayments.length > 1 ? 's' : ''}</div>
-                  {hasCOD && <div>💵 {shipmentPayments.filter(sp => sp.selectedMethod === "cash_on_delivery").length} COD</div>}
-                  {hasOnline && <div>💳 {shipmentPayments.filter(sp => sp.selectedMethod !== "cash_on_delivery").length} Online</div>}
+                  <div>{shipmentPayments.length} shipment{shipmentPayments.length > 1 ? "s" : ""}</div>
+                  {hasCOD && (
+                    <div>{shipmentPayments.filter(sp => sp.selectedMethod === "cash_on_delivery").length} COD</div>
+                  )}
+                  {hasOnline && (
+                    <div>{shipmentPayments.filter(sp => sp.selectedMethod !== "cash_on_delivery").length} Online</div>
+                  )}
                 </div>
               </div>
 
@@ -639,7 +639,7 @@ const PaymentSelection = () => {
                     Processing Payment...
                   </span>
                 ) : (
-                  "Confirm Payment & Place Order"
+                  "Confirm Payment and Place Order"
                 )}
               </button>
 

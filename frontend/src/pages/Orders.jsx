@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { CartContext } from "../context/CartContext";
 import api from "../api/axios";
 import { APIBASEURL } from "../utils/config";
+import AlertModal from "../components/AlertModal";
 
 const Orders = () => {
   const navigate = useNavigate();
@@ -13,40 +14,46 @@ const Orders = () => {
   const [appliedPromo, setAppliedPromo] = useState("");
   const [placingOrder, setPlacingOrder] = useState(false);
   const [loadingEstimate, setLoadingEstimate] = useState(false);
-  const [error, setError] = useState("");
 
-  // ✅ FIXED: Build items array for backend API
+  const [alertModal, setAlertModal] = useState({ isOpen: false, type: "", title: "", message: "" });
+
+  const showAlert = (title, message, type = "error") => {
+    setAlertModal({ isOpen: true, title, message, type });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  // Build items array for backend API
   const buildOrderItems = useMemo(() => {
-    return (cartItems || []).map((it) => ({
-      productId: it.id || it.productId || it._id,
-      quantity: Math.max(1, Number(it?.quantity || 1)),
-    })).filter(it => it.productId); // Only valid items
+    return (cartItems || [])
+      .map((it) => ({
+        productId: it.id || it.productId || it._id,
+        quantity: Math.max(1, Number(it?.quantity || 1)),
+      }))
+      .filter((it) => it.productId);
   }, [cartItems]);
 
-  // Call backend estimate API
   const fetchEstimate = async () => {
     if (buildOrderItems.length === 0) return;
-    
     setLoadingEstimate(true);
-    setError("");
     try {
       const res = await api.post("/api/orders/estimate", { items: buildOrderItems });
       setEstimate(res.data);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to calculate delivery");
+      showAlert("Delivery Calculation Failed", err.response?.data?.message || "Failed to calculate delivery.", "error");
     } finally {
       setLoadingEstimate(false);
     }
   };
 
-  // Auto-fetch estimate when cart changes
   useEffect(() => {
     if (buildOrderItems.length > 0) {
       fetchEstimate();
     }
   }, [buildOrderItems.length]);
 
-  // Fallback frontend calculation (if backend fails)
   const fallbackSubtotal = useMemo(() => {
     return (cartItems || []).reduce((sum, it) => {
       const price = Number(it?.price || 0);
@@ -77,22 +84,14 @@ const Orders = () => {
 
   const handleCheckout = async () => {
     if (placingOrder || buildOrderItems.length === 0) return;
-
-    setError("");
     setPlacingOrder(true);
 
     try {
       const res = await api.post("/api/orders", { items: buildOrderItems });
-      
-      // ✅ Clear THIS user's cart only
       clearCart();
-      
-      // ✅ Redirect to payment page
-      navigate("/payment", { 
-        state: { order: res.data } 
-      });
+      navigate("/payment", { state: { order: res.data } });
     } catch (err) {
-      setError(err.response?.data?.message || "Checkout failed");
+      showAlert("Checkout Failed", err.response?.data?.message || "Checkout failed. Please try again.", "error");
     } finally {
       setPlacingOrder(false);
     }
@@ -108,7 +107,7 @@ const Orders = () => {
             onClick={() => navigate("/consumer")}
             className="bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-3 rounded-xl transition"
           >
-            Continue Shopping →
+            Continue Shopping
           </button>
         </div>
       </div>
@@ -117,19 +116,29 @@ const Orders = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-10">
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+      />
+
       <div className="max-w-6xl mx-auto">
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
             <p className="text-gray-600 mt-1">
-              {cartItems.length} item{cartItems.length !== 1 ? 's' : ''}
+              {cartItems.length} item{cartItems.length !== 1 ? "s" : ""}
             </p>
           </div>
           <button
             onClick={() => navigate("/consumer")}
             className="text-green-600 hover:underline font-medium"
           >
-            ← Continue Shopping
+            Continue Shopping
           </button>
         </div>
 
@@ -158,7 +167,7 @@ const Orders = () => {
                           {item?.name || "Product"}
                         </h3>
                         <p className="text-sm text-gray-500">
-                          {item?.farmer?.firstName 
+                          {item?.farmer?.firstName
                             ? `From ${item.farmer.firstName} ${item.farmer.lastName}`
                             : "Local farm"
                           }
@@ -168,8 +177,11 @@ const Orders = () => {
                         onClick={() => removeFromCart(item?.id)}
                         className="text-gray-400 hover:text-red-500 p-1 -m-1 rounded-full hover:bg-red-50 transition"
                         title="Remove item"
+                        aria-label="Remove item"
                       >
-                        ✕
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
                     </div>
 
@@ -181,7 +193,7 @@ const Orders = () => {
                           onClick={() => updateQty(item?.id, Number(item?.quantity || 1) - 1)}
                           disabled={Number(item?.quantity || 1) <= 1}
                         >
-                          −
+                          -
                         </button>
                         <span className="px-4 py-2 font-bold bg-white rounded-lg min-w-[3rem] text-center">
                           {item?.quantity || 1}
@@ -208,15 +220,14 @@ const Orders = () => {
           {/* Order Summary */}
           <div className="bg-white border rounded-2xl p-6 lg:sticky lg:top-8 h-fit shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Order Summary</h2>
-            
+
             <div className="space-y-3 mb-6">
               <div className="flex justify-between text-sm">
                 <span>Subtotal ({cartItems.length} items)</span>
                 <span>Rs. {subtotal.toFixed(0)}</span>
               </div>
-              
               <div className="flex justify-between text-sm font-medium">
-                <span>Delivery ({shipmentCount} shipment{shipmentCount > 1 ? 's' : ''})</span>
+                <span>Delivery ({shipmentCount} shipment{shipmentCount > 1 ? "s" : ""})</span>
                 <span className="text-green-600">Rs. {deliveryTotal.toFixed(0)}</span>
               </div>
             </div>
@@ -236,28 +247,22 @@ const Orders = () => {
               </button>
             </div>
 
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm mb-6">
-                {error}
-              </div>
-            )}
-
             <div className="border-t pt-6 space-y-4">
               <div className="flex justify-between text-2xl font-bold">
                 <span>Total</span>
                 <span className="text-green-600">Rs. {grandTotal.toFixed(0)}</span>
               </div>
-              
+
               <button
                 disabled={placingOrder || loadingEstimate || buildOrderItems.length === 0}
                 onClick={handleCheckout}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-bold py-4 px-6 rounded-xl text-lg transition shadow-lg disabled:cursor-not-allowed"
               >
-                {placingOrder 
-                  ? "Placing Order..." 
-                  : loadingEstimate 
-                    ? "Calculating Delivery..." 
-                    : "Proceed to Payment"
+                {placingOrder
+                  ? "Placing Order..."
+                  : loadingEstimate
+                  ? "Calculating Delivery..."
+                  : "Proceed to Payment"
                 }
               </button>
 

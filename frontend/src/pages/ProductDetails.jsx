@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/axios";
 import { APIBASEURL } from "../utils/config";
 import { CartContext } from "../context/CartContext";
+import AlertModal from "../components/AlertModal";
 
 const fmtDate = (v) => {
   if (!v) return "Not specified";
@@ -29,7 +30,16 @@ const ProductDetails = () => {
   const [qty, setQty] = useState(1);
   const [related, setRelated] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+
+  const [alertModal, setAlertModal] = useState({ isOpen: false, type: "", title: "", message: "" });
+
+  const showAlert = (title, message, type = "error") => {
+    setAlertModal({ isOpen: true, title, message, type });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, isOpen: false }));
+  };
 
   const imgSrc = p?.image ? `${APIBASEURL}${p.image}` : "/placeholder-product.jpg";
   const farmName = [p?.farmer?.firstName, p?.farmer?.lastName].filter(Boolean).join(" ") || "Farm";
@@ -42,7 +52,6 @@ const ProductDetails = () => {
   const load = async () => {
     try {
       setLoading(true);
-      setError("");
 
       const { data } = await api.get(`/api/products/${id}`);
       setP(data);
@@ -53,7 +62,7 @@ const ProductDetails = () => {
       const pool = list.filter((x) => (x?.id || x?._id) !== currentId);
       setRelated(shuffle(pool).slice(0, 4));
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load product");
+      showAlert("Failed to Load Product", err.response?.data?.message || "Failed to load product.", "error");
     } finally {
       setLoading(false);
     }
@@ -84,11 +93,22 @@ const ProductDetails = () => {
     );
   }
 
-  if (error) {
+  if (!p) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+
+        <AlertModal
+          isOpen={alertModal.isOpen}
+          onClose={closeAlert}
+          type={alertModal.type}
+          title={alertModal.title}
+          message={alertModal.message}
+          confirmText="OK"
+          onConfirm={load}
+        />
+
         <div className="bg-white border rounded-xl p-6 w-full max-w-md text-center">
-          <p className="text-red-600 font-semibold">{error}</p>
+          <p className="text-gray-600">Product not found.</p>
           <button
             type="button"
             onClick={load}
@@ -97,14 +117,6 @@ const ProductDetails = () => {
             Retry
           </button>
         </div>
-      </div>
-    );
-  }
-
-  if (!p) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-600">
-        Product not found
       </div>
     );
   }
@@ -118,7 +130,19 @@ const ProductDetails = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+        onConfirm={load}
+      />
+
       <div className="max-w-6xl mx-auto space-y-6">
+        {/* Breadcrumb */}
         <div className="text-sm text-gray-500">
           <button className="hover:underline" onClick={() => navigate("/")}>Home</button>
           <span className="mx-2">›</span>
@@ -134,15 +158,14 @@ const ProductDetails = () => {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden grid md:grid-cols-2">
+          {/* Image */}
           <div className="p-4 md:p-6">
             <div className="bg-gray-50 rounded-2xl overflow-hidden">
               <img
                 src={imgSrc}
                 alt={p?.name}
                 className="w-full h-80 object-cover"
-                onError={(e) => {
-                  e.currentTarget.src = "/placeholder-product.jpg";
-                }}
+                onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
               />
             </div>
 
@@ -157,23 +180,29 @@ const ProductDetails = () => {
                     src={imgSrc}
                     alt={`${p?.name} ${k + 1}`}
                     className="w-full h-16 object-cover"
-                    onError={(e) => {
-                      e.currentTarget.src = "/placeholder-product.jpg";
-                    }}
+                    onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
                   />
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Details */}
           <div className="p-4 md:p-6 space-y-5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h1 className="text-3xl font-extrabold text-gray-900 truncate">{p?.name}</h1>
                 <p className="text-sm text-gray-500 mt-1 truncate">{farmName}</p>
               </div>
-              <button className="text-gray-400 hover:text-gray-700" type="button" title="Wishlist">
-                ♡
+              <button
+                className="text-gray-400 hover:text-red-500 transition"
+                type="button"
+                title="Add to wishlist"
+                aria-label="Add to wishlist"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+                </svg>
               </button>
             </div>
 
@@ -238,6 +267,7 @@ const ProductDetails = () => {
               <p className="text-gray-600 leading-relaxed">{p?.description || "No description available."}</p>
             </div>
 
+            {/* Quantity */}
             <div className="space-y-2">
               <div className="text-sm font-semibold text-gray-700">Quantity</div>
               <div className="flex items-center gap-3">
@@ -259,13 +289,13 @@ const ProductDetails = () => {
                     +
                   </button>
                 </div>
-
                 <div className="text-sm text-gray-600">
                   Total: <span className="font-bold text-gray-900">Rs. {total}</span>
                 </div>
               </div>
             </div>
 
+            {/* Actions */}
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
@@ -293,6 +323,7 @@ const ProductDetails = () => {
               </button>
             </div>
 
+            {/* Delivery Estimate */}
             <div className="bg-gray-50 rounded-2xl p-4 border">
               <div className="font-semibold text-gray-900">Delivery Estimate</div>
               <div className="mt-2 flex gap-2">
@@ -307,13 +338,12 @@ const ProductDetails = () => {
                   Check
                 </button>
               </div>
-              <div className="mt-2 text-xs text-gray-500">
-                Delivery time depends on location.
-              </div>
+              <div className="mt-2 text-xs text-gray-500">Delivery time depends on location.</div>
             </div>
           </div>
         </div>
 
+        {/* Farmer Card */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <div className="font-bold text-gray-900 mb-3">Meet your farmer</div>
           <div className="flex items-center gap-4">
@@ -333,6 +363,7 @@ const ProductDetails = () => {
           </div>
         </div>
 
+        {/* Related Products */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-extrabold text-gray-900">You may also like</h2>

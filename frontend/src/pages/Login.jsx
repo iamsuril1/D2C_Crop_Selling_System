@@ -2,7 +2,7 @@ import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import api from "../api/axios";
-
+import AlertModal from "../components/AlertModal";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -12,51 +12,47 @@ const Login = () => {
     email: "",
     password: "",
   });
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [alertModal, setAlertModal] = useState({ isOpen: false, type: "", title: "", message: "" });
+
+  const showAlert = (title, message, type = "error") => {
+    setAlertModal({ isOpen: true, title, message, type });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, isOpen: false }));
+  };
+
   const handleChange = (e) => {
-    setError(""); // clear error when user types
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (loading) return;
 
     const email = formData.email.trim();
     const password = formData.password.trim();
 
-    // ✅ Explicit page-level error if fields are missing
     if (!email && !password) {
-      setError("Email and password are required");
+      showAlert("Validation Error", "Email and password are required.", "warning");
       return;
     }
-
     if (!email) {
-      setError("Email is required");
+      showAlert("Validation Error", "Email is required.", "warning");
       return;
     }
-
     if (!password) {
-      setError("Password is required");
+      showAlert("Validation Error", "Password is required.", "warning");
       return;
     }
 
-    setError("");
     setLoading(true);
 
     try {
-      const res = await api.post("/api/auth/login", {
-        email,
-        password,
-      });
+      const res = await api.post("/api/auth/login", { email, password });
 
-      // Validate backend response
       if (!res?.data?.token || !res?.data?.user) {
         throw new Error("Invalid server response");
       }
@@ -68,18 +64,16 @@ const Login = () => {
       let message = "Login failed. Please try again.";
 
       if (!navigator.onLine) {
-        message = "No internet connection";
+        message = "No internet connection.";
       } else if (err.response) {
-        message =
-          err.response.data?.message ||
-          `Server error (${err.response.status})`;
+        message = err.response.data?.message || `Server error (${err.response.status})`;
       } else if (err.request) {
         message = "Server is not responding. Please try later.";
       } else if (err.message) {
         message = err.message;
       }
 
-      setError(message);
+      showAlert("Login Failed", message, "error");
     } finally {
       setLoading(false);
     }
@@ -87,7 +81,17 @@ const Login = () => {
 
   return (
     <div className="min-h-screen grid md:grid-cols-2 font-[Poppins]">
-      {/* LEFT FORM */}
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+      />
+
+      {/* Left Form */}
       <div className="flex items-center justify-center px-6 py-16 bg-gradient-to-b from-[#E6F4EA] to-[#FDF8E3]">
         <form
           onSubmit={handleSubmit}
@@ -125,30 +129,24 @@ const Login = () => {
           </div>
 
           <div className="text-right -mt-4">
-  <span
-    onClick={() => navigate("/forgot-password")}
-    className="text-sm text-[#1E9C17] cursor-pointer hover:underline"
-  >
-    Forgot password?
-  </span>
-</div>
-
-          {/* ✅ Page-level error */}
-          {error && (
-            <p className="text-red-500 text-sm text-center">{error}</p>
-          )}
+            <span
+              onClick={() => navigate("/forgot-password")}
+              className="text-sm text-[#1E9C17] cursor-pointer hover:underline"
+            >
+              Forgot password?
+            </span>
+          </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-[#1E9C17] to-[#27AE60] text-white py-3 rounded-2xl
-                       font-semibold tracking-wide shadow-lg hover:scale-105 hover:shadow-2xl transition"
+            className="w-full bg-gradient-to-r from-[#1E9C17] to-[#27AE60] text-white py-3 rounded-2xl font-semibold tracking-wide shadow-lg hover:scale-105 hover:shadow-2xl transition"
           >
             {loading ? "Logging in..." : "Login"}
           </button>
 
           <p className="text-center text-sm text-gray-700">
-            Don’t have an account?{" "}
+            Don't have an account?{" "}
             <span
               className="text-[#1E9C17] cursor-pointer font-medium hover:underline"
               onClick={() => navigate("/register")}
@@ -159,7 +157,7 @@ const Login = () => {
         </form>
       </div>
 
-      {/* RIGHT IMAGE */}
+      {/* Right Image */}
       <div className="hidden md:block relative">
         <img
           src="Login.jpg"
@@ -181,8 +179,7 @@ const Login = () => {
           </h1>
 
           <p className="text-base text-gray-200 leading-relaxed max-w-2xl">
-            MeroBari bridges the gap between farmers and consumers by eliminating
-            middlemen.
+            MeroBari bridges the gap between farmers and consumers by eliminating middlemen.
           </p>
         </div>
       </div>

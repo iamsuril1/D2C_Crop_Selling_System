@@ -8,21 +8,31 @@ const FarmerOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
-  const [error, setError] = useState("");
   const [updatingOrder, setUpdatingOrder] = useState(null);
   const [expandedOrder, setExpandedOrder] = useState(null);
 
-  const [alert, setAlert] = useState({ isOpen: false, type: "", title: "", message: "" });
-  const [confirm, setConfirm] = useState({ isOpen: false, action: null, title: "", message: "", confirmText: "" });
+  const [alertModal, setAlertModal] = useState({ isOpen: false, type: "", title: "", message: "" });
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, action: null, type: "", title: "", message: "", confirmText: "" });
+
+  const showAlert = (title, message, type = "error") => {
+    setAlertModal({ isOpen: true, title, message, type });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const closeConfirm = () => {
+    setConfirmModal((prev) => ({ ...prev, isOpen: false, action: null }));
+  };
 
   const loadOrders = async () => {
     try {
       setLoading(true);
-      setError("");
       const res = await api.get("/api/orders/farmer");
       setOrders(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load orders");
+      showAlert("Failed to Load Orders", err.response?.data?.message || "Failed to load orders", "error");
     } finally {
       setLoading(false);
     }
@@ -30,9 +40,9 @@ const FarmerOrders = () => {
 
   useEffect(() => { loadOrders(); }, []);
 
-  const updateOrderStatus = async (orderId, newStatus) => {
+  const updateOrderStatus = (orderId, newStatus) => {
     if (!orderId || updatingOrder) return;
-    setConfirm({
+    setConfirmModal({
       isOpen: true,
       type: "warning",
       title: "Update Order Status",
@@ -43,20 +53,20 @@ const FarmerOrders = () => {
           setUpdatingOrder(orderId);
           await api.put(`/api/orders/${orderId}/status`, { status: newStatus });
           await loadOrders();
-          setAlert({ isOpen: true, type: "success", title: "Updated", message: `Order updated to ${newStatus}` });
+          showAlert("Updated", `Order updated to ${newStatus}`, "success");
         } catch (err) {
-          setAlert({ isOpen: true, type: "error", title: "Failed", message: err.response?.data?.message || "Failed to update" });
+          showAlert("Update Failed", err.response?.data?.message || "Failed to update", "error");
         } finally {
           setUpdatingOrder(null);
         }
-      }
+      },
     });
   };
 
   const cancelOrderByFarmer = (orderId, e) => {
     e?.stopPropagation();
     if (!orderId || updatingOrder) return;
-    setConfirm({
+    setConfirmModal({
       isOpen: true,
       type: "danger",
       title: "Cancel Order",
@@ -67,37 +77,41 @@ const FarmerOrders = () => {
           setUpdatingOrder(orderId);
           await api.put(`/api/orders/${orderId}/cancel`);
           await loadOrders();
-          setAlert({ isOpen: true, type: "success", title: "Cancelled", message: "Order cancelled successfully" });
+          showAlert("Cancelled", "Order cancelled successfully", "success");
         } catch (err) {
-          setAlert({ isOpen: true, type: "error", title: "Failed", message: err.response?.data?.message || "Failed to cancel order" });
+          showAlert("Cancel Failed", err.response?.data?.message || "Failed to cancel order", "error");
         } finally {
           setUpdatingOrder(null);
         }
-      }
+      },
     });
   };
 
-  const verifyPayment = async (orderId, status) => {
+  const verifyPayment = (orderId, status) => {
     if (!orderId || updatingOrder) return;
-    const action = status === "paid" ? "verify" : "reject";
-    setConfirm({
+    const isVerify = status === "paid";
+    setConfirmModal({
       isOpen: true,
-      type: status === "paid" ? "warning" : "danger",
-      title: `${action === "verify" ? "Verify" : "Reject"} Payment`,
-      message: `Are you sure you want to ${action} this payment?`,
-      confirmText: `Yes, ${action === "verify" ? "Verify" : "Reject"}`,
+      type: isVerify ? "warning" : "danger",
+      title: `${isVerify ? "Verify" : "Reject"} Payment`,
+      message: `Are you sure you want to ${isVerify ? "verify" : "reject"} this payment?`,
+      confirmText: `Yes, ${isVerify ? "Verify" : "Reject"}`,
       action: async () => {
         try {
           setUpdatingOrder(orderId);
           await api.put("/api/payments/verify", { orderId, status });
           await loadOrders();
-          setAlert({ isOpen: true, type: status === "paid" ? "success" : "warning", title: status === "paid" ? "Verified" : "Rejected", message: `Payment ${status === "paid" ? "verified" : "rejected"}` });
+          showAlert(
+            isVerify ? "Verified" : "Rejected",
+            `Payment ${isVerify ? "verified" : "rejected"}`,
+            isVerify ? "success" : "warning"
+          );
         } catch (err) {
-          setAlert({ isOpen: true, type: "error", title: "Failed", message: err.response?.data?.message || "Failed" });
+          showAlert("Failed", err.response?.data?.message || "Failed", "error");
         } finally {
           setUpdatingOrder(null);
         }
-      }
+      },
     });
   };
 
@@ -140,6 +154,27 @@ const FarmerOrders = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmModal.action}
+        type={confirmModal.type}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText="Cancel"
+      />
+
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -177,19 +212,14 @@ const FarmerOrders = () => {
           ))}
         </div>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
-        )}
-
         {filteredOrders.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
-            <div className="text-5xl mb-3">📦</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-1">No Orders Found</h3>
             <p className="text-gray-500 text-sm">{filter === "all" ? "No orders received yet" : `No ${filter} orders`}</p>
           </div>
         ) : (
           <>
-            {/* ── Square Cards Grid: 4 per row ── */}
+            {/* Square Cards Grid: 4 per row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {filteredOrders.map((order) => {
                 const orderId = order._id || order.id;
@@ -219,7 +249,9 @@ const FarmerOrders = () => {
                             {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
                           </span>
                           {needsPaymentVerification && (
-                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 animate-pulse">⚡ Pay</span>
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 animate-pulse">
+                              Pay Pending
+                            </span>
                           )}
                         </div>
                       </div>
@@ -262,7 +294,7 @@ const FarmerOrders = () => {
               })}
             </div>
 
-            {/* ── Expanded Detail Panel ── */}
+            {/* Expanded Detail Panel */}
             {expandedOrder && (() => {
               const order = filteredOrders.find(o => (o._id || o.id) === expandedOrder);
               if (!order) return null;
@@ -298,9 +330,9 @@ const FarmerOrders = () => {
                       </div>
                       <button
                         onClick={() => setExpandedOrder(null)}
-                        className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-sm transition"
+                        className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-sm font-bold transition"
                       >
-                        ✕
+                        X
                       </button>
                     </div>
                   </div>
@@ -310,11 +342,19 @@ const FarmerOrders = () => {
                     <div className="px-6 py-4 bg-gray-50 border-b">
                       <div className="flex justify-between text-xs text-gray-500 mb-1.5">
                         {statusSteps.map(s => (
-                          <span key={s} className={`capitalize font-medium ${statusSteps.indexOf(order.status) >= statusSteps.indexOf(s) ? "text-gray-800" : ""}`}>{s}</span>
+                          <span
+                            key={s}
+                            className={`capitalize font-medium ${statusSteps.indexOf(order.status) >= statusSteps.indexOf(s) ? "text-gray-800" : ""}`}
+                          >
+                            {s}
+                          </span>
                         ))}
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div className="h-full rounded-full bg-green-500 transition-all duration-500" style={{ width: `${Math.max(5, (stepIndex / (statusSteps.length - 1)) * 100)}%` }} />
+                        <div
+                          className="h-full rounded-full bg-green-500 transition-all duration-500"
+                          style={{ width: `${Math.max(5, (stepIndex / (statusSteps.length - 1)) * 100)}%` }}
+                        />
                       </div>
                     </div>
                   )}
@@ -330,7 +370,7 @@ const FarmerOrders = () => {
                               <div key={idx} className="flex justify-between items-center bg-gray-50 rounded-lg px-3 py-2.5 text-sm">
                                 <div>
                                   <span className="font-medium text-gray-900">{item.name}</span>
-                                  <span className="text-gray-400 text-xs ml-2">×{item.quantity} · Rs.{item.price} each</span>
+                                  <span className="text-gray-400 text-xs ml-2">x{item.quantity} · Rs.{item.price} each</span>
                                 </div>
                                 <span className="font-semibold text-gray-900">Rs. {(item.price * item.quantity).toFixed(0)}</span>
                               </div>
@@ -344,7 +384,7 @@ const FarmerOrders = () => {
 
                         {/* Payment */}
                         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-3">💳 Payment Info</p>
+                          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-3">Payment Info</p>
                           <div className="grid grid-cols-2 gap-3 text-sm">
                             <div>
                               <span className="text-xs text-gray-500">Method</span>
@@ -352,7 +392,11 @@ const FarmerOrders = () => {
                             </div>
                             <div>
                               <span className="text-xs text-gray-500">Status</span>
-                              <p><span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getPaymentStatusColor(myShipment.paymentStatus)}`}>{myShipment.paymentStatus?.toUpperCase() || "PENDING"}</span></p>
+                              <p>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getPaymentStatusColor(myShipment.paymentStatus)}`}>
+                                  {myShipment.paymentStatus?.toUpperCase() || "PENDING"}
+                                </span>
+                              </p>
                             </div>
                             {myShipment.transactionId && (
                               <div className="col-span-2">
@@ -372,15 +416,31 @@ const FarmerOrders = () => {
                             <div className="mt-3">
                               <p className="text-xs text-gray-500 mb-1">Payment Proof</p>
                               <a href={`${APIBASEURL}${myShipment.paymentProof}`} target="_blank" rel="noopener noreferrer">
-                                <img src={`${APIBASEURL}${myShipment.paymentProof}`} alt="Payment proof" className="max-w-xs rounded-lg border-2 border-blue-300 hover:border-blue-500 transition cursor-pointer" />
+                                <img
+                                  src={`${APIBASEURL}${myShipment.paymentProof}`}
+                                  alt="Payment proof"
+                                  className="max-w-xs rounded-lg border-2 border-blue-300 hover:border-blue-500 transition cursor-pointer"
+                                />
                               </a>
                             </div>
                           )}
 
                           {needsPaymentVerification && (
                             <div className="flex gap-2 mt-3 pt-3 border-t border-blue-200">
-                              <button onClick={() => verifyPayment(orderId, "paid")} disabled={updatingOrder === orderId} className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">✓ Verify Payment</button>
-                              <button onClick={() => verifyPayment(orderId, "failed")} disabled={updatingOrder === orderId} className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">✗ Reject</button>
+                              <button
+                                onClick={() => verifyPayment(orderId, "paid")}
+                                disabled={updatingOrder === orderId}
+                                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold px-4 py-2 rounded-lg text-sm transition"
+                              >
+                                Verify Payment
+                              </button>
+                              <button
+                                onClick={() => verifyPayment(orderId, "failed")}
+                                disabled={updatingOrder === orderId}
+                                className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold px-4 py-2 rounded-lg text-sm transition"
+                              >
+                                Reject
+                              </button>
                             </div>
                           )}
                         </div>
@@ -395,16 +455,40 @@ const FarmerOrders = () => {
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {order.status === "pending" && (
-                            <button onClick={() => updateOrderStatus(orderId, "confirmed")} disabled={updatingOrder === orderId} className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold px-5 py-2 rounded-lg text-sm transition">✓ Confirm Order</button>
+                            <button
+                              onClick={() => updateOrderStatus(orderId, "confirmed")}
+                              disabled={updatingOrder === orderId}
+                              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold px-5 py-2 rounded-lg text-sm transition"
+                            >
+                              Confirm Order
+                            </button>
                           )}
                           {order.status === "confirmed" && (
-                            <button onClick={() => updateOrderStatus(orderId, "shipped")} disabled={updatingOrder === orderId} className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-semibold px-5 py-2 rounded-lg text-sm transition">📦 Mark as Shipped</button>
+                            <button
+                              onClick={() => updateOrderStatus(orderId, "shipped")}
+                              disabled={updatingOrder === orderId}
+                              className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-semibold px-5 py-2 rounded-lg text-sm transition"
+                            >
+                              Mark as Shipped
+                            </button>
                           )}
                           {order.status === "shipped" && (
-                            <button onClick={() => updateOrderStatus(orderId, "delivered")} disabled={updatingOrder === orderId} className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold px-5 py-2 rounded-lg text-sm transition">✓ Mark as Delivered</button>
+                            <button
+                              onClick={() => updateOrderStatus(orderId, "delivered")}
+                              disabled={updatingOrder === orderId}
+                              className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold px-5 py-2 rounded-lg text-sm transition"
+                            >
+                              Mark as Delivered
+                            </button>
                           )}
                           {canCancel && (
-                            <button onClick={() => cancelOrderByFarmer(orderId)} disabled={updatingOrder === orderId} className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold px-5 py-2 rounded-lg text-sm transition">✗ Cancel Order</button>
+                            <button
+                              onClick={() => cancelOrderByFarmer(orderId)}
+                              disabled={updatingOrder === orderId}
+                              className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold px-5 py-2 rounded-lg text-sm transition"
+                            >
+                              Cancel Order
+                            </button>
                           )}
                           {updatingOrder === orderId && (
                             <div className="flex items-center gap-2 text-gray-500 text-sm">
@@ -422,9 +506,6 @@ const FarmerOrders = () => {
           </>
         )}
       </div>
-
-      <AlertModal isOpen={alert.isOpen} onClose={() => setAlert({ ...alert, isOpen: false })} type={alert.type} title={alert.title} message={alert.message} />
-      <ConfirmModal isOpen={confirm.isOpen} onClose={() => setConfirm({ ...confirm, isOpen: false })} onConfirm={confirm.action} type={confirm.type} title={confirm.title} message={confirm.message} confirmText={confirm.confirmText} />
     </div>
   );
 };

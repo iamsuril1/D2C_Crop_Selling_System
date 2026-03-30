@@ -10,7 +10,6 @@ const FarmerDashboard = () => {
 
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
-
   const [loading, setLoading] = useState(true);
 
   const [editingProduct, setEditingProduct] = useState(null);
@@ -23,11 +22,22 @@ const FarmerDashboard = () => {
     description: "",
   });
 
-  // Alert and Confirm modals
-  const [alert, setAlert] = useState({ isOpen: false, type: '', title: '', message: '' });
-  const [confirm, setConfirm] = useState({ isOpen: false, action: null, title: '', message: '' });
+  const [alertModal, setAlertModal] = useState({ isOpen: false, type: "", title: "", message: "" });
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, action: null, type: "", title: "", message: "" });
 
-  // ✅ robust product id getter: works whether backend sends `id` or `_id`
+  const showAlert = (title, message, type = "error") => {
+    setAlertModal({ isOpen: true, title, message, type });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const closeConfirm = () => {
+    setConfirmModal((prev) => ({ ...prev, isOpen: false, action: null }));
+  };
+
+  // Robust product id getter: works whether backend sends `id` or `_id`
   const getPid = (p) => p?.id || p?._id;
 
   const loadDashboard = async () => {
@@ -58,12 +68,7 @@ const FarmerDashboard = () => {
   const startEdit = (product) => {
     const pid = getPid(product);
     if (!pid) {
-      setAlert({
-        isOpen: true,
-        type: 'error',
-        title: 'Error',
-        message: 'Product id missing'
-      });
+      showAlert("Error", "Product id missing", "error");
       return;
     }
 
@@ -83,69 +88,42 @@ const FarmerDashboard = () => {
   };
 
   const submitEdit = async (id) => {
-    const pid = id;
-    if (!pid) {
-      setAlert({
-        isOpen: true,
-        type: 'error',
-        title: 'Error',
-        message: 'Product id missing'
-      });
+    if (!id) {
+      showAlert("Error", "Product id missing", "error");
       return;
     }
 
     try {
-      await api.put(`/api/products/${pid}`, editForm);
+      await api.put(`/api/products/${id}`, editForm);
       setEditingProduct(null);
       await loadDashboard();
     } catch (err) {
       console.error(err.response?.data || err);
-      setAlert({
-        isOpen: true,
-        type: 'error',
-        title: 'Update Failed',
-        message: err.response?.data?.message || "Failed to update product"
-      });
+      showAlert("Update Failed", err.response?.data?.message || "Failed to update product", "error");
     }
   };
 
-  const deleteProduct = async (id) => {
-    const pid = id;
-    if (!pid) {
-      setAlert({
-        isOpen: true,
-        type: 'error',
-        title: 'Error',
-        message: 'Product id missing'
-      });
+  const deleteProduct = (id) => {
+    if (!id) {
+      showAlert("Error", "Product id missing", "error");
       return;
     }
 
-    setConfirm({
+    setConfirmModal({
       isOpen: true,
-      type: 'danger',
-      title: 'Delete Product',
-      message: 'Are you sure you want to delete this product? This action cannot be undone.',
+      type: "danger",
+      title: "Delete Product",
+      message: "Are you sure you want to delete this product? This action cannot be undone.",
       action: async () => {
         try {
-          await api.delete(`/api/products/${pid}`);
+          await api.delete(`/api/products/${id}`);
           await loadDashboard();
-          setAlert({
-            isOpen: true,
-            type: 'success',
-            title: 'Success',
-            message: 'Product deleted successfully'
-          });
+          showAlert("Success", "Product deleted successfully", "success");
         } catch (err) {
           console.error(err.response?.data || err);
-          setAlert({
-            isOpen: true,
-            type: 'error',
-            title: 'Delete Failed',
-            message: err.response?.data?.message || "Failed to delete product"
-          });
+          showAlert("Delete Failed", err.response?.data?.message || "Failed to delete product", "error");
         }
-      }
+      },
     });
   };
 
@@ -158,6 +136,27 @@ const FarmerDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 px-8 py-6 space-y-6">
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmModal.action}
+        type={confirmModal.type}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText="Confirm"
+        cancelText="Cancel"
+      />
+
       {/* Top bar */}
       <div className="flex justify-between items-center">
         <div>
@@ -172,7 +171,7 @@ const FarmerDashboard = () => {
           >
             Payment Settings
           </button>
-          
+
           <button
             onClick={() => navigate("/add-product")}
             className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
@@ -249,18 +248,14 @@ const FarmerDashboard = () => {
                       <>
                         <input
                           value={editForm.name}
-                          onChange={(e) =>
-                            setEditForm((prev) => ({ ...prev, name: e.target.value }))
-                          }
+                          onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
                           className="border border-gray-200 rounded px-2 py-1 text-sm"
                           placeholder="Name"
                         />
 
                         <input
                           value={editForm.category}
-                          onChange={(e) =>
-                            setEditForm((prev) => ({ ...prev, category: e.target.value }))
-                          }
+                          onChange={(e) => setEditForm((prev) => ({ ...prev, category: e.target.value }))}
                           className="border border-gray-200 rounded px-2 py-1 text-sm"
                           placeholder="Category"
                         />
@@ -269,9 +264,7 @@ const FarmerDashboard = () => {
                           <input
                             type="number"
                             value={editForm.price}
-                            onChange={(e) =>
-                              setEditForm((prev) => ({ ...prev, price: e.target.value }))
-                            }
+                            onChange={(e) => setEditForm((prev) => ({ ...prev, price: e.target.value }))}
                             className="border border-gray-200 rounded px-2 py-1 text-sm w-1/2"
                             placeholder="Price"
                           />
@@ -279,12 +272,7 @@ const FarmerDashboard = () => {
                           <input
                             type="number"
                             value={editForm.quantity}
-                            onChange={(e) =>
-                              setEditForm((prev) => ({
-                                ...prev,
-                                quantity: e.target.value,
-                              }))
-                            }
+                            onChange={(e) => setEditForm((prev) => ({ ...prev, quantity: e.target.value }))}
                             className="border border-gray-200 rounded px-2 py-1 text-sm w-1/2"
                             placeholder="Qty"
                           />
@@ -320,9 +308,7 @@ const FarmerDashboard = () => {
                         </div>
 
                         <p className="text-xs text-gray-600">
-                          Qty:{" "}
-                          <span className="font-semibold text-green-700">{p.quantity}</span>{" "}
-                          {p.unit}
+                          Qty: <span className="font-semibold text-green-700">{p.quantity}</span> {p.unit}
                         </p>
 
                         <div className="flex gap-2">
@@ -362,11 +348,10 @@ const FarmerDashboard = () => {
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 {activeOrders.map((o) => {
-                  // Find my shipment in this order
                   const myShipment = o.shipments?.find(
-                    s => s.farmer?._id === o.farmer?._id || s.farmer?.toString() === o.farmer?.toString()
+                    (s) => s.farmer?._id === o.farmer?._id || s.farmer?.toString() === o.farmer?.toString()
                   );
-                  
+
                   return (
                     <div
                       key={o.id || o._id}
@@ -383,18 +368,17 @@ const FarmerDashboard = () => {
                           In progress
                         </span>
                       </div>
-                      
+
                       {myShipment && (
                         <div className="mt-2 pt-2 border-t border-gray-100">
                           <p className="text-[11px] text-gray-600">
-                            Payment: <span className="font-semibold capitalize">
-                              {myShipment.paymentMethod || "pending"}
-                            </span>
+                            Payment: <span className="font-semibold capitalize">{myShipment.paymentMethod || "pending"}</span>
                           </p>
                           <p className="text-[11px] text-gray-600">
-                            Status: <span className={`font-semibold capitalize ${
-                              myShipment.paymentStatus === "paid" 
-                                ? "text-green-600" 
+                            Status:{" "}
+                            <span className={`font-semibold capitalize ${
+                              myShipment.paymentStatus === "paid"
+                                ? "text-green-600"
                                 : myShipment.paymentStatus === "failed"
                                 ? "text-red-600"
                                 : "text-yellow-600"
@@ -414,9 +398,7 @@ const FarmerDashboard = () => {
           <div className="bg-white rounded-xl shadow-sm p-5">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-base font-semibold text-gray-900">Delivered Orders</h2>
-              <span className="text-xs text-gray-500">
-                {deliveredOrders.length} orders
-              </span>
+              <span className="text-xs text-gray-500">{deliveredOrders.length} orders</span>
             </div>
 
             {deliveredOrders.length === 0 ? (
@@ -444,25 +426,6 @@ const FarmerDashboard = () => {
           </div>
         </div>
       </section>
-
-      {/* Alert Modal */}
-      <AlertModal
-        isOpen={alert.isOpen}
-        onClose={() => setAlert({ ...alert, isOpen: false })}
-        type={alert.type}
-        title={alert.title}
-        message={alert.message}
-      />
-
-      {/* Confirm Modal */}
-      <ConfirmModal
-        isOpen={confirm.isOpen}
-        onClose={() => setConfirm({ ...confirm, isOpen: false })}
-        onConfirm={confirm.action}
-        type={confirm.type}
-        title={confirm.title}
-        message={confirm.message}
-      />
     </div>
   );
 };
