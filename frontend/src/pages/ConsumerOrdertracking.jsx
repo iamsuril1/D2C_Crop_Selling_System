@@ -1,42 +1,35 @@
 import { useEffect, useState, useContext } from "react";
-import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
+import api from "../api/axios";
 import AlertModal from "../components/AlertModal";
 import ConfirmModal from "../components/ConfirmModal";
 import { NotificationContext } from "../context/NotificationContext";
 
-// FIX: Removed the component-level setInterval that polled /api/orders/my every 30s.
-// The NotificationContext already has a 30s interval. Having both active on this page
-// caused two simultaneous polling loops. Now we call the shared refetch() from context
-// when we need a notification refresh, and we fetch orders independently only once
-// (on mount). If real-time order updates are needed, they can be triggered via
-// the context's refetch after a mutation.
-
 const ConsumerOrderTracking = () => {
-  const navigate = useNavigate();
-  const notifCtx = useContext(NotificationContext);
+  const navigate  = useNavigate();
+  const notifCtx  = useContext(NotificationContext);
 
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  const [orders,         setOrders]         = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [filter,         setFilter]         = useState("all");
   const [cancellingOrder, setCancellingOrder] = useState(null);
-  const [expandedOrder, setExpandedOrder] = useState(null);
+  const [expandedOrder,  setExpandedOrder]  = useState(null);
+
+  // Track which shipments already have a return request so we can
+  // disable the button if one is already submitted.
+  const [existingReturns, setExistingReturns] = useState({}); // { "orderId_farmerId": true }
 
   const [alertModal, setAlertModal] = useState({
     isOpen: false, title: "", message: "", type: "info",
   });
-
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false, orderId: null,
   });
 
-  const showAlert = (title, message, type = "error") => {
+  const showAlert = (title, message, type = "error") =>
     setAlertModal({ isOpen: true, title, message, type });
-  };
-
-  const closeAlert = () => {
-    setAlertModal((prev) => ({ ...prev, isOpen: false }));
-  };
+  const closeAlert = () =>
+    setAlertModal((p) => ({ ...p, isOpen: false }));
 
   const loadOrders = async () => {
     try {
@@ -44,15 +37,30 @@ const ConsumerOrderTracking = () => {
       const res = await api.get("/api/orders/my");
       setOrders(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      showAlert("Failed to Load Orders", err.response?.data?.message || "Failed to load orders", "error");
+      showAlert("Failed to load orders", err.response?.data?.message || "Please try again.", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // FIX: fetch once on mount — no own interval
+  const loadMyReturns = async () => {
+    try {
+      const res = await api.get("/api/returns/my");
+      const map = {};
+      (res.data || []).forEach((r) => {
+        const oid = r.order?._id || r.order?.toString();
+        const fid = r.farmer?._id || r.farmer?.toString();
+        if (oid && fid) map[`${oid}_${fid}`] = r.status;
+      });
+      setExistingReturns(map);
+    } catch {
+      // non-critical
+    }
+  };
+
   useEffect(() => {
     loadOrders();
+    loadMyReturns();
   }, []);
 
   const requestCancel = (orderId, e) => {
@@ -68,18 +76,20 @@ const ConsumerOrderTracking = () => {
       setCancellingOrder(orderId);
       await api.put(`/api/orders/${orderId}/cancel`);
       await loadOrders();
-      // Refresh notifications so the farmer's cancellation notification appears
       notifCtx?.refetch?.();
     } catch (err) {
-      showAlert(
-        "Cancel Failed",
-        err.response?.data?.message || "Failed to cancel order",
-        "error"
-      );
+      showAlert("Cancel failed", err.response?.data?.message || "Failed to cancel.", "error");
     } finally {
       setCancellingOrder(null);
       setConfirmModal({ isOpen: false, orderId: null });
     }
+  };
+
+  const handleRequestReturn = (order, shipment) => {
+    const farmerName = shipment.farmer
+      ? `${shipment.farmer.firstName || ""} ${shipment.farmer.lastName || ""}`.trim()
+      : "Farmer";
+    navigate("/return-request", { state: { order, shipment, farmerName } });
   };
 
   const getStatusInfo = (status) => {
@@ -102,6 +112,15 @@ const ConsumerOrderTracking = () => {
     }
   };
 
+  const getReturnBadge = (status) => {
+    switch (status) {
+      case "pending":  return "bg-yellow-100 text-yellow-800";
+      case "approved": return "bg-green-100 text-green-800";
+      case "rejected": return "bg-red-100 text-red-800";
+      default:         return "bg-gray-100 text-gray-800";
+    }
+  };
+
   const filteredOrders = orders.filter((o) => {
     if (filter === "all") return true;
     if (filter === "active") return !["delivered", "cancelled"].includes(o.status);
@@ -109,11 +128,23 @@ const ConsumerOrderTracking = () => {
   });
 
   const statusSteps = ["pending", "confirmed", "shipped", "delivered"];
-
-  // FIX: only pending and confirmed can be cancelled by consumer
-  // (shipped/delivered guard is enforced on the backend too, but we reflect
-  // the same logic in the UI so the button doesn't appear at all for shipped orders)
   const canConsumerCancel = (status) => ["pending", "confirmed"].includes(status);
+
+  // Return is available only on delivered orders, within the 3-day window
+  const canRequestReturn = (order, shipment) => {
+    if (order.status !== "delivered") return false;
+    const daysSince = (Date.now() - new Date(order.updatedAt).getTime()) / 86_400_000;
+    if (daysSince > 3) return false;
+    const oid = order._id || order.id;
+    const fid = shipment.farmer?._id || shipment.farmer?.toString();
+    return !existingReturns[`${oid}_${fid}`]; // no return submitted yet
+  };
+
+  const getReturnStatus = (order, shipment) => {
+    const oid = order._id || order.id;
+    const fid = shipment.farmer?._id || shipment.farmer?.toString();
+    return existingReturns[`${oid}_${fid}`] || null;
+  };
 
   if (loading) {
     return (
@@ -134,22 +165,21 @@ const ConsumerOrderTracking = () => {
         type={alertModal.type}
         confirmText="OK"
       />
-
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal({ isOpen: false, orderId: null })}
         onConfirm={confirmCancel}
-        title="Cancel Order"
+        title="Cancel order"
         message="Are you sure you want to cancel this order? This action cannot be undone."
-        confirmText="Yes, Cancel"
-        cancelText="Keep Order"
+        confirmText="Yes, cancel"
+        cancelText="Keep order"
         type="danger"
       />
 
       <div className="max-w-6xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">My Orders</h1>
-          <p className="text-gray-500 text-sm">Click any order card to view details</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">My orders</h1>
+          <p className="text-gray-500 text-sm">Click any card to view details</p>
         </div>
 
         {/* Stats */}
@@ -167,7 +197,7 @@ const ConsumerOrderTracking = () => {
           ))}
         </div>
 
-        {/* Filter Tabs */}
+        {/* Filter tabs */}
         <div className="bg-white rounded-xl shadow-sm p-1.5 mb-6 flex gap-1 border border-gray-100">
           {[
             { value: "all",       label: "All"       },
@@ -189,26 +219,31 @@ const ConsumerOrderTracking = () => {
 
         {filteredOrders.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">No Orders Found</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">No orders found</h3>
             <p className="text-gray-500 text-sm mb-5">
-              {filter === "all" ? "You haven't placed any orders yet" : `No ${filter} orders`}
+              {filter === "all" ? "You haven't placed any orders yet." : `No ${filter} orders.`}
             </p>
             <button
               onClick={() => navigate("/consumer")}
               className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition"
             >
-              Start Shopping
+              Start shopping
             </button>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {filteredOrders.map((order) => {
-                const orderId = order._id || order.id;
+                const orderId        = order._id || order.id;
                 const orderDisplayId = orderId?.toString().slice(-6);
-                const si = getStatusInfo(order.status);
-                const isSelected = expandedOrder === orderId;
-                const cancellable = canConsumerCancel(order.status);
+                const si             = getStatusInfo(order.status);
+                const isSelected     = expandedOrder === orderId;
+                const cancellable    = canConsumerCancel(order.status);
+                const hasReturn      = order.status === "delivered" &&
+                  order.shipments?.some((s) => {
+                    const fid = s.farmer?._id || s.farmer?.toString();
+                    return existingReturns[`${orderId}_${fid}`];
+                  });
 
                 return (
                   <div key={orderId} className="relative">
@@ -222,9 +257,16 @@ const ConsumerOrderTracking = () => {
                     >
                       <div className="flex items-start justify-between">
                         <div className={`w-2.5 h-2.5 rounded-full mt-0.5 flex-shrink-0 ${si.dot}`} />
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${si.color}`}>
-                          {si.label}
-                        </span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${si.color}`}>
+                            {si.label}
+                          </span>
+                          {hasReturn && (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                              Return
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <div className="text-xl font-bold text-gray-900">#{orderDisplayId}</div>
@@ -240,7 +282,6 @@ const ConsumerOrderTracking = () => {
                       </div>
                     </button>
 
-                    {/* FIX: only show cancel for pending/confirmed */}
                     {cancellable && (
                       <button
                         onClick={(e) => requestCancel(orderId, e)}
@@ -259,17 +300,18 @@ const ConsumerOrderTracking = () => {
               })}
             </div>
 
-            {/* Expanded Detail Panel */}
+            {/* Expanded detail panel */}
             {expandedOrder && (() => {
               const order = filteredOrders.find(o => (o._id || o.id) === expandedOrder);
               if (!order) return null;
-              const orderId = order._id || order.id;
-              const si = getStatusInfo(order.status);
-              const stepIndex = statusSteps.indexOf(order.status);
+              const orderId    = order._id || order.id;
+              const si         = getStatusInfo(order.status);
+              const stepIndex  = statusSteps.indexOf(order.status);
               const cancellable = canConsumerCancel(order.status);
 
               return (
                 <div className="bg-white rounded-2xl border-2 border-green-500 shadow-xl overflow-hidden mt-2">
+                  {/* Header */}
                   <div className="bg-gradient-to-r from-green-50 to-blue-50 px-6 py-5 border-b flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-3 mb-1">
@@ -284,7 +326,7 @@ const ConsumerOrderTracking = () => {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <div className="text-xs text-gray-500">Total Amount</div>
+                        <div className="text-xs text-gray-500">Total</div>
                         <div className="text-2xl font-bold text-gray-900">Rs. {order.totalAmount?.toFixed(0)}</div>
                       </div>
                       <button
@@ -296,6 +338,7 @@ const ConsumerOrderTracking = () => {
                     </div>
                   </div>
 
+                  {/* Progress */}
                   {order.status !== "cancelled" && (
                     <div className="px-6 py-5 bg-gray-50 border-b">
                       <div className="relative flex justify-between items-start">
@@ -306,7 +349,7 @@ const ConsumerOrderTracking = () => {
                           />
                         </div>
                         {statusSteps.map((step, idx) => {
-                          const active = stepIndex >= idx;
+                          const active  = stepIndex >= idx;
                           const current = order.status === step;
                           return (
                             <div key={step} className="flex-1 flex flex-col items-center relative z-10">
@@ -317,9 +360,7 @@ const ConsumerOrderTracking = () => {
                                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                   </svg>
-                                ) : (
-                                  idx + 1
-                                )}
+                                ) : idx + 1}
                               </div>
                               <div className={`text-xs mt-1.5 font-medium capitalize ${active ? "text-gray-800" : "text-gray-400"}`}>{step}</div>
                             </div>
@@ -329,53 +370,88 @@ const ConsumerOrderTracking = () => {
                     </div>
                   )}
 
+                  {/* Shipments */}
                   <div className="px-6 py-5 space-y-4">
-                    <h4 className="font-semibold text-gray-800 text-sm">Shipment Details ({order.shipments?.length || 0})</h4>
+                    <h4 className="font-semibold text-gray-800 text-sm">
+                      Shipment details ({order.shipments?.length || 0})
+                    </h4>
 
                     {order.shipments?.map((shipment, idx) => {
-                      const farmer = shipment.farmer;
-                      const farmerName = farmer ? `${farmer.firstName || ""} ${farmer.lastName || ""}`.trim() : "Farmer";
+                      const farmer     = shipment.farmer;
+                      const farmerName = farmer
+                        ? `${farmer.firstName || ""} ${farmer.lastName || ""}`.trim()
+                        : "Farmer";
+                      const canReturn      = canRequestReturn(order, shipment);
+                      const returnStatus   = getReturnStatus(order, shipment);
+
                       return (
                         <div key={idx} className="border border-gray-200 rounded-xl p-4">
                           <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100">
                             <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
                               {farmerName.charAt(0)}
                             </div>
-                            <div>
+                            <div className="flex-1 min-w-0">
                               <p className="font-semibold text-sm text-gray-900">{farmerName}</p>
                               <p className="text-xs text-gray-400">Shipment {idx + 1} of {order.shipments.length}</p>
                             </div>
+                            {/* Return status badge */}
+                            {returnStatus && (
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getReturnBadge(returnStatus)}`}>
+                                Return: {returnStatus}
+                              </span>
+                            )}
                           </div>
+
                           <div className="space-y-1.5 mb-3">
                             {shipment.items?.map((item, i) => (
                               <div key={i} className="flex justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
                                 <span className="font-medium text-gray-900">
-                                  {item.name} <span className="text-gray-400 font-normal">x{item.quantity}</span>
+                                  {item.name} <span className="text-gray-400 font-normal">×{item.quantity}</span>
                                 </span>
                                 <span className="font-semibold">Rs. {(item.price * item.quantity).toFixed(0)}</span>
                               </div>
                             ))}
                           </div>
+
                           <div className="flex items-center justify-between text-xs bg-blue-50 rounded-lg px-3 py-2 mb-2">
                             <span className="text-blue-700 font-medium capitalize">{shipment.paymentMethod || "Pending"}</span>
                             <span className={`px-2 py-0.5 rounded-full font-semibold ${getPaymentStatusColor(shipment.paymentStatus)}`}>
                               {shipment.paymentStatus?.toUpperCase() || "PENDING"}
                             </span>
                           </div>
-                          <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
+
+                          <div className="flex justify-between text-sm pt-2 border-t border-gray-100 mb-3">
                             <span className="text-gray-500">Shipment total</span>
                             <span className="font-bold">Rs. {((shipment.subtotal || 0) + (shipment.deliveryFee || 0)).toFixed(0)}</span>
                           </div>
+
+                          {/* Return button — only on delivered orders within window */}
+                          {order.status === "delivered" && (
+                            canReturn ? (
+                              <button
+                                onClick={() => handleRequestReturn(order, shipment)}
+                                className="w-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 font-semibold py-2 rounded-xl text-sm transition"
+                              >
+                                Request return
+                              </button>
+                            ) : !returnStatus ? (
+                              <p className="text-xs text-center text-gray-400 py-1">
+                                Return window closed (3 days after delivery)
+                              </p>
+                            ) : null
+                          )}
                         </div>
                       );
                     })}
 
+                    {/* Summary */}
                     <div className="bg-gray-50 rounded-xl p-4 space-y-1.5">
                       <div className="flex justify-between text-sm text-gray-600"><span>Items subtotal</span><span>Rs. {order.itemsSubtotal?.toFixed(0)}</span></div>
                       <div className="flex justify-between text-sm text-gray-600"><span>Delivery</span><span>Rs. {order.deliveryTotal?.toFixed(0)}</span></div>
                       <div className="flex justify-between font-bold text-gray-900 pt-1.5 border-t border-gray-200 text-sm"><span>Total</span><span>Rs. {order.totalAmount?.toFixed(0)}</span></div>
                     </div>
 
+                    {/* Order-level actions */}
                     <div className="flex gap-2">
                       {cancellable && (
                         <button
@@ -383,11 +459,11 @@ const ConsumerOrderTracking = () => {
                           disabled={cancellingOrder === orderId}
                           className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition"
                         >
-                          {cancellingOrder === orderId ? "Cancelling..." : "Cancel Order"}
+                          {cancellingOrder === orderId ? "Cancelling..." : "Cancel order"}
                         </button>
                       )}
                       <button className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition">
-                        Contact Farmer
+                        Contact farmer
                       </button>
                     </div>
                   </div>

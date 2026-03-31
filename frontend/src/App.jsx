@@ -3,38 +3,38 @@ import { useContext } from "react";
 
 import { AuthContext } from "./context/AuthContext.jsx";
 
-import Navbar from "./components/Navbar";
-import Footer from "./components/Footer";
+import Navbar   from "./components/Navbar";
+import Footer   from "./components/Footer";
 
-import Home from "./pages/Home";
-import Login from "./pages/Login";
+import Home     from "./pages/Home";
+import Login    from "./pages/Login";
 import Register from "./pages/Register";
 
-import Profile from "./pages/Profile";
+import Profile     from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 
-import FarmerDashboard from "./pages/FarmerDashboard";
+import FarmerDashboard   from "./pages/FarmerDashboard";
 import ConsumerDashboard from "./pages/ConsumerDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
+import AdminDashboard    from "./pages/AdminDashboard";
 
 import ProductDetails from "./pages/ProductDetails";
-import ProductForm from "./components/ProductForm";
+import ProductForm    from "./components/ProductForm";
 
-import Orders from "./pages/Orders";
+import Orders        from "./pages/Orders";
 import Notifications from "./pages/Notifications";
 
-import FarmerOrders from "./pages/FarmerOrders";
+import FarmerOrders          from "./pages/FarmerOrders";
 import ConsumerOrderTracking from "./pages/ConsumerOrdertracking";
 
 import FarmerPaymentSettings from "./pages/FarmerPaymentSettings";
-import PaymentSelection from "./pages/PaymentSelection";
+import PaymentSelection      from "./pages/PaymentSelection";
 
 import ForgotPassword from "./pages/ForgotPassword";
 
-// FIX: ProtectedRoute was defined INSIDE the App component function.
-// Defining it inside means a new component identity is created on every render,
-// causing React to unmount and remount the child tree on every state change.
-// Moved outside so it has a stable identity across renders.
+// NEW
+import ReturnRequest  from "./pages/ReturnRequest";
+import FarmerReturns  from "./pages/FarmerReturns";
+
 const ProtectedRoute = ({ user, roles, children }) => {
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
@@ -54,133 +54,55 @@ function App() {
 
   const roleRedirect = () => {
     if (!user) return <Home />;
-    if (user.role === "farmer") return <Navigate to="/farmer" replace />;
+    if (user.role === "farmer")   return <Navigate to="/farmer"   replace />;
     if (user.role === "consumer") return <Navigate to="/consumer" replace />;
-    if (user.role === "admin") return <Navigate to="/admin" replace />;
+    if (user.role === "admin")    return <Navigate to="/admin"    replace />;
     return <Home />;
   };
 
   return (
     <>
       <Navbar />
-
       <main style={{ minHeight: "80vh" }}>
         <Routes>
           <Route path="/" element={roleRedirect()} />
 
-          <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
-          <Route path="/register" element={!user ? <Register /> : <Navigate to="/" replace />} />
+          <Route path="/login"          element={!user ? <Login />    : <Navigate to="/" replace />} />
+          <Route path="/register"       element={!user ? <Register /> : <Navigate to="/" replace />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
 
           <Route path="/product/:id" element={<ProductDetails />} />
 
-          <Route
-            path="/consumer"
-            element={
-              <ProtectedRoute user={user} roles={["consumer"]}>
-                <ConsumerDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cart"
-            element={
-              <ProtectedRoute user={user} roles={["consumer"]}>
-                <Orders />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/my-orders"
-            element={
-              <ProtectedRoute user={user} roles={["consumer"]}>
-                <ConsumerOrderTracking />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/payment"
-            element={
-              <ProtectedRoute user={user} roles={["consumer"]}>
-                <PaymentSelection />
-              </ProtectedRoute>
-            }
-          />
+          {/* Consumer */}
+          <Route path="/consumer" element={<ProtectedRoute user={user} roles={["consumer"]}><ConsumerDashboard /></ProtectedRoute>} />
+          <Route path="/cart"     element={<ProtectedRoute user={user} roles={["consumer"]}><Orders /></ProtectedRoute>} />
+          <Route path="/my-orders" element={<ProtectedRoute user={user} roles={["consumer"]}><ConsumerOrderTracking /></ProtectedRoute>} />
+          <Route path="/payment"  element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentSelection /></ProtectedRoute>} />
+          {/* NEW: consumer return request */}
+          <Route path="/return-request" element={<ProtectedRoute user={user} roles={["consumer"]}><ReturnRequest /></ProtectedRoute>} />
 
-          <Route
-            path="/farmer"
-            element={
-              <ProtectedRoute user={user} roles={["farmer"]}>
-                <FarmerDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/add-product"
-            element={
-              <ProtectedRoute user={user} roles={["farmer"]}>
-                <ProductForm />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/farmer/orders"
-            element={
-              <ProtectedRoute user={user} roles={["farmer"]}>
-                <FarmerOrders />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/farmer/payment-settings"
-            element={
-              <ProtectedRoute user={user} roles={["farmer"]}>
-                <FarmerPaymentSettings />
-              </ProtectedRoute>
-            }
-          />
+          {/* Farmer */}
+          <Route path="/farmer"                  element={<ProtectedRoute user={user} roles={["farmer"]}><FarmerDashboard /></ProtectedRoute>} />
+          <Route path="/add-product"             element={<ProtectedRoute user={user} roles={["farmer"]}><ProductForm /></ProtectedRoute>} />
+          <Route path="/farmer/orders"           element={<ProtectedRoute user={user} roles={["farmer"]}><FarmerOrders /></ProtectedRoute>} />
+          <Route path="/farmer/payment-settings" element={<ProtectedRoute user={user} roles={["farmer"]}><FarmerPaymentSettings /></ProtectedRoute>} />
+          {/* NEW: farmer returns management */}
+          <Route path="/farmer/returns"          element={<ProtectedRoute user={user} roles={["farmer"]}><FarmerReturns /></ProtectedRoute>} />
 
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute user={user} roles={["admin"]}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
+          {/* Admin */}
+          <Route path="/admin" element={<ProtectedRoute user={user} roles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
 
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute user={user} roles={["consumer", "farmer", "admin"]}>
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile/edit"
-            element={
-              <ProtectedRoute user={user} roles={["consumer", "farmer", "admin"]}>
-                <EditProfile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/notifications"
-            element={
-              <ProtectedRoute user={user} roles={["consumer", "farmer", "admin"]}>
-                <Notifications />
-              </ProtectedRoute>
-            }
-          />
+          {/* Shared */}
+          <Route path="/profile"       element={<ProtectedRoute user={user} roles={["consumer","farmer","admin"]}><Profile /></ProtectedRoute>} />
+          <Route path="/profile/edit"  element={<ProtectedRoute user={user} roles={["consumer","farmer","admin"]}><EditProfile /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute user={user} roles={["consumer","farmer","admin"]}><Notifications /></ProtectedRoute>} />
 
-          <Route path="/about" element={<div className="min-h-screen bg-gray-50 p-8"><h1 className="text-3xl font-bold">About</h1></div>} />
+          <Route path="/about"   element={<div className="min-h-screen bg-gray-50 p-8"><h1 className="text-3xl font-bold">About</h1></div>} />
           <Route path="/contact" element={<div className="min-h-screen bg-gray-50 p-8"><h1 className="text-3xl font-bold">Contact</h1></div>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-
       <Footer />
     </>
   );
