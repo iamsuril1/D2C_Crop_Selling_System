@@ -39,7 +39,6 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
     const normalized = items.map((it) => {
       const p = productById.get(it.productId);
       if (!p) return null;
-
       const qty = Math.max(1, toNum(it.quantity || 1));
       return {
         farmerId: p.farmer?._id?.toString(),
@@ -62,7 +61,6 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
 
     for (const [farmerId, arr] of grouped.entries()) {
       const farmer = arr[0].farmer;
-
       const sub = arr.reduce((s, it) => s + it.price * it.quantity, 0);
       itemsSubtotal += sub;
 
@@ -89,7 +87,6 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
   }
 };
 
-// ✅ UPDATED: Complete createOrder with stock decrease
 export const createOrder = async (req, res) => {
   try {
     const { items } = req.body;
@@ -103,14 +100,12 @@ export const createOrder = async (req, res) => {
     const normalized = items.map((it) => {
       const p = productById.get(it.productId);
       if (!p) return null;
-
       const qty = Math.max(1, toNum(it.quantity || 1));
-      
       return {
         farmerId: p.farmer?._id?.toString(),
         farmerDoc: p.farmer,
         product: p._id,
-        productDoc: p, // Keep product doc for stock check
+        productDoc: p,
         name: p.name,
         price: toNum(p.price || 0),
         quantity: qty,
@@ -121,11 +116,11 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({ message: "Invalid products/farmers" });
     }
 
-    // ✅ Check stock availability for all products
+    // Check stock
     for (const item of normalized) {
       if (item.productDoc.quantity < item.quantity) {
-        return res.status(400).json({ 
-          message: `Insufficient stock for ${item.name}. Available: ${item.productDoc.quantity} ${item.productDoc.unit}` 
+        return res.status(400).json({
+          message: `Insufficient stock for ${item.name}. Available: ${item.productDoc.quantity} ${item.productDoc.unit}`,
         });
       }
     }
@@ -139,11 +134,10 @@ export const createOrder = async (req, res) => {
       const sub = arr.reduce((s, it) => s + it.price * it.quantity, 0);
       itemsSubtotal += sub;
 
-      // Fetch farmer payment info
       const farmer = await User.findById(farmerId).select(
         "paymentMethods preferredPaymentMethod firstName lastName"
       );
-      
+
       const farmerPaymentInfo = {
         esewaId: farmer.paymentMethods?.find(p => p.type === "esewa" && p.enabled)?.esewaId || null,
         bankName: farmer.paymentMethods?.find(p => (p.type === "bank_qr" || p.type === "bank_transfer") && p.enabled)?.bankName || null,
@@ -165,14 +159,13 @@ export const createOrder = async (req, res) => {
         subtotal: sub,
         paymentMethod: "pending",
         paymentStatus: "pending",
-        farmerPaymentInfo
+        farmerPaymentInfo,
       });
     }
 
     const deliveryTotal = shipments.length * DELIVERY_FEE_PER_SHIPMENT;
     const totalAmount = itemsSubtotal + deliveryTotal;
 
-    // ✅ Create order
     const order = await Order.create({
       consumer: req.user._id,
       shipments,
@@ -181,26 +174,13 @@ export const createOrder = async (req, res) => {
       totalAmount,
     });
 
-    // ✅ DECREASE PRODUCT QUANTITIES (Atomic operation)
-    const stockUpdatePromises = normalized.map(async (item) => {
-      const result = await Product.findByIdAndUpdate(
-        item.product,
-        { $inc: { quantity: -item.quantity } },
-        { new: true }
-      );
-      
-      if (!result) {
-        console.error(`Failed to update stock for product ${item.product}`);
-      }
-      
-      return result;
-    });
+    // Decrease product stock atomically
+    await Promise.all(
+      normalized.map((item) =>
+        Product.findByIdAndUpdate(item.product, { $inc: { quantity: -item.quantity } }, { new: true })
+      )
+    );
 
-    await Promise.all(stockUpdatePromises);
-    
-    console.log(`✅ Stock updated for ${stockUpdatePromises.length} products in order #${order._id.toString().slice(-6)}`);
-
-    // Notifications
     await sendNotification(
       req.user._id,
       "order_placed",
@@ -221,7 +201,7 @@ export const createOrder = async (req, res) => {
 
     res.status(201).json(order);
   } catch (err) {
-    console.error("❌ Create order error:", err);
+    console.error("Create order error:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -232,7 +212,6 @@ export const getFarmerOrders = async (req, res) => {
       .populate("consumer", "firstName lastName email")
       .populate("shipments.farmer", "firstName lastName email")
       .sort({ createdAt: -1 });
-
     res.json(orders);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -244,7 +223,6 @@ export const getMyOrders = async (req, res) => {
     const orders = await Order.find({ consumer: req.user._id })
       .populate("shipments.farmer", "firstName lastName email")
       .sort({ createdAt: -1 });
-
     res.json(orders);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -254,8 +232,8 @@ export const getMyOrders = async (req, res) => {
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-
     const allowed = ["pending", "confirmed", "shipped", "delivered"];
+
     if (!allowed.includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
@@ -271,7 +249,6 @@ export const updateOrderStatus = async (req, res) => {
     order.status = status;
     await order.save();
 
-    // Notification
     await sendNotification(
       order.consumer,
       `order_${status}`,
@@ -286,43 +263,48 @@ export const updateOrderStatus = async (req, res) => {
   }
 };
 
+// FIX: Restrict consumer cancellation to pending and confirmed orders only.
+// Previously: any non-delivered status was cancellable, meaning consumers could
+// cancel shipped orders where the farmer had already dispatched goods.
+// Now: shipped and delivered orders cannot be cancelled by the consumer.
 export const cancelOrderConsumer = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
 
     if (!order) return res.status(404).json({ message: "Order not found" });
+
     if (order.consumer.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "Unauthorized" });
     }
-    if (order.status === "delivered") {
-      return res
-        .status(400)
-        .json({ message: "Delivered orders cannot be cancelled" });
+
+    // FIX: block cancellation once shipped or delivered
+    const nonCancellableStatuses = ["shipped", "delivered", "cancelled"];
+    if (nonCancellableStatuses.includes(order.status)) {
+      const reason =
+        order.status === "shipped"
+          ? "Order has already been shipped and cannot be cancelled"
+          : order.status === "delivered"
+          ? "Delivered orders cannot be cancelled"
+          : "Order is already cancelled";
+      return res.status(400).json({ message: reason });
     }
 
-    // ✅ RESTORE PRODUCT QUANTITIES when order is cancelled
+    // Restore product stock
     try {
-      const restorePromises = order.shipments.flatMap(shipment => 
-        shipment.items.map(async (item) => {
-          const result = await Product.findByIdAndUpdate(
-            item.product,
-            { $inc: { quantity: item.quantity } }, // Add back the quantity
-            { new: true }
-          );
-          
-          if (result) {
-            console.log(`✅ Restored ${item.quantity} ${result.unit} of ${result.name}`);
-          }
-          
-          return result;
-        })
+      await Promise.all(
+        order.shipments.flatMap((shipment) =>
+          shipment.items.map((item) =>
+            Product.findByIdAndUpdate(
+              item.product,
+              { $inc: { quantity: item.quantity } },
+              { new: true }
+            )
+          )
+        )
       );
-      
-      await Promise.all(restorePromises);
-      console.log(`✅ Stock restored for cancelled order #${order._id.toString().slice(-6)}`);
     } catch (restoreError) {
-      console.error("❌ Error restoring stock:", restoreError);
-      // Continue with cancellation even if stock restore fails
+      console.error("Error restoring stock:", restoreError);
+      // Continue with cancellation even if restore partially fails
     }
 
     order.status = "cancelled";
@@ -330,7 +312,6 @@ export const cancelOrderConsumer = async (req, res) => {
     order.cancelledAt = new Date();
     await order.save();
 
-    // Notify farmers
     for (const shipment of order.shipments) {
       await sendNotification(
         shipment.farmer,
@@ -344,6 +325,69 @@ export const cancelOrderConsumer = async (req, res) => {
     res.json(order);
   } catch (err) {
     console.error("Cancel order error:", err);
+    res.status(500).json({ message: "Failed to cancel order" });
+  }
+};
+
+// FIX: Also restrict farmer cancellation to pending/confirmed only.
+// Farmers should not cancel shipped orders either.
+export const cancelOrderFarmer = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    // Verify this farmer has a shipment in this order
+    const hasShipment = order.shipments.some(
+      (s) => s.farmer.toString() === req.user._id.toString()
+    );
+    if (!hasShipment) return res.status(403).json({ message: "Unauthorized" });
+
+    const nonCancellableStatuses = ["shipped", "delivered", "cancelled"];
+    if (nonCancellableStatuses.includes(order.status)) {
+      return res.status(400).json({
+        message:
+          order.status === "shipped"
+            ? "Order has already been shipped and cannot be cancelled"
+            : order.status === "delivered"
+            ? "Delivered orders cannot be cancelled"
+            : "Order is already cancelled",
+      });
+    }
+
+    // Restore stock
+    try {
+      await Promise.all(
+        order.shipments.flatMap((shipment) =>
+          shipment.items.map((item) =>
+            Product.findByIdAndUpdate(
+              item.product,
+              { $inc: { quantity: item.quantity } },
+              { new: true }
+            )
+          )
+        )
+      );
+    } catch (restoreError) {
+      console.error("Error restoring stock:", restoreError);
+    }
+
+    order.status = "cancelled";
+    order.cancelledBy = "farmer";
+    order.cancelledAt = new Date();
+    await order.save();
+
+    await sendNotification(
+      order.consumer,
+      "order_cancelled",
+      `Order #${order._id.toString().slice(-6)} cancelled`,
+      "The farmer has cancelled your order",
+      { orderId: order._id }
+    );
+
+    res.json(order);
+  } catch (err) {
+    console.error("Farmer cancel order error:", err);
     res.status(500).json({ message: "Failed to cancel order" });
   }
 };

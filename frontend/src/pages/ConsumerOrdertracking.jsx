@@ -1,11 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import AlertModal from "../components/AlertModal";
 import ConfirmModal from "../components/ConfirmModal";
+import { NotificationContext } from "../context/NotificationContext";
+
+// FIX: Removed the component-level setInterval that polled /api/orders/my every 30s.
+// The NotificationContext already has a 30s interval. Having both active on this page
+// caused two simultaneous polling loops. Now we call the shared refetch() from context
+// when we need a notification refresh, and we fetch orders independently only once
+// (on mount). If real-time order updates are needed, they can be triggered via
+// the context's refetch after a mutation.
 
 const ConsumerOrderTracking = () => {
   const navigate = useNavigate();
+  const notifCtx = useContext(NotificationContext);
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -13,15 +23,11 @@ const ConsumerOrderTracking = () => {
   const [expandedOrder, setExpandedOrder] = useState(null);
 
   const [alertModal, setAlertModal] = useState({
-    isOpen: false,
-    title: "",
-    message: "",
-    type: "info",
+    isOpen: false, title: "", message: "", type: "info",
   });
 
   const [confirmModal, setConfirmModal] = useState({
-    isOpen: false,
-    orderId: null,
+    isOpen: false, orderId: null,
   });
 
   const showAlert = (title, message, type = "error") => {
@@ -44,10 +50,9 @@ const ConsumerOrderTracking = () => {
     }
   };
 
+  // FIX: fetch once on mount — no own interval
   useEffect(() => {
     loadOrders();
-    const interval = setInterval(loadOrders, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const requestCancel = (orderId, e) => {
@@ -63,8 +68,14 @@ const ConsumerOrderTracking = () => {
       setCancellingOrder(orderId);
       await api.put(`/api/orders/${orderId}/cancel`);
       await loadOrders();
+      // Refresh notifications so the farmer's cancellation notification appears
+      notifCtx?.refetch?.();
     } catch (err) {
-      showAlert("Cancel Failed", err.response?.data?.message || "Failed to cancel order", "error");
+      showAlert(
+        "Cancel Failed",
+        err.response?.data?.message || "Failed to cancel order",
+        "error"
+      );
     } finally {
       setCancellingOrder(null);
       setConfirmModal({ isOpen: false, orderId: null });
@@ -99,6 +110,11 @@ const ConsumerOrderTracking = () => {
 
   const statusSteps = ["pending", "confirmed", "shipped", "delivered"];
 
+  // FIX: only pending and confirmed can be cancelled by consumer
+  // (shipped/delivered guard is enforced on the backend too, but we reflect
+  // the same logic in the UI so the button doesn't appear at all for shipped orders)
+  const canConsumerCancel = (status) => ["pending", "confirmed"].includes(status);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -131,7 +147,6 @@ const ConsumerOrderTracking = () => {
       />
 
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-1">My Orders</h1>
           <p className="text-gray-500 text-sm">Click any order card to view details</p>
@@ -187,14 +202,13 @@ const ConsumerOrderTracking = () => {
           </div>
         ) : (
           <>
-            {/* Square Cards Grid: 4 per row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {filteredOrders.map((order) => {
                 const orderId = order._id || order.id;
                 const orderDisplayId = orderId?.toString().slice(-6);
                 const si = getStatusInfo(order.status);
                 const isSelected = expandedOrder === orderId;
-                const canCancel = !["delivered", "cancelled"].includes(order.status);
+                const cancellable = canConsumerCancel(order.status);
 
                 return (
                   <div key={orderId} className="relative">
@@ -206,23 +220,18 @@ const ConsumerOrderTracking = () => {
                           : "border-gray-100 bg-white hover:border-green-300 hover:shadow-md"
                       }`}
                     >
-                      {/* Top */}
                       <div className="flex items-start justify-between">
                         <div className={`w-2.5 h-2.5 rounded-full mt-0.5 flex-shrink-0 ${si.dot}`} />
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${si.color}`}>
                           {si.label}
                         </span>
                       </div>
-
-                      {/* Middle */}
                       <div>
                         <div className="text-xl font-bold text-gray-900">#{orderDisplayId}</div>
                         <div className="text-xs text-gray-400 mt-0.5">
                           {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                         </div>
                       </div>
-
-                      {/* Bottom */}
                       <div>
                         <div className="text-base font-bold text-gray-900">Rs.{order.totalAmount?.toFixed(0)}</div>
                         <div className="text-xs text-gray-400">
@@ -231,8 +240,8 @@ const ConsumerOrderTracking = () => {
                       </div>
                     </button>
 
-                    {/* Cancel button overlaid at bottom */}
-                    {canCancel && (
+                    {/* FIX: only show cancel for pending/confirmed */}
+                    {cancellable && (
                       <button
                         onClick={(e) => requestCancel(orderId, e)}
                         disabled={cancellingOrder === orderId}
@@ -242,7 +251,6 @@ const ConsumerOrderTracking = () => {
                       </button>
                     )}
 
-                    {/* Arrow pointer */}
                     {isSelected && (
                       <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[10px] border-l-transparent border-r-transparent border-t-green-500 z-10" />
                     )}
@@ -258,11 +266,10 @@ const ConsumerOrderTracking = () => {
               const orderId = order._id || order.id;
               const si = getStatusInfo(order.status);
               const stepIndex = statusSteps.indexOf(order.status);
-              const canCancel = !["delivered", "cancelled"].includes(order.status);
+              const cancellable = canConsumerCancel(order.status);
 
               return (
                 <div className="bg-white rounded-2xl border-2 border-green-500 shadow-xl overflow-hidden mt-2">
-                  {/* Header */}
                   <div className="bg-gradient-to-r from-green-50 to-blue-50 px-6 py-5 border-b flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-3 mb-1">
@@ -289,7 +296,6 @@ const ConsumerOrderTracking = () => {
                     </div>
                   </div>
 
-                  {/* Progress Tracker */}
                   {order.status !== "cancelled" && (
                     <div className="px-6 py-5 bg-gray-50 border-b">
                       <div className="relative flex justify-between items-start">
@@ -323,7 +329,6 @@ const ConsumerOrderTracking = () => {
                     </div>
                   )}
 
-                  {/* Shipments & Summary */}
                   <div className="px-6 py-5 space-y-4">
                     <h4 className="font-semibold text-gray-800 text-sm">Shipment Details ({order.shipments?.length || 0})</h4>
 
@@ -365,16 +370,14 @@ const ConsumerOrderTracking = () => {
                       );
                     })}
 
-                    {/* Order Summary */}
                     <div className="bg-gray-50 rounded-xl p-4 space-y-1.5">
                       <div className="flex justify-between text-sm text-gray-600"><span>Items subtotal</span><span>Rs. {order.itemsSubtotal?.toFixed(0)}</span></div>
                       <div className="flex justify-between text-sm text-gray-600"><span>Delivery</span><span>Rs. {order.deliveryTotal?.toFixed(0)}</span></div>
                       <div className="flex justify-between font-bold text-gray-900 pt-1.5 border-t border-gray-200 text-sm"><span>Total</span><span>Rs. {order.totalAmount?.toFixed(0)}</span></div>
                     </div>
 
-                    {/* Actions */}
                     <div className="flex gap-2">
-                      {canCancel && (
+                      {cancellable && (
                         <button
                           onClick={(e) => requestCancel(orderId, e)}
                           disabled={cancellingOrder === orderId}

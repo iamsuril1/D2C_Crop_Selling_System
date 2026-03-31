@@ -1,32 +1,34 @@
 import mongoose from "mongoose";
-
 const notificationSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
-    index: true, // Fast lookups by user
+    index: true,
   },
   type: {
     type: String,
     enum: [
-      "order_placed",      // New order for farmer
-      "order_confirmed",   // Farmer confirmed
-      "order_shipped",     // Farmer shipped
-      "order_delivered",   // Delivered to consumer
-      "order_cancelled",   // Cancelled
-      "new_product_like",  // Consumer liked product
-      "payment_received",  // Payment confirmed
+      "order_placed",
+      "order_confirmed",
+      "order_shipped",
+      "order_delivered",
+      "order_cancelled",
+      "new_product_like",
+      "payment_submitted",
+      "payment_received",
+      "payment_paid",
+      "payment_failed",
     ],
     required: true,
   },
   title: { type: String, required: true },
   message: { type: String, required: true },
-  data: { type: mongoose.Schema.Types.Mixed }, // orderId, productId, etc.
+  data: { type: mongoose.Schema.Types.Mixed },
   isRead: { type: Boolean, default: false },
   relatedOrder: { type: mongoose.Schema.Types.ObjectId, ref: "Order" },
-}, { 
-  timestamps: true 
+}, {
+  timestamps: true,
 });
 
 notificationSchema.index({ user: 1, isRead: 1 });

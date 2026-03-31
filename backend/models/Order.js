@@ -36,11 +36,9 @@ const shipmentSchema = new mongoose.Schema(
       enum: ["pending", "paid", "failed", "refunded"],
       default: "pending"
     },
-    paymentProof: String, // path to uploaded payment screenshot
+    paymentProof: String, 
     paymentDate: Date,
-    transactionId: String, // for eSewa or bank transactions
-    
-    // Farmer payment details (snapshot at order time)
+    transactionId: String, 
     farmerPaymentInfo: {
       esewaId: String,
       bankName: String,
