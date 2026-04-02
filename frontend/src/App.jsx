@@ -33,7 +33,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 
 // NEW
 import ReturnRequest  from "./pages/ReturnRequest";
-import FarmerReturns  from "./pages/FarmerReturns";
+import FarmerReturns  from "./pages/FarmerReturns.jsx";
 
 const ProtectedRoute = ({ user, roles, children }) => {
   if (!user) return <Navigate to="/login" replace />;

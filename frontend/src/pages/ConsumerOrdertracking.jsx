@@ -1,23 +1,39 @@
 import { useEffect, useState, useContext } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/axios";
 import AlertModal from "../components/AlertModal";
 import ConfirmModal from "../components/ConfirmModal";
 import { NotificationContext } from "../context/NotificationContext";
 
+// FIX: All farmer ID extraction now goes through this single helper so there
+// is one place to change if the shape of the populated farmer object ever differs.
+// It handles three cases:
+//   1. Populated object with _id:  { _id: ObjectId, firstName, ... }  → _id.toString()
+//   2. Raw Mongoose ObjectId                                           → .toString()
+//   3. Already a plain string                                          → trim()
+const toFarmerIdStr = (farmer) => {
+  if (!farmer) return "";
+  if (typeof farmer === "string") return farmer.trim();
+  // The backend User model's toJSON transform deletes _id and exposes id instead.
+  // Always check both so this works regardless of populate/toJSON behaviour.
+  if (farmer._id) return farmer._id.toString().trim();
+  if (farmer.id)  return farmer.id.toString().trim();
+  return "";
+};
+
 const ConsumerOrderTracking = () => {
-  const navigate  = useNavigate();
-  const notifCtx  = useContext(NotificationContext);
+  const navigate = useNavigate();
+  const location = useLocation();  // used to re-run loaders when navigating back
+  const notifCtx = useContext(NotificationContext);
 
-  const [orders,         setOrders]         = useState([]);
-  const [loading,        setLoading]        = useState(true);
-  const [filter,         setFilter]         = useState("all");
+  const [orders,          setOrders]          = useState([]);
+  const [loading,         setLoading]         = useState(true);
+  const [filter,          setFilter]          = useState("all");
   const [cancellingOrder, setCancellingOrder] = useState(null);
-  const [expandedOrder,  setExpandedOrder]  = useState(null);
+  const [expandedOrder,   setExpandedOrder]   = useState(null);
 
-  // Track which shipments already have a return request so we can
-  // disable the button if one is already submitted.
-  const [existingReturns, setExistingReturns] = useState({}); // { "orderId_farmerId": true }
+  // { "orderId_farmerId": "pending" | "approved" | "rejected" }
+  const [existingReturns, setExistingReturns] = useState({});
 
   const [alertModal, setAlertModal] = useState({
     isOpen: false, title: "", message: "", type: "info",
@@ -48,20 +64,21 @@ const ConsumerOrderTracking = () => {
       const res = await api.get("/api/returns/my");
       const map = {};
       (res.data || []).forEach((r) => {
-        const oid = r.order?._id || r.order?.toString();
-        const fid = r.farmer?._id || r.farmer?.toString();
+        // FIX: use toFarmerIdStr so the key is always a plain hex string
+        const oid = r.order?._id?.toString() || r.order?.toString();
+        const fid = toFarmerIdStr(r.farmer);
         if (oid && fid) map[`${oid}_${fid}`] = r.status;
       });
       setExistingReturns(map);
     } catch {
-      // non-critical
+      // non-critical — if this fails the return button just won't reflect existing state
     }
   };
 
   useEffect(() => {
     loadOrders();
     loadMyReturns();
-  }, []);
+  }, [location.pathname]);
 
   const requestCancel = (orderId, e) => {
     e.stopPropagation();
@@ -86,10 +103,35 @@ const ConsumerOrderTracking = () => {
   };
 
   const handleRequestReturn = (order, shipment) => {
-    const farmerName = shipment.farmer
-      ? `${shipment.farmer.firstName || ""} ${shipment.farmer.lastName || ""}`.trim()
+    const farmer     = shipment.farmer;
+    const farmerName = farmer
+      ? `${farmer.firstName || ""} ${farmer.lastName || ""}`.trim()
       : "Farmer";
-    navigate("/return-request", { state: { order, shipment, farmerName } });
+
+    // React Router's navigate state goes through the browser History API's
+    // structured clone algorithm. Mongoose documents and ObjectId objects do
+    // NOT survive structured clone — _id becomes { id, _bsontype } and
+    // .toString() on that returns "[object Object]".
+    // Extract everything we need as plain primitives HERE, before serialisation.
+    const farmerId = toFarmerIdStr(farmer);
+    const orderId  = (order._id ?? order.id)?.toString() ?? "";
+
+    navigate("/return-request", {
+      state: {
+        farmerId,
+        orderId,
+        farmerName,
+        orderDisplayId: orderId.slice(-6),
+        // Strip to plain primitives only — structured clone drops Mongoose ObjectIds
+        // (e.g. item.product). ReturnRequest only needs name/quantity/price for display;
+        // the backend re-reads items from the Order document itself.
+        items: (shipment.items ?? []).map((i) => ({
+          name:     String(i.name     ?? ""),
+          quantity: Number(i.quantity ?? 0),
+          price:    Number(i.price    ?? 0),
+        })),
+      },
+    });
   };
 
   const getStatusInfo = (status) => {
@@ -121,30 +163,31 @@ const ConsumerOrderTracking = () => {
     }
   };
 
+  // FIX: use toFarmerIdStr for the key so it matches the keys set in loadMyReturns
+  const makeReturnKey = (order, shipment) => {
+    const oid = (order._id ?? order.id)?.toString() ?? "";
+    const fid = toFarmerIdStr(shipment.farmer);
+    return `${oid}_${fid}`;
+  };
+
+  const canRequestReturn = (order, shipment) => {
+    if (order.status !== "delivered") return false;
+    const daysSince = (Date.now() - new Date(order.updatedAt).getTime()) / 86_400_000;
+    if (daysSince > 2) return false;
+    return !existingReturns[makeReturnKey(order, shipment)];
+  };
+
+  const getReturnStatus = (order, shipment) =>
+    existingReturns[makeReturnKey(order, shipment)] || null;
+
   const filteredOrders = orders.filter((o) => {
-    if (filter === "all") return true;
+    if (filter === "all")    return true;
     if (filter === "active") return !["delivered", "cancelled"].includes(o.status);
     return o.status === filter;
   });
 
-  const statusSteps = ["pending", "confirmed", "shipped", "delivered"];
+  const statusSteps       = ["pending", "confirmed", "shipped", "delivered"];
   const canConsumerCancel = (status) => ["pending", "confirmed"].includes(status);
-
-  // Return is available only on delivered orders, within the 3-day window
-  const canRequestReturn = (order, shipment) => {
-    if (order.status !== "delivered") return false;
-    const daysSince = (Date.now() - new Date(order.updatedAt).getTime()) / 86_400_000;
-    if (daysSince > 3) return false;
-    const oid = order._id || order.id;
-    const fid = shipment.farmer?._id || shipment.farmer?.toString();
-    return !existingReturns[`${oid}_${fid}`]; // no return submitted yet
-  };
-
-  const getReturnStatus = (order, shipment) => {
-    const oid = order._id || order.id;
-    const fid = shipment.farmer?._id || shipment.farmer?.toString();
-    return existingReturns[`${oid}_${fid}`] || null;
-  };
 
   if (loading) {
     return (
@@ -232,6 +275,7 @@ const ConsumerOrderTracking = () => {
           </div>
         ) : (
           <>
+            {/* Order cards grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {filteredOrders.map((order) => {
                 const orderId        = order._id || order.id;
@@ -240,10 +284,7 @@ const ConsumerOrderTracking = () => {
                 const isSelected     = expandedOrder === orderId;
                 const cancellable    = canConsumerCancel(order.status);
                 const hasReturn      = order.status === "delivered" &&
-                  order.shipments?.some((s) => {
-                    const fid = s.farmer?._id || s.farmer?.toString();
-                    return existingReturns[`${orderId}_${fid}`];
-                  });
+                  order.shipments?.some((s) => getReturnStatus(order, s));
 
                 return (
                   <div key={orderId} className="relative">
@@ -304,9 +345,9 @@ const ConsumerOrderTracking = () => {
             {expandedOrder && (() => {
               const order = filteredOrders.find(o => (o._id || o.id) === expandedOrder);
               if (!order) return null;
-              const orderId    = order._id || order.id;
-              const si         = getStatusInfo(order.status);
-              const stepIndex  = statusSteps.indexOf(order.status);
+              const orderId     = order._id || order.id;
+              const si          = getStatusInfo(order.status);
+              const stepIndex   = statusSteps.indexOf(order.status);
               const cancellable = canConsumerCancel(order.status);
 
               return (
@@ -338,7 +379,7 @@ const ConsumerOrderTracking = () => {
                     </div>
                   </div>
 
-                  {/* Progress */}
+                  {/* Progress bar */}
                   {order.status !== "cancelled" && (
                     <div className="px-6 py-5 bg-gray-50 border-b">
                       <div className="relative flex justify-between items-start">
@@ -377,12 +418,12 @@ const ConsumerOrderTracking = () => {
                     </h4>
 
                     {order.shipments?.map((shipment, idx) => {
-                      const farmer     = shipment.farmer;
-                      const farmerName = farmer
+                      const farmer       = shipment.farmer;
+                      const farmerName   = farmer
                         ? `${farmer.firstName || ""} ${farmer.lastName || ""}`.trim()
                         : "Farmer";
-                      const canReturn      = canRequestReturn(order, shipment);
-                      const returnStatus   = getReturnStatus(order, shipment);
+                      const canReturn    = canRequestReturn(order, shipment);
+                      const returnStatus = getReturnStatus(order, shipment);
 
                       return (
                         <div key={idx} className="border border-gray-200 rounded-xl p-4">
@@ -394,7 +435,6 @@ const ConsumerOrderTracking = () => {
                               <p className="font-semibold text-sm text-gray-900">{farmerName}</p>
                               <p className="text-xs text-gray-400">Shipment {idx + 1} of {order.shipments.length}</p>
                             </div>
-                            {/* Return status badge */}
                             {returnStatus && (
                               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getReturnBadge(returnStatus)}`}>
                                 Return: {returnStatus}
@@ -425,7 +465,7 @@ const ConsumerOrderTracking = () => {
                             <span className="font-bold">Rs. {((shipment.subtotal || 0) + (shipment.deliveryFee || 0)).toFixed(0)}</span>
                           </div>
 
-                          {/* Return button — only on delivered orders within window */}
+                          {/* Return action */}
                           {order.status === "delivered" && (
                             canReturn ? (
                               <button
@@ -436,7 +476,7 @@ const ConsumerOrderTracking = () => {
                               </button>
                             ) : !returnStatus ? (
                               <p className="text-xs text-center text-gray-400 py-1">
-                                Return window closed (3 days after delivery)
+                                Return window closed (2 days after delivery)
                               </p>
                             ) : null
                           )}

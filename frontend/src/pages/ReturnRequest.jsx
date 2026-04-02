@@ -1,27 +1,29 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/axios";
 import AlertModal from "../components/AlertModal";
 
 const REASON_LABELS = {
-  damaged_item:              "Item arrived damaged",
-  wrong_item:                "Wrong item received",
-  quality_not_as_described:  "Quality not as described",
-  item_missing:              "Item was missing",
-  changed_mind:              "Changed my mind",
-  other:                     "Other",
+  damaged_item:             "Item arrived damaged",
+  wrong_item:               "Wrong item received",
+  quality_not_as_described: "Quality not as described",
+  item_missing:             "Item was missing",
+  changed_mind:             "Changed my mind",
+  other:                    "Other",
 };
 
-// Expects location.state = { order, shipment, farmerName }
-// Navigated to from ConsumerOrderTracking.
-
 const ReturnRequest = () => {
-  const navigate  = useNavigate();
-  const location  = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const order    = location.state?.order;
-  const shipment = location.state?.shipment;
-  const farmerName = location.state?.farmerName || "Farmer";
+  const state = location.state ?? {};
+  const {
+    farmerId       = "",
+    orderId        = "",
+    farmerName     = "Farmer",
+    items          = [],
+    orderDisplayId = "",
+  } = state;
 
   const [reason,       setReason]       = useState("");
   const [reasonDetail, setReasonDetail] = useState("");
@@ -37,21 +39,33 @@ const ReturnRequest = () => {
   const showAlert = (title, message, type = "error", onConfirm = null) => {
     setAlertModal({ isOpen: true, title, message, type, onConfirm });
   };
-
   const closeAlert = () => {
     const cb = alertModal.onConfirm;
     setAlertModal((p) => ({ ...p, isOpen: false, onConfirm: null }));
     if (cb) cb();
   };
 
-  useEffect(() => {
-    if (!order || !shipment) navigate("/my-orders", { replace: true });
-  }, [order, shipment, navigate]);
-
-  if (!order || !shipment) return null;
-
-  const farmerId = shipment.farmer?._id || shipment.farmer;
-  const orderId  = order._id || order.id;
+  // Guard inline — no useEffect, no redirect race.
+  // If state is missing (direct URL visit, stale history) show a plain error
+  // with a button back to My Orders rather than silently redirecting.
+  const isValidId = (id) => /^[a-f\d]{24}$/i.test(String(id));
+  if (!isValidId(farmerId) || !isValidId(orderId)) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center max-w-sm w-full">
+          <p className="text-gray-600 mb-4">
+            Return details could not be loaded. Please go back and try again.
+          </p>
+          <button
+            onClick={() => navigate("/my-orders", { replace: true })}
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition"
+          >
+            Back to my orders
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
@@ -69,16 +83,9 @@ const ReturnRequest = () => {
     setErrors((p) => { const e = { ...p }; delete e.photo; return e; });
   };
 
-  const validate = () => {
-    const e = {};
-    if (!reason) e.reason = "Please select a reason";
-    return e;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+  const handleSubmit = async (ev) => {
+    ev.preventDefault();
+    if (!reason) { setErrors({ reason: "Please select a reason" }); return; }
 
     setSubmitting(true);
     try {
@@ -93,7 +100,7 @@ const ReturnRequest = () => {
 
       showAlert(
         "Return submitted",
-        "Your return request has been sent to the farmer. You'll be notified once they review it.",
+        "Your request has been sent to the farmer. You'll be notified once they review it.",
         "success",
         () => navigate("/my-orders", { replace: true })
       );
@@ -108,9 +115,7 @@ const ReturnRequest = () => {
     }
   };
 
-  const totalAmount = shipment.items?.reduce(
-    (s, i) => s + i.price * i.quantity, 0
-  ) ?? 0;
+  const totalAmount = items.reduce((s, i) => s + (i.price ?? 0) * (i.quantity ?? 0), 0);
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
@@ -126,7 +131,6 @@ const ReturnRequest = () => {
       />
 
       <div className="max-w-2xl mx-auto">
-        {/* Back */}
         <button
           onClick={() => navigate("/my-orders")}
           className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-6 transition"
@@ -138,11 +142,10 @@ const ReturnRequest = () => {
         </button>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* Header */}
           <div className="bg-gradient-to-r from-orange-50 to-red-50 border-b px-6 py-5">
             <h1 className="text-2xl font-bold text-gray-900">Request a return</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Order #{orderId?.toString().slice(-6)} · {farmerName}
+              Order #{orderDisplayId || orderId.slice(-6)} · {farmerName}
             </p>
           </div>
 
@@ -152,17 +155,21 @@ const ReturnRequest = () => {
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                 Items in this shipment
               </p>
-              <div className="space-y-2">
-                {shipment.items?.map((item, i) => (
-                  <div key={i} className="flex justify-between text-sm">
-                    <span className="text-gray-800 font-medium">
-                      {item.name}
-                      <span className="text-gray-400 font-normal ml-1">×{item.quantity}</span>
-                    </span>
-                    <span className="text-gray-700">Rs. {(item.price * item.quantity).toFixed(0)}</span>
-                  </div>
-                ))}
-              </div>
+              {items.length === 0 ? (
+                <p className="text-sm text-gray-400">No items found.</p>
+              ) : (
+                <div className="space-y-2">
+                  {items.map((item, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-gray-800 font-medium">
+                        {item.name}
+                        <span className="text-gray-400 font-normal ml-1">×{item.quantity}</span>
+                      </span>
+                      <span className="text-gray-700">Rs. {((item.price ?? 0) * (item.quantity ?? 0)).toFixed(0)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between text-sm font-semibold text-gray-800">
                 <span>Shipment total</span>
                 <span>Rs. {totalAmount.toFixed(0)}</span>
@@ -170,7 +177,7 @@ const ReturnRequest = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Reason select */}
+              {/* Reason picker */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Reason for return <span className="text-red-500">*</span>
@@ -220,7 +227,6 @@ const ReturnRequest = () => {
                   Evidence photo{" "}
                   <span className="text-gray-400 font-normal">(strongly recommended)</span>
                 </label>
-
                 {photoPreview ? (
                   <div className="space-y-2">
                     <img
@@ -250,18 +256,16 @@ const ReturnRequest = () => {
                 )}
               </div>
 
-              {/* Info banner */}
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
                 <p className="font-medium mb-1">What happens next</p>
                 <ul className="space-y-0.5 list-disc list-inside text-blue-700">
                   <li>Your request is sent to the farmer for review</li>
-                  <li>The farmer has up to 3 days to approve or reject</li>
+                  <li>The farmer has up to 2 days to approve or reject</li>
                   <li>You'll receive a notification with their decision</li>
                   <li>If approved, stock is restored on their end</li>
                 </ul>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
