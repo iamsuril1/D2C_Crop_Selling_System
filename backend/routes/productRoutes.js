@@ -17,11 +17,7 @@ router.post("/", protect, authorize("farmer"), upload.single("image"), createPro
 router.get("/my-products", protect, authorize("farmer"), getMyProducts);
 router.put("/:id", protect, authorize("farmer"), upload.single("image"), updateProduct);
 router.delete("/:id", protect, authorize("farmer"), deleteProduct);
-
-// IMPORTANT: list first
 router.get("/", getPublicProducts);
-
-// detail last
 router.get("/:id", getProductById);
 
 export default router;

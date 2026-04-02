@@ -7,7 +7,7 @@ import {
   updateOrderStatus,
   getMyOrders,
   cancelOrderConsumer,
-  cancelOrderFarmer,       // FIX: import the new dedicated farmer cancel handler
+  cancelOrderFarmer,      
   estimateDeliveryMultiOrigin,
 } from "../controllers/orderController.js";
 
@@ -18,8 +18,6 @@ router.post("/", protect, authorize("consumer"), createOrder);
 
 router.get("/farmer", protect, authorize("farmer"), getFarmerOrders);
 router.put("/:id/status", protect, authorize("farmer"), updateOrderStatus);
-// FIX: Farmer cancel now uses cancelOrderFarmer (with shipped/delivered guard)
-// instead of reusing the consumer cancel endpoint.
 router.put("/:id/cancel/farmer", protect, authorize("farmer"), cancelOrderFarmer);
 
 router.get("/my", protect, authorize("consumer"), getMyOrders);
