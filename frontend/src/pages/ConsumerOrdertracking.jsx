@@ -5,26 +5,22 @@ import AlertModal from "../components/AlertModal";
 import ConfirmModal from "../components/ConfirmModal";
 import { NotificationContext } from "../context/NotificationContext";
 
-// FIX: All farmer ID extraction now goes through this single helper so there
-// is one place to change if the shape of the populated farmer object ever differs.
-// It handles three cases:
-//   1. Populated object with _id:  { _id: ObjectId, firstName, ... }  → _id.toString()
-//   2. Raw Mongoose ObjectId                                           → .toString()
-//   3. Already a plain string                                          → trim()
+// Extracts a plain hex string from a populated farmer object or raw ObjectId.
+// Works regardless of whether toJSON has run (id vs _id).
 const toFarmerIdStr = (farmer) => {
   if (!farmer) return "";
   if (typeof farmer === "string") return farmer.trim();
-  // The backend User model's toJSON transform deletes _id and exposes id instead.
-  // Always check both so this works regardless of populate/toJSON behaviour.
   if (farmer._id) return farmer._id.toString().trim();
   if (farmer.id)  return farmer.id.toString().trim();
   return "";
 };
 
+const RETURN_WINDOW_DAYS = 2;
+
 const ConsumerOrderTracking = () => {
-  const navigate = useNavigate();
-  const location = useLocation();  // used to re-run loaders when navigating back
-  const notifCtx = useContext(NotificationContext);
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const notifCtx  = useContext(NotificationContext);
 
   const [orders,          setOrders]          = useState([]);
   const [loading,         setLoading]         = useState(true);
@@ -32,7 +28,7 @@ const ConsumerOrderTracking = () => {
   const [cancellingOrder, setCancellingOrder] = useState(null);
   const [expandedOrder,   setExpandedOrder]   = useState(null);
 
-  // { "orderId_farmerId": "pending" | "approved" | "rejected" }
+  // Map of "orderId_farmerId" → return status string (or undefined if no return)
   const [existingReturns, setExistingReturns] = useState({});
 
   const [alertModal, setAlertModal] = useState({
@@ -64,14 +60,13 @@ const ConsumerOrderTracking = () => {
       const res = await api.get("/api/returns/my");
       const map = {};
       (res.data || []).forEach((r) => {
-        // FIX: use toFarmerIdStr so the key is always a plain hex string
         const oid = r.order?._id?.toString() || r.order?.toString();
         const fid = toFarmerIdStr(r.farmer);
         if (oid && fid) map[`${oid}_${fid}`] = r.status;
       });
       setExistingReturns(map);
     } catch {
-      // non-critical — if this fails the return button just won't reflect existing state
+      // non-critical
     }
   };
 
@@ -108,11 +103,6 @@ const ConsumerOrderTracking = () => {
       ? `${farmer.firstName || ""} ${farmer.lastName || ""}`.trim()
       : "Farmer";
 
-    // React Router's navigate state goes through the browser History API's
-    // structured clone algorithm. Mongoose documents and ObjectId objects do
-    // NOT survive structured clone — _id becomes { id, _bsontype } and
-    // .toString() on that returns "[object Object]".
-    // Extract everything we need as plain primitives HERE, before serialisation.
     const farmerId = toFarmerIdStr(farmer);
     const orderId  = (order._id ?? order.id)?.toString() ?? "";
 
@@ -122,9 +112,6 @@ const ConsumerOrderTracking = () => {
         orderId,
         farmerName,
         orderDisplayId: orderId.slice(-6),
-        // Strip to plain primitives only — structured clone drops Mongoose ObjectIds
-        // (e.g. item.product). ReturnRequest only needs name/quantity/price for display;
-        // the backend re-reads items from the Order document itself.
         items: (shipment.items ?? []).map((i) => ({
           name:     String(i.name     ?? ""),
           quantity: Number(i.quantity ?? 0),
@@ -163,17 +150,20 @@ const ConsumerOrderTracking = () => {
     }
   };
 
-  // FIX: use toFarmerIdStr for the key so it matches the keys set in loadMyReturns
   const makeReturnKey = (order, shipment) => {
     const oid = (order._id ?? order.id)?.toString() ?? "";
     const fid = toFarmerIdStr(shipment.farmer);
     return `${oid}_${fid}`;
   };
 
+  // FIX: use deliveredAt (if set) to calculate the return window. Fall back to
+  // updatedAt only for orders that predate the deliveredAt field being added.
   const canRequestReturn = (order, shipment) => {
     if (order.status !== "delivered") return false;
-    const daysSince = (Date.now() - new Date(order.updatedAt).getTime()) / 86_400_000;
-    if (daysSince > 2) return false;
+    const deliveredTimestamp = order.deliveredAt || order.updatedAt;
+    const daysSince = (Date.now() - new Date(deliveredTimestamp).getTime()) / 86_400_000;
+    if (daysSince > RETURN_WINDOW_DAYS) return false;
+    // FIX: hide the button entirely if a return already exists for this shipment
     return !existingReturns[makeReturnKey(order, shipment)];
   };
 
@@ -283,6 +273,7 @@ const ConsumerOrderTracking = () => {
                 const si             = getStatusInfo(order.status);
                 const isSelected     = expandedOrder === orderId;
                 const cancellable    = canConsumerCancel(order.status);
+                // Show a "Return" badge on the card only if there's an active return
                 const hasReturn      = order.status === "delivered" &&
                   order.shipments?.some((s) => getReturnStatus(order, s));
 
@@ -422,8 +413,18 @@ const ConsumerOrderTracking = () => {
                       const farmerName   = farmer
                         ? `${farmer.firstName || ""} ${farmer.lastName || ""}`.trim()
                         : "Farmer";
+                      // FIX: canRequestReturn already checks existingReturns — if a
+                      // return exists the button is hidden entirely, not just disabled.
                       const canReturn    = canRequestReturn(order, shipment);
                       const returnStatus = getReturnStatus(order, shipment);
+
+                      // FIX: check whether the return window is still open independently
+                      // of whether a return already exists (needed for the closed-window msg).
+                      const deliveredTimestamp = order.deliveredAt || order.updatedAt;
+                      const daysSince = order.status === "delivered"
+                        ? (Date.now() - new Date(deliveredTimestamp).getTime()) / 86_400_000
+                        : Infinity;
+                      const windowOpen = daysSince <= RETURN_WINDOW_DAYS;
 
                       return (
                         <div key={idx} className="border border-gray-200 rounded-xl p-4">
@@ -465,20 +466,35 @@ const ConsumerOrderTracking = () => {
                             <span className="font-bold">Rs. {((shipment.subtotal || 0) + (shipment.deliveryFee || 0)).toFixed(0)}</span>
                           </div>
 
-                          {/* Return action */}
+                          {/* ── Return action area ── */}
                           {order.status === "delivered" && (
-                            canReturn ? (
-                              <button
-                                onClick={() => handleRequestReturn(order, shipment)}
-                                className="w-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 font-semibold py-2 rounded-xl text-sm transition"
-                              >
-                                Request return
-                              </button>
-                            ) : !returnStatus ? (
-                              <p className="text-xs text-center text-gray-400 py-1">
-                                Return window closed (2 days after delivery)
-                              </p>
-                            ) : null
+                            <>
+                              {/* Case 1: can still request a return (no existing return + window open) */}
+                              {canReturn && (
+                                <button
+                                  onClick={() => handleRequestReturn(order, shipment)}
+                                  className="w-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 font-semibold py-2 rounded-xl text-sm transition"
+                                >
+                                  Request return
+                                </button>
+                              )}
+
+                              {/* Case 2: a return already exists — show its status, no button */}
+                              {!canReturn && returnStatus && (
+                                <div className={`w-full text-center py-2 rounded-xl text-sm font-semibold border-2 ${getReturnBadge(returnStatus)} border-transparent`}>
+                                  {returnStatus === "pending"  && "⏳ Return request pending"}
+                                  {returnStatus === "approved" && "✓ Return approved"}
+                                  {returnStatus === "rejected" && "✗ Return rejected"}
+                                </div>
+                              )}
+
+                              {/* Case 3: no return exists but window is closed */}
+                              {!canReturn && !returnStatus && (
+                                <p className="text-xs text-center text-gray-400 py-1">
+                                  Return window closed (2 days after delivery)
+                                </p>
+                              )}
+                            </>
                           )}
                         </div>
                       );

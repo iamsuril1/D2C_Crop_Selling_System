@@ -4,22 +4,14 @@ import api from "../api/axios";
 
 export const NotificationContext = createContext(null);
 
-// FIX: Centralized polling — a single 30s interval for notifications.
-// Previously, ConsumerOrderTracking ALSO polled every 30s independently,
-// meaning logged-in consumers on that page triggered two simultaneous polling
-// loops. Now all consumers share this one context-level interval and can call
-// refetch() directly when they need an immediate refresh.
-
 const POLL_INTERVAL_MS = 30_000;
 
 export const NotificationProvider = ({ children }) => {
   const { user } = useContext(AuthContext);
   const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [unreadCount,   setUnreadCount]   = useState(0);
+  const [loading,       setLoading]       = useState(false);
 
-  // Use a ref so the interval callback always has the latest user value
-  // without needing to be recreated when user changes.
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
 
@@ -35,7 +27,7 @@ export const NotificationProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []); // stable — no deps needed because userRef.current is used inside
+  }, []);
 
   const markAsRead = async (id) => {
     try {
@@ -61,15 +53,49 @@ export const NotificationProvider = ({ children }) => {
 
   useEffect(() => {
     if (!user) {
-      // Clear state on logout
       setNotifications([]);
       setUnreadCount(0);
       return;
     }
 
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
+
+    // FIX: pause the interval while the browser tab is hidden so we don't
+    // make unnecessary requests when the user isn't looking at the page.
+    let intervalId = null;
+
+    const startPolling = () => {
+      if (intervalId) return;
+      intervalId = setInterval(fetchNotifications, POLL_INTERVAL_MS);
+    };
+
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        // Immediately fetch when tab becomes visible again, then restart polling
+        fetchNotifications();
+        startPolling();
+      }
+    };
+
+    if (!document.hidden) {
+      startPolling();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [user, fetchNotifications]);
 
   const value = {

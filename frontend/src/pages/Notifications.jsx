@@ -1,9 +1,11 @@
 import { useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { NotificationContext } from "../context/NotificationContext";
+import { AuthContext } from "../context/AuthContext";
 
 const Notifications = () => {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
+  const { user }  = useContext(AuthContext);
   const { notifications, loading, markAsRead, markAllAsRead, refetch, unreadCount } =
     useContext(NotificationContext);
 
@@ -13,59 +15,77 @@ const Notifications = () => {
 
   const getNotificationIcon = (type) => {
     const iconMap = {
-      order_placed: "📦",
-      order_confirmed: "✓",
-      order_shipped: "🚚",
-      order_delivered: "✓✓",
-      order_cancelled: "✗",
+      order_placed:      "📦",
+      order_confirmed:   "✓",
+      order_shipped:     "🚚",
+      order_delivered:   "✓✓",
+      order_cancelled:   "✗",
       payment_submitted: "💳",
-      payment_paid: "✓",
-      payment_failed: "✗",
-      payment_received: "💰",
-      new_product_like: "❤️",
+      payment_paid:      "✓",
+      payment_failed:    "✗",
+      payment_received:  "💰",
+      new_product_like:  "❤️",
+      return_requested:  "↩️",
+      return_approved:   "✓",
+      return_rejected:   "✗",
     };
     return iconMap[type] || "🔔";
   };
 
   const getNotificationColor = (type) => {
-    if (type.includes("cancelled") || type.includes("failed")) {
+    if (type?.includes("cancelled") || type?.includes("failed") || type?.includes("rejected")) {
       return "bg-red-50 border-red-200";
     }
-    if (type.includes("delivered") || type.includes("paid") || type.includes("received")) {
+    if (type?.includes("delivered") || type?.includes("paid") || type?.includes("received") || type?.includes("approved")) {
       return "bg-green-50 border-green-200";
     }
-    if (type.includes("shipped")) {
+    if (type?.includes("shipped")) {
       return "bg-purple-50 border-purple-200";
     }
-    if (type.includes("confirmed")) {
+    if (type?.includes("confirmed")) {
       return "bg-blue-50 border-blue-200";
+    }
+    if (type?.includes("return")) {
+      return "bg-orange-50 border-orange-200";
     }
     return "bg-gray-50 border-gray-200";
   };
 
+  // FIX: navigate to the correct page based on the logged-in user's role,
+  // not always /consumer. Farmers should go to their orders or returns pages.
   const handleNotificationClick = (notification) => {
     if (!notification.isRead) {
       markAsRead(notification._id);
     }
 
-    // Navigate based on notification type and data
+    const isConsumer = user?.role === "consumer";
+    const isFarmer   = user?.role === "farmer";
+
+    if (notification.data?.returnId) {
+      if (isConsumer) navigate("/my-orders");
+      else if (isFarmer) navigate("/farmer/returns");
+      return;
+    }
+
     if (notification.data?.orderId) {
-      navigate("/consumer"); // or specific order page
+      if (isConsumer) navigate("/my-orders");
+      else if (isFarmer) navigate("/farmer/orders");
+      return;
     }
   };
 
   const formatTime = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
+    const date    = new Date(dateString);
+    const now     = new Date();
+    const diffMs  = now - date;
+    const diffMins  = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    const diffDays  = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffMins < 1)   return "Just now";
+    if (diffMins < 60)  return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 7)   return `${diffDays}d ago`;
     return date.toLocaleDateString();
   };
 
@@ -141,11 +161,7 @@ const Notifications = () => {
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-4 mb-1">
-                      <h3
-                        className={`font-semibold text-gray-900 ${
-                          !notification.isRead ? "font-bold" : ""
-                        }`}
-                      >
+                      <h3 className={`font-semibold text-gray-900 ${!notification.isRead ? "font-bold" : ""}`}>
                         {notification.title}
                       </h3>
                       <span className="text-xs text-gray-500 whitespace-nowrap">
@@ -173,7 +189,6 @@ const Notifications = () => {
                       </div>
                     )}
 
-                    {/* Action Indicators */}
                     <div className="mt-3 flex items-center gap-3">
                       {!notification.isRead && (
                         <span className="px-3 py-1 bg-green-600 text-white text-xs font-semibold rounded-full">
@@ -181,12 +196,12 @@ const Notifications = () => {
                         </span>
                       )}
                       <span className="text-xs text-gray-500 capitalize">
-                        {notification.type.replace(/_/g, " ")}
+                        {notification.type?.replace(/_/g, " ")}
                       </span>
                     </div>
                   </div>
 
-                  {/* Unread Indicator */}
+                  {/* Unread dot */}
                   {!notification.isRead && (
                     <div className="flex-shrink-0">
                       <div className="w-3 h-3 bg-green-600 rounded-full"></div>
@@ -198,7 +213,6 @@ const Notifications = () => {
           </div>
         )}
 
-        {/* Load More (if needed in future) */}
         {notifications.length >= 50 && (
           <div className="mt-6 text-center">
             <button className="text-green-600 hover:text-green-700 font-medium">

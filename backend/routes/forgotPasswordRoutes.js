@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import {
   sendForgotOtp,
   verifyForgotOtp,
@@ -7,8 +8,16 @@ import {
 
 const router = express.Router();
 
-router.post("/send-otp", sendForgotOtp);
-router.post("/verify-otp", verifyForgotOtp);
-router.post("/reset", resetPassword);
+const forgotLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { message: "Too many password reset requests. Please wait 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.post("/send-otp",    forgotLimiter, sendForgotOtp);
+router.post("/verify-otp",  forgotLimiter, verifyForgotOtp);
+router.post("/reset",       forgotLimiter, resetPassword);
 
 export default router;

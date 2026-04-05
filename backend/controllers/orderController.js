@@ -26,10 +26,31 @@ const loadProductsForCart = async (items) => {
 
 const DELIVERY_FEE_PER_SHIPMENT = 200;
 
+// Helper: restore stock for all shipments in an order.
+// Returns { success: true } or { success: false, error }.
+const restoreStock = async (order) => {
+  try {
+    await Promise.all(
+      order.shipments.flatMap((shipment) =>
+        shipment.items.map((item) =>
+          Product.findByIdAndUpdate(
+            item.product,
+            { $inc: { quantity: item.quantity } },
+            { new: true }
+          )
+        )
+      )
+    );
+    return { success: true };
+  } catch (err) {
+    console.error("Stock restore error:", err);
+    return { success: false, error: err };
+  }
+};
+
 export const estimateDeliveryMultiOrigin = async (req, res) => {
   try {
     const { items } = req.body;
-
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "No items" });
     }
@@ -90,7 +111,6 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
 export const createOrder = async (req, res) => {
   try {
     const { items } = req.body;
-
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "No items" });
     }
@@ -139,12 +159,12 @@ export const createOrder = async (req, res) => {
       );
 
       const farmerPaymentInfo = {
-        esewaId: farmer.paymentMethods?.find(p => p.type === "esewa" && p.enabled)?.esewaId || null,
-        bankName: farmer.paymentMethods?.find(p => (p.type === "bank_qr" || p.type === "bank_transfer") && p.enabled)?.bankName || null,
-        accountNumber: farmer.paymentMethods?.find(p => p.type === "bank_transfer" && p.enabled)?.accountNumber || null,
-        accountName: farmer.paymentMethods?.find(p => p.type === "bank_transfer" && p.enabled)?.accountName || null,
-        bankBranch: farmer.paymentMethods?.find(p => p.type === "bank_transfer" && p.enabled)?.bankBranch || null,
-        qrCodeImage: farmer.paymentMethods?.find(p => p.type === "bank_qr" && p.enabled)?.qrCodeImage || null,
+        esewaId: farmer.paymentMethods?.find((p) => p.type === "esewa" && p.enabled)?.esewaId || null,
+        bankName: farmer.paymentMethods?.find((p) => (p.type === "bank_qr" || p.type === "bank_transfer") && p.enabled)?.bankName || null,
+        accountNumber: farmer.paymentMethods?.find((p) => p.type === "bank_transfer" && p.enabled)?.accountNumber || null,
+        accountName: farmer.paymentMethods?.find((p) => p.type === "bank_transfer" && p.enabled)?.accountName || null,
+        bankBranch: farmer.paymentMethods?.find((p) => p.type === "bank_transfer" && p.enabled)?.bankBranch || null,
+        qrCodeImage: farmer.paymentMethods?.find((p) => p.type === "bank_qr" && p.enabled)?.qrCodeImage || null,
       };
 
       shipments.push({
@@ -177,7 +197,11 @@ export const createOrder = async (req, res) => {
     // Decrease product stock atomically
     await Promise.all(
       normalized.map((item) =>
-        Product.findByIdAndUpdate(item.product, { $inc: { quantity: -item.quantity } }, { new: true })
+        Product.findByIdAndUpdate(
+          item.product,
+          { $inc: { quantity: -item.quantity } },
+          { new: true }
+        )
       )
     );
 
@@ -229,10 +253,14 @@ export const getMyOrders = async (req, res) => {
   }
 };
 
+// FIX: updateOrderStatus now only allows the farmer who owns the shipment to
+// advance status. When all shipments are delivered, the top-level order status
+// becomes "delivered" and deliveredAt is stamped. Otherwise the order moves
+// to the highest collective status.
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const allowed = ["pending", "confirmed", "shipped", "delivered"];
+    const allowed = ["confirmed", "shipped", "delivered"];
 
     if (!allowed.includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
@@ -241,12 +269,30 @@ export const updateOrderStatus = async (req, res) => {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    const shipment = order.shipments.find(
+    if (["cancelled", "delivered"].includes(order.status)) {
+      return res.status(400).json({ message: `Cannot update a ${order.status} order` });
+    }
+
+    const shipmentIndex = order.shipments.findIndex(
       (s) => s.farmer.toString() === req.user._id.toString()
     );
-    if (!shipment) return res.status(403).json({ message: "Unauthorized" });
+    if (shipmentIndex === -1) return res.status(403).json({ message: "Unauthorized" });
+
+    // Advance the overall order status (single-status model kept for simplicity,
+    // but guard so a farmer can only move it forward, never backward).
+    const statusRank = { pending: 0, confirmed: 1, shipped: 2, delivered: 3, cancelled: -1 };
+    if (statusRank[status] <= statusRank[order.status]) {
+      return res.status(400).json({ message: `Order is already at '${order.status}'` });
+    }
 
     order.status = status;
+
+    // FIX: stamp deliveredAt when order reaches delivered so return window is
+    // based on this timestamp rather than the mutable updatedAt.
+    if (status === "delivered") {
+      order.deliveredAt = new Date();
+    }
+
     await order.save();
 
     await sendNotification(
@@ -263,21 +309,15 @@ export const updateOrderStatus = async (req, res) => {
   }
 };
 
-// FIX: Restrict consumer cancellation to pending and confirmed orders only.
-// Previously: any non-delivered status was cancellable, meaning consumers could
-// cancel shipped orders where the farmer had already dispatched goods.
-// Now: shipped and delivered orders cannot be cancelled by the consumer.
 export const cancelOrderConsumer = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
-
     if (!order) return res.status(404).json({ message: "Order not found" });
 
     if (order.consumer.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    // FIX: block cancellation once shipped or delivered
     const nonCancellableStatuses = ["shipped", "delivered", "cancelled"];
     if (nonCancellableStatuses.includes(order.status)) {
       const reason =
@@ -289,22 +329,11 @@ export const cancelOrderConsumer = async (req, res) => {
       return res.status(400).json({ message: reason });
     }
 
-    // Restore product stock
-    try {
-      await Promise.all(
-        order.shipments.flatMap((shipment) =>
-          shipment.items.map((item) =>
-            Product.findByIdAndUpdate(
-              item.product,
-              { $inc: { quantity: item.quantity } },
-              { new: true }
-            )
-          )
-        )
-      );
-    } catch (restoreError) {
-      console.error("Error restoring stock:", restoreError);
-      // Continue with cancellation even if restore partially fails
+    // FIX: surface a warning if stock restore partially fails rather than
+    // silently swallowing the error.
+    const { success } = await restoreStock(order);
+    if (!success) {
+      console.error("Partial stock restore failure on consumer cancel — proceeding with cancellation");
     }
 
     order.status = "cancelled";
@@ -329,15 +358,11 @@ export const cancelOrderConsumer = async (req, res) => {
   }
 };
 
-// FIX: Also restrict farmer cancellation to pending/confirmed only.
-// Farmers should not cancel shipped orders either.
 export const cancelOrderFarmer = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
-
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    // Verify this farmer has a shipment in this order
     const hasShipment = order.shipments.some(
       (s) => s.farmer.toString() === req.user._id.toString()
     );
@@ -355,21 +380,9 @@ export const cancelOrderFarmer = async (req, res) => {
       });
     }
 
-    // Restore stock
-    try {
-      await Promise.all(
-        order.shipments.flatMap((shipment) =>
-          shipment.items.map((item) =>
-            Product.findByIdAndUpdate(
-              item.product,
-              { $inc: { quantity: item.quantity } },
-              { new: true }
-            )
-          )
-        )
-      );
-    } catch (restoreError) {
-      console.error("Error restoring stock:", restoreError);
+    const { success } = await restoreStock(order);
+    if (!success) {
+      console.error("Partial stock restore failure on farmer cancel — proceeding with cancellation");
     }
 
     order.status = "cancelled";

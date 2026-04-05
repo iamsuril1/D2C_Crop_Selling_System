@@ -134,12 +134,13 @@ export const updateProduct = async (req, res) => {
   }
 };
 
+// FIX: return ALL of the farmer's own products (including inactive/disabled ones)
+// so they can see and manage their full catalogue. The isActive filter was wrong
+// here — it belongs only on the public-facing endpoint.
 export const getMyProducts = async (req, res) => {
   try {
     const products = await Product.find({
       farmer: req.user._id,
-      isActive: true,
-      ...notExpiredFilter(),
     }).sort({ createdAt: -1 });
 
     res.json(products);
@@ -176,7 +177,7 @@ export const getPublicProducts = async (req, res) => {
       limit = 20,
       lat,
       lng,
-      maxDistance = 5000, // meters
+      maxDistance = 5000,
     } = req.query;
 
     const filter = {
@@ -187,7 +188,6 @@ export const getPublicProducts = async (req, res) => {
     if (category) filter.category = category;
     if (subcategory) filter.subcategory = subcategory;
 
-    // MODE: all products
     if (lat === undefined || lng === undefined) {
       const products = await Product.find(filter)
         .populate("farmer", "firstName lastName email profileImage addressText location")
@@ -197,7 +197,6 @@ export const getPublicProducts = async (req, res) => {
       return res.json({ mode: "all", products });
     }
 
-    // MODE: nearby products (via nearby farmers)
     const latNum = Number(lat);
     const lngNum = Number(lng);
     const maxD = Number(maxDistance);
@@ -214,7 +213,7 @@ export const getPublicProducts = async (req, res) => {
           $maxDistance: maxD,
         },
       },
-    }).select("_id"); // $near sorts by distance [web:40]
+    }).select("_id");
 
     const farmerIds = nearbyFarmers.map((u) => u._id);
 

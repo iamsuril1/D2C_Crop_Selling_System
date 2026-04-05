@@ -14,7 +14,7 @@ const ProductForm = () => {
     unit: "kg",
     description: "",
     harvestDate: "",
-    shelfLife: ""  // ✅ Required
+    shelfLife: ""  
   });
   
   const [image, setImage] = useState(null);

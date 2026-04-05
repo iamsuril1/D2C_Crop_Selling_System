@@ -30,14 +30,10 @@ export const createReturn = async (req, res) => {
 
     const farmerIdStr = String(farmerId).trim();
 
-    // Validate format before hitting the DB — a Mongoose ObjectId is 24 hex chars
     if (!/^[a-f\d]{24}$/i.test(farmerIdStr)) {
       console.error(`[createReturn] Bad farmerId format: "${farmerIdStr}"`);
       return res.status(400).json({ message: "Invalid farmerId format" });
     }
-
-    console.log(`[createReturn] orderId="${orderId}" farmerId="${farmerIdStr}"`);
-
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: "Order not found" });
@@ -50,26 +46,25 @@ export const createReturn = async (req, res) => {
       return res.status(400).json({ message: "Returns are only allowed on delivered orders" });
     }
 
-    const daysSinceDelivery = (Date.now() - new Date(order.updatedAt).getTime()) / 86_400_000;
+    // FIX: use deliveredAt (set when farmer marks delivered) instead of updatedAt
+    // so that admin edits don't accidentally reset the return window.
+    const deliveredTimestamp = order.deliveredAt || order.updatedAt;
+    const daysSinceDelivery = (Date.now() - new Date(deliveredTimestamp).getTime()) / 86_400_000;
+
     if (daysSinceDelivery > RETURN_WINDOW_DAYS) {
       return res.status(400).json({
         message: `Return window has closed. Returns must be requested within ${RETURN_WINDOW_DAYS} days of delivery.`,
       });
     }
 
-    // FIX: s.farmer may be either a raw ObjectId (when the order is fetched
-    // without .populate()) or a populated object (if populate was called).
-    // In both cases we call .toString() to get the hex string, then compare
-    // against farmerIdStr which we already normalised above.
     const shipment = order.shipments.find((s) => {
       const sid = s.farmer?._id
-        ? s.farmer._id.toString()   // populated object
-        : s.farmer?.toString();      // raw ObjectId
+        ? s.farmer._id.toString()
+        : s.farmer?.toString();
       return sid === farmerIdStr;
     });
 
     if (!shipment) {
-      // Emit diagnostic info in dev so the mismatch is visible in server logs
       const available = order.shipments.map((s) =>
         s.farmer?._id ? s.farmer._id.toString() : s.farmer?.toString()
       );
@@ -77,9 +72,7 @@ export const createReturn = async (req, res) => {
         `[createReturn] Shipment not found. farmerId sent: "${farmerIdStr}", ` +
         `available farmer IDs in order: [${available.join(", ")}]`
       );
-      return res.status(404).json({
-        message: "Shipment not found for this farmer",
-      });
+      return res.status(404).json({ message: "Shipment not found for this farmer" });
     }
 
     const existing = await Return.findOne({ order: orderId, farmer: farmerIdStr });
@@ -130,7 +123,7 @@ export const createReturn = async (req, res) => {
 export const getMyReturns = async (req, res) => {
   try {
     const returns = await Return.find({ consumer: req.user._id })
-      .populate("order",  "totalAmount createdAt status")
+      .populate("order",  "totalAmount createdAt status deliveredAt")
       .populate("farmer", "firstName lastName")
       .sort({ createdAt: -1 });
 
@@ -145,7 +138,7 @@ export const getMyReturns = async (req, res) => {
 export const getFarmerReturns = async (req, res) => {
   try {
     const returns = await Return.find({ farmer: req.user._id })
-      .populate("order",    "totalAmount createdAt status")
+      .populate("order",    "totalAmount createdAt status deliveredAt")
       .populate("consumer", "firstName lastName email")
       .sort({ createdAt: -1 });
 
@@ -240,9 +233,6 @@ export const rejectReturn = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-// ─── GET /api/returns/files/:filename ────────────────────────────────────────
-
 export const serveReturnFile = (req, res) => {
   const filename = path.basename(req.params.filename);
   const filePath = path.join(PRIVATE_DIR, filename);
