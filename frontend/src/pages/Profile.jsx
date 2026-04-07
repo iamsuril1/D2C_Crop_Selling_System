@@ -153,16 +153,17 @@ const Profile = () => {
 
         <div className="p-8 space-y-10">
           <div className="grid sm:grid-cols-2 gap-6">
-            <Info label="User ID"   value={user.id || user._id} />
-            <Info label="Email"     value={user.email} />
-            <Info label="Role"      value={user.role} />
-            <Info label="Status"    value="Active" green />
-            <Info label="Address"   value={user.addressText || "Not set"} />
-            <Info
-              label="Location"
-              value={hasCoords ? `Lat: ${lat}, Lng: ${lng}` : "Not set"}
-            />
-          </div>
+  <Info label="User ID"   value={user.id || user._id} />
+  <Info label="Email"     value={user.email} />
+  <Info label="Phone"     value={user.phone || "Not set"} />
+  <Info label="Role"      value={user.role} />
+  <Info label="Status"    value="Active" green />
+  <Info label="Address"   value={user.addressText || "Not set"} />
+  <Info
+    label="Location"
+    value={hasCoords ? `Lat: ${lat}, Lng: ${lng}` : "Not set"}
+  />
+</div>
 
           <div className="flex flex-wrap gap-4">
             <button

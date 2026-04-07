@@ -31,9 +31,11 @@ import PaymentSelection      from "./pages/PaymentSelection";
 
 import ForgotPassword from "./pages/ForgotPassword";
 
-// NEW
 import ReturnRequest  from "./pages/ReturnRequest";
 import FarmerReturns  from "./pages/FarmerReturns.jsx";
+
+import About from "./pages/About.jsx";
+import Contact from "./pages/Contact";
 
 const ProtectedRoute = ({ user, roles, children }) => {
   if (!user) return <Navigate to="/login" replace />;
@@ -67,18 +69,17 @@ function App() {
         <Routes>
           <Route path="/" element={roleRedirect()} />
 
-          <Route path="/login"          element={!user ? <Login />    : <Navigate to="/" replace />} />
-          <Route path="/register"       element={!user ? <Register /> : <Navigate to="/" replace />} />
+          <Route path="/login"           element={!user ? <Login />    : <Navigate to="/" replace />} />
+          <Route path="/register"        element={!user ? <Register /> : <Navigate to="/" replace />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
 
           <Route path="/product/:id" element={<ProductDetails />} />
 
           {/* Consumer */}
-          <Route path="/consumer" element={<ProtectedRoute user={user} roles={["consumer"]}><ConsumerDashboard /></ProtectedRoute>} />
-          <Route path="/cart"     element={<ProtectedRoute user={user} roles={["consumer"]}><Orders /></ProtectedRoute>} />
+          <Route path="/consumer"  element={<ProtectedRoute user={user} roles={["consumer"]}><ConsumerDashboard /></ProtectedRoute>} />
+          <Route path="/cart"      element={<ProtectedRoute user={user} roles={["consumer"]}><Orders /></ProtectedRoute>} />
           <Route path="/my-orders" element={<ProtectedRoute user={user} roles={["consumer"]}><ConsumerOrderTracking /></ProtectedRoute>} />
-          <Route path="/payment"  element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentSelection /></ProtectedRoute>} />
-          {/* NEW: consumer return request */}
+          <Route path="/payment"   element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentSelection /></ProtectedRoute>} />
           <Route path="/return-request" element={<ProtectedRoute user={user} roles={["consumer"]}><ReturnRequest /></ProtectedRoute>} />
 
           {/* Farmer */}
@@ -86,7 +87,6 @@ function App() {
           <Route path="/add-product"             element={<ProtectedRoute user={user} roles={["farmer"]}><ProductForm /></ProtectedRoute>} />
           <Route path="/farmer/orders"           element={<ProtectedRoute user={user} roles={["farmer"]}><FarmerOrders /></ProtectedRoute>} />
           <Route path="/farmer/payment-settings" element={<ProtectedRoute user={user} roles={["farmer"]}><FarmerPaymentSettings /></ProtectedRoute>} />
-          {/* NEW: farmer returns management */}
           <Route path="/farmer/returns"          element={<ProtectedRoute user={user} roles={["farmer"]}><FarmerReturns /></ProtectedRoute>} />
 
           {/* Admin */}
@@ -97,8 +97,9 @@ function App() {
           <Route path="/profile/edit"  element={<ProtectedRoute user={user} roles={["consumer","farmer","admin"]}><EditProfile /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute user={user} roles={["consumer","farmer","admin"]}><Notifications /></ProtectedRoute>} />
 
-          <Route path="/about"   element={<div className="min-h-screen bg-gray-50 p-8"><h1 className="text-3xl font-bold">About</h1></div>} />
-          <Route path="/contact" element={<div className="min-h-screen bg-gray-50 p-8"><h1 className="text-3xl font-bold">Contact</h1></div>} />
+          {/* Public */}
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -49,35 +49,14 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* PLATFORM */}
-          <div>
-            <h3 className="font-[Montserrat] text-lg font-semibold text-white mb-4">
-              Platform
-            </h3>
-            <ul className="space-y-3 text-sm">
-              <li className="hover:text-[#FDB933] transition cursor-pointer">
-                How It Works
-              </li>
-              <li className="hover:text-[#FDB933] transition cursor-pointer">
-                Why MeroBari
-              </li>
-              <li className="hover:text-[#FDB933] transition cursor-pointer">
-                Privacy Policy
-              </li>
-              <li className="hover:text-[#FDB933] transition cursor-pointer">
-                Terms & Conditions
-              </li>
-            </ul>
-          </div>
-
           {/* CONTACT */}
           <div>
             <h3 className="font-[Montserrat] text-lg font-semibold text-white mb-4">
               Contact
             </h3>
             <ul className="space-y-3 text-sm text-[#BDBDBD]">
-              <li>Email: support@merobari.com</li>
-              <li>Phone: +977-98XXXXXXXX</li>
+              <li>Email: surilpokharel4@gmail.com</li>
+              <li>Phone: +977-9803383479</li>
               <li>Location: Nepal</li>
             </ul>
           </div>

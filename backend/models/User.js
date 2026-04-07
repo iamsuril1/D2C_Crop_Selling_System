@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const pointSchema = new mongoose.Schema(
   {
     type: { type: String, enum: ["Point"], default: "Point" },
-    coordinates: { type: [Number], default: undefined }, // [lng, lat]
+    coordinates: { type: [Number], default: undefined },
   },
   { _id: false }
 );
@@ -16,15 +16,9 @@ const paymentMethodSchema = new mongoose.Schema(
       required: true
     },
     enabled: { type: Boolean, default: false },
-    
-    // For eSewa
     esewaId: String,
-    
-    // For Bank QR
     bankName: String,
-    qrCodeImage: String, // path to uploaded QR image
-    
-    // For Bank Transfer
+    qrCodeImage: String,
     accountNumber: String,
     accountName: String,
     bankBranch: String,
@@ -35,12 +29,17 @@ const paymentMethodSchema = new mongoose.Schema(
 const userSchema = new mongoose.Schema(
   {
     firstName: { type: String, required: true, trim: true },
-    lastName: { type: String, required: true, trim: true },
+    lastName:  { type: String, required: true, trim: true },
     email: {
       type: String,
       required: true,
       unique: true,
       lowercase: true,
+      trim: true,
+    },
+    phone: {
+      type: String,
+      required: true,
       trim: true,
     },
     password: { type: String, required: true },
@@ -50,18 +49,12 @@ const userSchema = new mongoose.Schema(
       default: "consumer",
     },
     profileImage: { type: String, default: "" },
-
-    // Location (for farmer and consumer)
     location: { type: pointSchema, default: null },
     addressText: { type: String, default: "" },
-    
-    // Payment information (farmer only)
     paymentMethods: {
       type: [paymentMethodSchema],
       default: []
     },
-    
-    // Default payment preference
     preferredPaymentMethod: {
       type: String,
       enum: ["esewa", "bank_qr", "bank_transfer", "cash_on_delivery"],
@@ -71,8 +64,8 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Required for $near / proximity queries
 userSchema.index({ location: "2dsphere" });
+userSchema.index({ phone: 1 }, { unique: true, sparse: true });
 
 userSchema.set("toJSON", {
   virtuals: true,

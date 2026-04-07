@@ -13,12 +13,12 @@ import paymentRoutes        from "./routes/paymentRoutes.js";
 import otpRoutes            from "./routes/otpRoutes.js";
 import forgotPasswordRoutes from "./routes/forgotPasswordRoutes.js";
 import returnRoutes         from "./routes/returnRoutes.js";
+import contactRoutes        from "./routes/contactRoutes.js";   // NEW
 
 import { errorHandler } from "./middleware/errorMiddleware.js";
 
 const app = express();
 
-// Ensure upload directories exist
 for (const dir of ["uploads", "uploads/private"]) {
   const p = path.join(process.cwd(), dir);
   if (!fs.existsSync(p)) {
@@ -32,7 +32,6 @@ app.use(express.urlencoded({ extended: true }));
 
 const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
 app.use(cors({ origin: allowedOrigin, credentials: true }));
-
 
 app.use(
   "/uploads",
@@ -56,6 +55,7 @@ app.use("/api/payments",        paymentRoutes);
 app.use("/api/otp",             otpRoutes);
 app.use("/api/forgot-password", forgotPasswordRoutes);
 app.use("/api/returns",         returnRoutes);
+app.use("/api/contact",         contactRoutes);   // NEW
 
 app.use(errorHandler);
 
