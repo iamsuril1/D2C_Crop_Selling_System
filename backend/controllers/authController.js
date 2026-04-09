@@ -166,3 +166,19 @@ export const deleteMe = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// Add this export to your existing authController.js
+export const clearMyLocation = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.location    = null;
+    user.addressText = "";
+    await user.save();
+
+    res.json({ message: "Location cleared" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

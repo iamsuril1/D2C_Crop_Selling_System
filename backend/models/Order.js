@@ -2,30 +2,23 @@ import mongoose from "mongoose";
 
 const shipmentItemSchema = new mongoose.Schema(
   {
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Product",
-      required: true,
-    },
-    name: String,
+    product:  { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+    name:     String,
     quantity: Number,
-    price: Number,
+    price:    Number,
   },
   { _id: false }
 );
 
 const shipmentSchema = new mongoose.Schema(
   {
-    farmer: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    items: [shipmentItemSchema],
-    deliveryFee: { type: Number, required: true, default: 200 },
-    subtotal: { type: Number, required: true, default: 0 },
+    farmer: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    items:  [shipmentItemSchema],
 
-    // Payment tracking per shipment
+    distanceKm:  { type: Number, default: null },   // ← NEW: km between farmer & consumer
+    deliveryFee: { type: Number, required: true, default: 50 },
+    subtotal:    { type: Number, required: true, default: 0  },
+
     paymentMethod: {
       type: String,
       enum: ["esewa", "bank_qr", "bank_transfer", "cash_on_delivery", "pending"],
@@ -36,16 +29,16 @@ const shipmentSchema = new mongoose.Schema(
       enum: ["pending", "paid", "failed", "refunded"],
       default: "pending",
     },
-    paymentProof: String,
-    paymentDate: Date,
-    transactionId: String,
+    paymentProof:      String,
+    paymentDate:       Date,
+    transactionId:     String,
     farmerPaymentInfo: {
-      esewaId: String,
-      bankName: String,
+      esewaId:       String,
+      bankName:      String,
       accountNumber: String,
-      accountName: String,
-      bankBranch: String,
-      qrCodeImage: String,
+      accountName:   String,
+      bankBranch:    String,
+      qrCodeImage:   String,
     },
   },
   { _id: false }
@@ -53,27 +46,19 @@ const shipmentSchema = new mongoose.Schema(
 
 const orderSchema = new mongoose.Schema(
   {
-    consumer: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-
+    consumer: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     shipments: { type: [shipmentSchema], default: [] },
 
     itemsSubtotal: { type: Number, required: true, default: 0 },
     deliveryTotal: { type: Number, required: true, default: 0 },
-    totalAmount: { type: Number, required: true },
+    totalAmount:   { type: Number, required: true },
 
     status: {
       type: String,
       enum: ["pending", "confirmed", "shipped", "delivered", "cancelled"],
       default: "pending",
     },
-    cancelledBy: {
-      type: String,
-      enum: ["admin", "farmer", "consumer"],
-    },
+    cancelledBy: { type: String, enum: ["admin", "farmer", "consumer"] },
     cancelledAt: Date,
     deliveredAt: Date,
   },

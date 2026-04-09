@@ -85,3 +85,72 @@ body {
 .order-cancelled-by-admin {
   @apply bg-red-200 border-red-600 text-red-800;
 }
+
+/*
+  Add these rules to your existing index.css / global stylesheet.
+  They handle:
+    1. Navbar offset so content is never hidden behind the fixed bar
+    2. Marquee animation keyframes (also inlined in Home.jsx as a fallback)
+    3. Smooth scroll
+*/
+
+/* ── 1. Smooth scroll ─────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── 2. Fixed navbar offset ───────────────────────────────── */
+/*
+  The Navbar is `fixed top-0` with py-3 (≈48px) + logo (40px) = ~64px total.
+  We give the <main> a matching padding-top so content starts below it.
+  Home / Login / Register override this locally because they use h-screen sections.
+*/
+main {
+  padding-top: 64px;       /* mobile */
+}
+
+@media (min-width: 768px) {
+  main {
+    padding-top: 72px;     /* desktop — slightly taller due to larger logo */
+  }
+}
+
+/*
+  Pages with their own full-height hero (Home, Login, Register, About hero)
+  reset the padding — they handle the offset themselves through h-screen
+  and absolute positioning.
+*/
+main > .hero-no-offset:first-child {
+  margin-top: -64px;       /* pull back to fill the gap */
+}
+@media (min-width: 768px) {
+  main > .hero-no-offset:first-child {
+    margin-top: -72px;
+  }
+}
+
+/* ── 3. Marquee keyframes ─────────────────────────────────── */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes marqueeRev {
+  0%   { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+/* ── 4. Auth input (floating label) ──────────────────────── */
+/* Keep these if they're already in your file — no duplication needed */
+.auth-input {
+  @apply w-full border-2 rounded-xl px-4 pt-5 pb-2 text-sm focus:outline-none;
+}
+
+.floating-label {
+  @apply absolute left-4 top-3.5 text-sm transition-all duration-200 pointer-events-none;
+}
+
+.peer:focus ~ .floating-label,
+.peer:not(:placeholder-shown) ~ .floating-label {
+  @apply top-1 text-xs font-semibold;
+}

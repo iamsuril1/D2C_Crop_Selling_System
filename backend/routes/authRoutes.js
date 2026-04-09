@@ -7,6 +7,7 @@ import {
   updateProfile,
   deleteMe,
   updateMyLocation,
+  clearMyLocation,          
 } from "../controllers/authController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { authorize } from "../middleware/roleMiddleware.js";

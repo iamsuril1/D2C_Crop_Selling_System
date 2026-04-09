@@ -34,14 +34,18 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ReturnRequest  from "./pages/ReturnRequest";
 import FarmerReturns  from "./pages/FarmerReturns.jsx";
 
-import About from "./pages/About.jsx";
+import About   from "./pages/About";
 import Contact from "./pages/Contact";
 
+import PageWrapper from "./components/PageWrapper";/* ── ProtectedRoute ─────────────────────────────────────── */
 const ProtectedRoute = ({ user, roles, children }) => {
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
   return children;
 };
+const HeroPage = ({ children }) => (
+  <div className="hero-no-offset">{children}</div>
+);
 
 function App() {
   const { user, loading } = useContext(AuthContext);
@@ -55,11 +59,11 @@ function App() {
   }
 
   const roleRedirect = () => {
-    if (!user) return <Home />;
+    if (!user) return <HeroPage><Home /></HeroPage>;
     if (user.role === "farmer")   return <Navigate to="/farmer"   replace />;
     if (user.role === "consumer") return <Navigate to="/consumer" replace />;
     if (user.role === "admin")    return <Navigate to="/admin"    replace />;
-    return <Home />;
+    return <HeroPage><Home /></HeroPage>;
   };
 
   return (
@@ -69,8 +73,9 @@ function App() {
         <Routes>
           <Route path="/" element={roleRedirect()} />
 
-          <Route path="/login"           element={!user ? <Login />    : <Navigate to="/" replace />} />
-          <Route path="/register"        element={!user ? <Register /> : <Navigate to="/" replace />} />
+          {/* Auth pages — have their own full-screen layouts */}
+          <Route path="/login"           element={!user ? <HeroPage><Login /></HeroPage>    : <Navigate to="/" replace />} />
+          <Route path="/register"        element={!user ? <HeroPage><Register /></HeroPage> : <Navigate to="/" replace />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
 
           <Route path="/product/:id" element={<ProductDetails />} />
@@ -97,13 +102,14 @@ function App() {
           <Route path="/profile/edit"  element={<ProtectedRoute user={user} roles={["consumer","farmer","admin"]}><EditProfile /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute user={user} roles={["consumer","farmer","admin"]}><Notifications /></ProtectedRoute>} />
 
-          {/* Public */}
-          <Route path="/about" element={<About />} />
+          {/* Public — About has its own hero section */}
+          <Route path="/about"   element={<HeroPage><About /></HeroPage>} />
           <Route path="/contact" element={<Contact />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+
       <Footer />
     </>
   );
