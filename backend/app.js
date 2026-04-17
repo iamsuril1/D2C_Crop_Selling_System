@@ -12,8 +12,8 @@ import notificationRoutes   from "./routes/notificationRoutes.js";
 import paymentRoutes        from "./routes/paymentRoutes.js";
 import otpRoutes            from "./routes/otpRoutes.js";
 import forgotPasswordRoutes from "./routes/forgotPasswordRoutes.js";
-import returnRoutes         from "./routes/returnRoutes.js";
-import contactRoutes        from "./routes/contactRoutes.js";   // NEW
+import returnRoutes         from "./routes/ReturnRoutes.js";   // FIX: matched to actual filename casing
+import contactRoutes        from "./routes/contactRoutes.js";
 
 import { errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -55,7 +55,7 @@ app.use("/api/payments",        paymentRoutes);
 app.use("/api/otp",             otpRoutes);
 app.use("/api/forgot-password", forgotPasswordRoutes);
 app.use("/api/returns",         returnRoutes);
-app.use("/api/contact",         contactRoutes);   // NEW
+app.use("/api/contact",         contactRoutes);
 
 app.use(errorHandler);
 

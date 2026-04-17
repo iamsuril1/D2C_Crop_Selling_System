@@ -1,4 +1,3 @@
-// routes/authRoutes.js
 import express from "express";
 import {
   register,
@@ -7,7 +6,7 @@ import {
   updateProfile,
   deleteMe,
   updateMyLocation,
-  clearMyLocation,          
+  clearMyLocation,
 } from "../controllers/authController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { authorize } from "../middleware/roleMiddleware.js";
@@ -21,9 +20,13 @@ router.get("/me", protect, getMe);
 
 router.put("/update-profile", protect, upload.single("profileImage"), updateProfile);
 
-// UPDATED: allow farmer + consumer to set location
+// Both farmers and consumers can set their location
 router.put("/location", protect, authorize("farmer", "consumer"), updateMyLocation);
 
+// FIX: register the clearMyLocation route that existed in the controller but had no route
+router.put("/location/clear", protect, clearMyLocation);
+
+// FIX: deleteMe now requires password in request body
 router.delete("/me", protect, deleteMe);
 
 export default router;

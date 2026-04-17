@@ -5,8 +5,6 @@ import AlertModal from "../components/AlertModal";
 import ConfirmModal from "../components/ConfirmModal";
 import { NotificationContext } from "../context/NotificationContext";
 
-// Extracts a plain hex string from a populated farmer object or raw ObjectId.
-// Works regardless of whether toJSON has run (id vs _id).
 const toFarmerIdStr = (farmer) => {
   if (!farmer) return "";
   if (typeof farmer === "string") return farmer.trim();
@@ -28,8 +26,11 @@ const ConsumerOrderTracking = () => {
   const [cancellingOrder, setCancellingOrder] = useState(null);
   const [expandedOrder,   setExpandedOrder]   = useState(null);
 
-  // Map of "orderId_farmerId" → return status string (or undefined if no return)
+  // Map of "orderId_farmerId" → return status string
   const [existingReturns, setExistingReturns] = useState({});
+  // Guard: never show the return button until we know if a return already exists.
+  // This prevents the button from flashing briefly after navigating back from ReturnRequest.
+  const [returnsLoaded, setReturnsLoaded] = useState(false);
 
   const [alertModal, setAlertModal] = useState({
     isOpen: false, title: "", message: "", type: "info",
@@ -56,6 +57,8 @@ const ConsumerOrderTracking = () => {
   };
 
   const loadMyReturns = async () => {
+    // Reset guard so button stays hidden while new data is in-flight
+    setReturnsLoaded(false);
     try {
       const res = await api.get("/api/returns/my");
       const map = {};
@@ -66,14 +69,18 @@ const ConsumerOrderTracking = () => {
       });
       setExistingReturns(map);
     } catch {
-      // non-critical
+      // non-critical — still mark loaded so UI isn't stuck
+    } finally {
+      setReturnsLoaded(true);
     }
   };
 
+  // location.key changes on every navigation even to the same path,
+  // so coming back from ReturnRequest always re-fetches returns.
   useEffect(() => {
     loadOrders();
     loadMyReturns();
-  }, [location.pathname]);
+  }, [location.pathname, location.key]);
 
   const requestCancel = (orderId, e) => {
     e.stopPropagation();
@@ -156,14 +163,13 @@ const ConsumerOrderTracking = () => {
     return `${oid}_${fid}`;
   };
 
-  // FIX: use deliveredAt (if set) to calculate the return window. Fall back to
-  // updatedAt only for orders that predate the deliveredAt field being added.
   const canRequestReturn = (order, shipment) => {
     if (order.status !== "delivered") return false;
+    // Never show the button before we've confirmed no return already exists
+    if (!returnsLoaded) return false;
     const deliveredTimestamp = order.deliveredAt || order.updatedAt;
     const daysSince = (Date.now() - new Date(deliveredTimestamp).getTime()) / 86_400_000;
     if (daysSince > RETURN_WINDOW_DAYS) return false;
-    // FIX: hide the button entirely if a return already exists for this shipment
     return !existingReturns[makeReturnKey(order, shipment)];
   };
 
@@ -273,7 +279,6 @@ const ConsumerOrderTracking = () => {
                 const si             = getStatusInfo(order.status);
                 const isSelected     = expandedOrder === orderId;
                 const cancellable    = canConsumerCancel(order.status);
-                // Show a "Return" badge on the card only if there's an active return
                 const hasReturn      = order.status === "delivered" &&
                   order.shipments?.some((s) => getReturnStatus(order, s));
 
@@ -413,13 +418,9 @@ const ConsumerOrderTracking = () => {
                       const farmerName   = farmer
                         ? `${farmer.firstName || ""} ${farmer.lastName || ""}`.trim()
                         : "Farmer";
-                      // FIX: canRequestReturn already checks existingReturns — if a
-                      // return exists the button is hidden entirely, not just disabled.
                       const canReturn    = canRequestReturn(order, shipment);
                       const returnStatus = getReturnStatus(order, shipment);
 
-                      // FIX: check whether the return window is still open independently
-                      // of whether a return already exists (needed for the closed-window msg).
                       const deliveredTimestamp = order.deliveredAt || order.updatedAt;
                       const daysSince = order.status === "delivered"
                         ? (Date.now() - new Date(deliveredTimestamp).getTime()) / 86_400_000
@@ -469,8 +470,16 @@ const ConsumerOrderTracking = () => {
                           {/* ── Return action area ── */}
                           {order.status === "delivered" && (
                             <>
-                              {/* Case 1: can still request a return (no existing return + window open) */}
-                              {canReturn && (
+                              {/* While return data is still loading, show a neutral
+                                  placeholder so the button never flashes then disappears */}
+                              {!returnsLoaded && windowOpen && (
+                                <div className="w-full py-2 rounded-xl text-sm text-center text-gray-400 border-2 border-gray-100 animate-pulse">
+                                  Checking return status…
+                                </div>
+                              )}
+
+                              {/* Case 1: loaded + window open + no existing return → show button */}
+                              {returnsLoaded && canReturn && (
                                 <button
                                   onClick={() => handleRequestReturn(order, shipment)}
                                   className="w-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 font-semibold py-2 rounded-xl text-sm transition"
@@ -479,17 +488,17 @@ const ConsumerOrderTracking = () => {
                                 </button>
                               )}
 
-                              {/* Case 2: a return already exists — show its status, no button */}
-                              {!canReturn && returnStatus && (
-                                <div className={`w-full text-center py-2 rounded-xl text-sm font-semibold border-2 ${getReturnBadge(returnStatus)} border-transparent`}>
+                              {/* Case 2: return already exists → show status badge, NO button */}
+                              {returnsLoaded && !canReturn && returnStatus && (
+                                <div className={`w-full text-center py-2 rounded-xl text-sm font-semibold border-2 border-transparent ${getReturnBadge(returnStatus)}`}>
                                   {returnStatus === "pending"  && "⏳ Return request pending"}
                                   {returnStatus === "approved" && "✓ Return approved"}
                                   {returnStatus === "rejected" && "✗ Return rejected"}
                                 </div>
                               )}
 
-                              {/* Case 3: no return exists but window is closed */}
-                              {!canReturn && !returnStatus && (
+                              {/* Case 3: loaded + no return + window closed */}
+                              {returnsLoaded && !canReturn && !returnStatus && (
                                 <p className="text-xs text-center text-gray-400 py-1">
                                   Return window closed (2 days after delivery)
                                 </p>

@@ -158,8 +158,28 @@ export const updateMyLocation = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   DELETE ACCOUNT
+   FIX: require current password before deleting — prevents account
+   deletion by anyone who merely has a stolen/leaked JWT token.
+───────────────────────────────────────────────────────────── */
 export const deleteMe = async (req, res) => {
   try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ message: "Current password is required to delete your account" });
+    }
+
+    // Fetch the full user record (req.user has password stripped by authMiddleware)
+    const user = await User.findById(req.user._id).select("+password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({ message: "Incorrect password" });
+    }
+
     await User.findByIdAndDelete(req.user._id);
     res.json({ message: "Account deleted" });
   } catch (err) {
@@ -167,7 +187,6 @@ export const deleteMe = async (req, res) => {
   }
 };
 
-// Add this export to your existing authController.js
 export const clearMyLocation = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);

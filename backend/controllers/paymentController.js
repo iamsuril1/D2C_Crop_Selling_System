@@ -1,7 +1,7 @@
-import User from "../models/User.js";
+import User  from "../models/User.js";
 import Order from "../models/Order.js";
-import fs from "fs";
-import path from "path";
+import fs    from "fs";
+import path  from "path";
 import { sendNotification } from "../utils/notificationHelpers.js";
 
 const PRIVATE_DIR = path.join(process.cwd(), "uploads", "private");
@@ -11,7 +11,7 @@ if (!fs.existsSync(PRIVATE_DIR)) {
 
 const moveToPrivate = (filename) => {
   if (!filename) return null;
-  const src = path.join(process.cwd(), "uploads", filename);
+  const src  = path.join(process.cwd(), "uploads", filename);
   const dest = path.join(PRIVATE_DIR, filename);
   if (fs.existsSync(src)) {
     fs.renameSync(src, dest);
@@ -90,7 +90,6 @@ export const submitPaymentProof = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    // FIX: move proof to private directory
     let paymentProofPath = null;
     if (req.file) {
       paymentProofPath = moveToPrivate(req.file.filename);
@@ -100,9 +99,9 @@ export const submitPaymentProof = async (req, res) => {
       if (farmerIds.includes(shipment.farmer.toString())) {
         shipment.paymentMethod = paymentMethod;
         shipment.paymentStatus = paymentMethod === "cash_on_delivery" ? "paid" : "pending";
-        shipment.paymentProof = paymentProofPath;
+        shipment.paymentProof  = paymentProofPath;
         shipment.transactionId = transactionId;
-        shipment.paymentDate = new Date();
+        shipment.paymentDate   = new Date();
       }
       return shipment;
     });
@@ -155,6 +154,54 @@ export const verifyPayment = async (req, res) => {
     );
 
     res.json({ message: `Payment ${status}`, order });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* ─────────────────────────────────────────────────────────────
+   SERVE PAYMENT PROOF FILE
+   FIX: previously any authenticated user could access any file by
+   guessing the filename. Now we verify the requester is either:
+     - the consumer who submitted the proof, OR
+     - a farmer whose shipment the proof belongs to.
+───────────────────────────────────────────────────────────── */
+export const servePaymentFile = async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    const filePath = path.join(PRIVATE_DIR, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "File not found" });
+    }
+
+    const userId = req.user._id.toString();
+
+    // Find an order that contains this proof and where the user is authorized
+    const order = await Order.findOne({
+      $or: [
+        // Consumer who owns the order
+        {
+          consumer: req.user._id,
+          "shipments.paymentProof": { $regex: filename },
+        },
+        // Farmer whose shipment has this proof
+        {
+          shipments: {
+            $elemMatch: {
+              farmer:       req.user._id,
+              paymentProof: { $regex: filename },
+            },
+          },
+        },
+      ],
+    });
+
+    if (!order) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    res.sendFile(filePath);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

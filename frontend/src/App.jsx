@@ -37,7 +37,7 @@ import FarmerReturns  from "./pages/FarmerReturns.jsx";
 import About   from "./pages/About";
 import Contact from "./pages/Contact";
 
-import PageWrapper from "./components/PageWrapper";/* ── ProtectedRoute ─────────────────────────────────────── */
+import PageWrapper from "./components/PageWrapper";
 const ProtectedRoute = ({ user, roles, children }) => {
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;

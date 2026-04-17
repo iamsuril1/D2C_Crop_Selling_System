@@ -59,9 +59,6 @@ export const NotificationProvider = ({ children }) => {
     }
 
     fetchNotifications();
-
-    // FIX: pause the interval while the browser tab is hidden so we don't
-    // make unnecessary requests when the user isn't looking at the page.
     let intervalId = null;
 
     const startPolling = () => {

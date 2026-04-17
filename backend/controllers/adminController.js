@@ -1,7 +1,8 @@
-import User from '../models/User.js';
+import User    from '../models/User.js';
 import Product from '../models/Product.js';
-import Order from '../models/Order.js';
-import bcrypt from 'bcryptjs';
+import Order   from '../models/Order.js';
+import bcrypt  from 'bcryptjs';
+import mongoose from 'mongoose';
 
 export const getAllUsers = async (req, res) => {
   try {
@@ -16,7 +17,6 @@ export const getAllUsers = async (req, res) => {
 export const createUser = async (req, res) => {
   try {
     const { firstName, lastName, email, password, role } = req.body;
-    // FIX: only farmer/consumer allowed — admins cannot be created via this endpoint
     if (!['farmer', 'consumer'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role. Only farmer or consumer allowed.' });
     }
@@ -24,7 +24,7 @@ export const createUser = async (req, res) => {
     if (exists) return res.status(409).json({ message: 'Email already exists' });
 
     const hashed = await bcrypt.hash(password, 10);
-    const user = await User.create({ firstName, lastName, email, password: hashed, role });
+    const user   = await User.create({ firstName, lastName, email, password: hashed, role });
 
     res.status(201).json({ id: user.id, firstName, lastName, email, role });
   } catch (err) {
@@ -35,7 +35,6 @@ export const createUser = async (req, res) => {
 
 export const deleteUser = async (req, res) => {
   try {
-    // FIX: check user exists before deleting; also prevent deleting admins
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
     if (user.role === 'admin') {
@@ -86,30 +85,88 @@ export const deleteProductAdmin = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   GET ALL ORDERS
+   FIX: the original code used nested Promise.all loops to populate
+   shipment farmers — an N+1 pattern that fires one DB query per
+   shipment. Replaced with a MongoDB aggregation pipeline that
+   populates consumer + all shipment farmers in two round-trips.
+───────────────────────────────────────────────────────────── */
 export const getAllOrders = async (req, res) => {
   try {
-    const orders = await Order.find({})
-      .populate('consumer', 'firstName lastName email')
-      .lean();
+    const orders = await Order.aggregate([
+      // 1. Join consumer
+      {
+        $lookup: {
+          from:         "users",
+          localField:   "consumer",
+          foreignField: "_id",
+          as:           "consumer",
+          pipeline: [
+            { $project: { firstName: 1, lastName: 1, email: 1 } },
+          ],
+        },
+      },
+      { $unwind: { path: "$consumer", preserveNullAndEmpty: true } },
 
-    const ordersWithFarmers = await Promise.all(
-      orders.map(async (order) => {
-        const shipmentsWithFarmers = await Promise.all(
-          (order.shipments || []).map(async (shipment) => {
-            if (shipment.farmer) {
-              const farmer = await User.findById(shipment.farmer)
-                .select('firstName lastName email')
-                .lean();
-              return { ...shipment, farmer };
-            }
-            return shipment;
-          })
-        );
-        return { ...order, shipments: shipmentsWithFarmers };
-      })
-    );
+      // 2. Join shipment farmers — collect all unique farmer IDs first
+      {
+        $addFields: {
+          farmerIds: {
+            $map: { input: "$shipments", as: "s", in: "$$s.farmer" },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from:         "users",
+          localField:   "farmerIds",
+          foreignField: "_id",
+          as:           "farmerDocs",
+          pipeline: [
+            { $project: { firstName: 1, lastName: 1, email: 1 } },
+          ],
+        },
+      },
 
-    res.json(ordersWithFarmers);
+      // 3. Replace shipment.farmer ObjectId with the populated doc
+      {
+        $addFields: {
+          shipments: {
+            $map: {
+              input: "$shipments",
+              as:    "shipment",
+              in: {
+                $mergeObjects: [
+                  "$$shipment",
+                  {
+                    farmer: {
+                      $arrayElemAt: [
+                        {
+                          $filter: {
+                            input: "$farmerDocs",
+                            as:    "fd",
+                            cond:  { $eq: ["$$fd._id", "$$shipment.farmer"] },
+                          },
+                        },
+                        0,
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+
+      // 4. Clean up temporary fields
+      { $unset: ["farmerIds", "farmerDocs"] },
+
+      { $sort: { createdAt: -1 } },
+    ]);
+
+    res.json(orders);
   } catch (err) {
     console.error('Admin getAllOrders ERROR:', err);
     res.status(500).json({ message: err.message });
@@ -144,7 +201,7 @@ export const cancelOrderAdmin = async (req, res) => {
       console.error('Stock restore error during admin cancel:', restoreErr);
     }
 
-    order.status = 'cancelled';
+    order.status      = 'cancelled';
     order.cancelledBy = 'admin';
     order.cancelledAt = new Date();
     await order.save();

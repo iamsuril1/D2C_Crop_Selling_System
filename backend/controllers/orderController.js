@@ -28,51 +28,50 @@ const loadProductsForCart = async (items) => {
    DELIVERY FEE CALCULATION
    Base  : Rs. 50 for the first 10 km
    Extra : Rs. 5  per km beyond 10 km  (rounded up to next km)
-   Min   : Rs. 50  (even if distance < 10 km)
-   Max   : Rs. 500 (cap so remote orders stay reasonable)
+   Min   : Rs. 50
+   Max   : Rs. 500
 ───────────────────────────────────────────────────────────── */
-const BASE_FEE        = 50;   // Rs. for first 10 km
-const BASE_KM         = 10;   // km included in base fee
-const RATE_PER_KM     = 5;    // Rs. per additional km
-const MIN_FEE         = 50;
-const MAX_FEE         = 500;
-const FALLBACK_FEE    = 100;  // used when either location is missing
+const BASE_FEE     = 50;
+const BASE_KM      = 10;
+const RATE_PER_KM  = 5;
+const MIN_FEE      = 50;
+const MAX_FEE      = 500;
+const FALLBACK_FEE = 100;
 
-/**
- * Haversine distance between two [lng, lat] GeoJSON coordinate pairs.
- * Returns distance in kilometres.
- */
 const haversineKm = (coords1, coords2) => {
   const toRad = (deg) => (deg * Math.PI) / 180;
-
   const [lng1, lat1] = coords1;
   const [lng2, lat2] = coords2;
-
-  const R    = 6371; // Earth radius in km
+  const R    = 6371;
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
-
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
     Math.sin(dLng / 2) ** 2;
-
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
 
-/**
- * Calculate delivery fee given farmer coords and consumer coords.
- * Both are GeoJSON format: [lng, lat]
- */
 const calcDeliveryFee = (farmerCoords, consumerCoords) => {
   if (!farmerCoords || !consumerCoords) return FALLBACK_FEE;
-
-  const distKm   = haversineKm(farmerCoords, consumerCoords);
-  const extraKm  = Math.max(0, Math.ceil(distKm) - BASE_KM);
-  const fee      = BASE_FEE + extraKm * RATE_PER_KM;
-
+  const distKm  = haversineKm(farmerCoords, consumerCoords);
+  const extraKm = Math.max(0, Math.ceil(distKm) - BASE_KM);
+  const fee     = BASE_FEE + extraKm * RATE_PER_KM;
   return Math.min(MAX_FEE, Math.max(MIN_FEE, Math.round(fee)));
+};
+
+/* ─────────────────────────────────────────────────────────────
+   BULK PRICING HELPER
+   FIX: shared between estimate AND createOrder so they always agree
+───────────────────────────────────────────────────────────── */
+const BULK_THRESHOLD = 100;
+
+const effectivePrice = (product, qty) => {
+  if (qty >= BULK_THRESHOLD && product.bulkPrice != null && product.bulkPrice > 0) {
+    return product.bulkPrice;
+  }
+  return product.price;
 };
 
 /* ─────────────────────────────────────────────────────────────
@@ -111,16 +110,22 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
     const productById = await loadProductsForCart(items);
 
     const normalized = items.map((it) => {
-      const p   = productById.get(it.productId);
+      const p         = productById.get(it.productId);
       if (!p) return null;
-      const qty = Math.max(1, toNum(it.quantity || 1));
+      const qty       = Math.max(Number(p.minOrderQty || 10), toNum(it.quantity || 1));
+      const unitPrice = effectivePrice(p, qty);
       return {
-        farmerId: p.farmer?._id?.toString(),
-        farmer:   p.farmer,
-        productId: p._id.toString(),
-        name:     p.name,
-        price:    toNum(p.price || 0),
-        quantity: qty,
+        farmerId:    p.farmer?._id?.toString(),
+        farmer:      p.farmer,
+        productId:   p._id.toString(),
+        name:        p.name,
+        price:       unitPrice,
+        basePrice:   p.price,
+        bulkPrice:   p.bulkPrice,
+        minOrderQty: p.minOrderQty || 10,
+        isBulk:      qty >= BULK_THRESHOLD && !!p.bulkPrice,
+        quantity:    qty,
+        unit:        p.unit,
       };
     });
 
@@ -128,10 +133,8 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
       return res.status(400).json({ message: "Invalid products/farmers" });
     }
 
-    // consumer coords from their saved profile location
     const consumerCoords = req.user?.location?.coordinates || null;
-
-    const grouped = groupBy(normalized, (x) => x.farmerId);
+    const grouped        = groupBy(normalized, (x) => x.farmerId);
 
     let itemsSubtotal = 0;
     const shipments   = [];
@@ -153,10 +156,15 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
         deliveryFee,
         subtotal:    sub,
         items: arr.map((x) => ({
-          productId: x.productId,
-          name:      x.name,
-          quantity:  x.quantity,
-          price:     x.price,
+          productId:   x.productId,
+          name:        x.name,
+          quantity:    x.quantity,
+          price:       x.price,
+          basePrice:   x.basePrice,
+          bulkPrice:   x.bulkPrice,
+          isBulk:      x.isBulk,
+          minOrderQty: x.minOrderQty,
+          unit:        x.unit,
         })),
       });
     }
@@ -178,6 +186,7 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
 
 /* ─────────────────────────────────────────────────────────────
    CREATE ORDER — POST /api/orders
+   FIX: now applies effectivePrice (bulk pricing) same as estimate
 ───────────────────────────────────────────────────────────── */
 export const createOrder = async (req, res) => {
   try {
@@ -191,14 +200,16 @@ export const createOrder = async (req, res) => {
     const normalized = items.map((it) => {
       const p   = productById.get(it.productId);
       if (!p) return null;
-      const qty = Math.max(1, toNum(it.quantity || 1));
+      // FIX: enforce minOrderQty and apply bulk pricing — same logic as estimate
+      const qty = Math.max(Number(p.minOrderQty || 1), Math.max(1, toNum(it.quantity || 1)));
+      const unitPrice = effectivePrice(p, qty);
       return {
         farmerId:   p.farmer?._id?.toString(),
         farmerDoc:  p.farmer,
         product:    p._id,
         productDoc: p,
         name:       p.name,
-        price:      toNum(p.price || 0),
+        price:      unitPrice,
         quantity:   qty,
       };
     });
@@ -309,7 +320,7 @@ export const createOrder = async (req, res) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
-   REST — unchanged functions kept intact
+   GET FARMER ORDERS
 ───────────────────────────────────────────────────────────── */
 export const getFarmerOrders = async (req, res) => {
   try {
@@ -323,6 +334,9 @@ export const getFarmerOrders = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   GET MY ORDERS (consumer)
+───────────────────────────────────────────────────────────── */
 export const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ consumer: req.user._id })
@@ -334,6 +348,10 @@ export const getMyOrders = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   UPDATE ORDER STATUS (farmer)
+   FIX: cleaner status progression check — no misleading rank for 'cancelled'
+───────────────────────────────────────────────────────────── */
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -346,8 +364,12 @@ export const updateOrderStatus = async (req, res) => {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    if (["cancelled", "delivered"].includes(order.status)) {
-      return res.status(400).json({ message: `Cannot update a ${order.status} order` });
+    // FIX: guard cancelled and delivered separately — don't use rank for cancelled
+    if (order.status === "cancelled") {
+      return res.status(400).json({ message: "Cannot update a cancelled order" });
+    }
+    if (order.status === "delivered") {
+      return res.status(400).json({ message: "Cannot update a delivered order" });
     }
 
     const shipmentIndex = order.shipments.findIndex(
@@ -355,9 +377,17 @@ export const updateOrderStatus = async (req, res) => {
     );
     if (shipmentIndex === -1) return res.status(403).json({ message: "Unauthorized" });
 
-    const statusRank = { pending: 0, confirmed: 1, shipped: 2, delivered: 3, cancelled: -1 };
-    if (statusRank[status] <= statusRank[order.status]) {
-      return res.status(400).json({ message: `Order is already at '${order.status}'` });
+    // FIX: explicit valid progression table — no rank-based comparisons
+    const validProgressions = {
+      pending:   ["confirmed"],
+      confirmed: ["shipped"],
+      shipped:   ["delivered"],
+    };
+
+    if (!validProgressions[order.status]?.includes(status)) {
+      return res.status(400).json({
+        message: `Cannot transition from '${order.status}' to '${status}'`,
+      });
     }
 
     order.status = status;
@@ -379,6 +409,9 @@ export const updateOrderStatus = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   CANCEL ORDER (consumer)
+───────────────────────────────────────────────────────────── */
 export const cancelOrderConsumer = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -422,6 +455,9 @@ export const cancelOrderConsumer = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   CANCEL ORDER (farmer)
+───────────────────────────────────────────────────────────── */
 export const cancelOrderFarmer = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);

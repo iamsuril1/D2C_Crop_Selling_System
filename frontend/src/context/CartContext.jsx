@@ -1,4 +1,3 @@
-// src/context/CartContext.jsx
 import { createContext, useEffect, useMemo, useState, useContext } from "react";
 import AuthContext from "./AuthContext.jsx";
 
@@ -19,18 +18,14 @@ const writeCart = (key, cartItems) => {
 };
 
 export const CartProvider = ({ children }) => {
-  const { user } = useContext(AuthContext); // depends on your existing AuthProvider [file:47]
+  const { user } = useContext(AuthContext); 
 
   const cartKey = user?._id ? `cartItems:${user._id}` : "cartItems:guest";
 
   const [cartItems, setCartItems] = useState(() => readCart(cartKey));
-
-  // When user changes (login/logout), switch to that user's cart
   useEffect(() => {
     setCartItems(readCart(cartKey));
   }, [cartKey]);
-
-  // Persist cart
   useEffect(() => {
     writeCart(cartKey, cartItems);
   }, [cartKey, cartItems]);

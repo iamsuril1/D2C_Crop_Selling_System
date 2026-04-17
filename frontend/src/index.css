@@ -1,8 +1,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Custom Fonts */
 :root {
   --font-primary: 'Montserrat', sans-serif;
   --font-secondary: 'Poppins', sans-serif;
@@ -11,8 +9,6 @@
 body {
   font-family: var(--font-primary);
 }
-
-/* ================= ANIMATION ================= */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -27,8 +23,6 @@ body {
 .animate-fadeIn {
   animation: fadeIn 1.2s ease-out forwards;
 }
-
-/* ================= AUTH INPUT ================= */
 .auth-input {
   width: 100%;
   padding: 16px 14px;
@@ -42,8 +36,6 @@ body {
 .auth-input:focus {
   border-color: #000000;
 }
-
-/* ================= FLOATING LABEL ================= */
 .floating-label {
   position: absolute;
   left: 14px;
@@ -62,7 +54,6 @@ body {
   top: -8px;
   font-size: 11px;
 }
-/* ================= ORDER STATUS COLORS ================= */
 .order-status {
   @apply border-l-4 p-3 mb-2 rounded;
 }
@@ -85,43 +76,20 @@ body {
 .order-cancelled-by-admin {
   @apply bg-red-200 border-red-600 text-red-800;
 }
-
-/*
-  Add these rules to your existing index.css / global stylesheet.
-  They handle:
-    1. Navbar offset so content is never hidden behind the fixed bar
-    2. Marquee animation keyframes (also inlined in Home.jsx as a fallback)
-    3. Smooth scroll
-*/
-
-/* ── 1. Smooth scroll ─────────────────────────────────────── */
 html {
   scroll-behavior: smooth;
 }
-
-/* ── 2. Fixed navbar offset ───────────────────────────────── */
-/*
-  The Navbar is `fixed top-0` with py-3 (≈48px) + logo (40px) = ~64px total.
-  We give the <main> a matching padding-top so content starts below it.
-  Home / Login / Register override this locally because they use h-screen sections.
-*/
 main {
-  padding-top: 64px;       /* mobile */
+  padding-top: 64px;    
 }
 
 @media (min-width: 768px) {
   main {
-    padding-top: 72px;     /* desktop — slightly taller due to larger logo */
+    padding-top: 72px;  
   }
 }
-
-/*
-  Pages with their own full-height hero (Home, Login, Register, About hero)
-  reset the padding — they handle the offset themselves through h-screen
-  and absolute positioning.
-*/
 main > .hero-no-offset:first-child {
-  margin-top: -64px;       /* pull back to fill the gap */
+  margin-top: -64px;     
 }
 @media (min-width: 768px) {
   main > .hero-no-offset:first-child {
@@ -129,7 +97,6 @@ main > .hero-no-offset:first-child {
   }
 }
 
-/* ── 3. Marquee keyframes ─────────────────────────────────── */
 @keyframes marquee {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
@@ -139,9 +106,6 @@ main > .hero-no-offset:first-child {
   0%   { transform: translateX(-50%); }
   100% { transform: translateX(0); }
 }
-
-/* ── 4. Auth input (floating label) ──────────────────────── */
-/* Keep these if they're already in your file — no duplication needed */
 .auth-input {
   @apply w-full border-2 rounded-xl px-4 pt-5 pb-2 text-sm focus:outline-none;
 }
