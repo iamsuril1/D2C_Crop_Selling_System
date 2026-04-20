@@ -1,5 +1,13 @@
+/* src/context/CartContext.jsx
+   Change: addToCart now defaults to NORMAL_MIN_KG (20) instead of 1
+   when a product is first added to the cart.
+   If the item already exists, the quantity increments by the same
+   default (20) so repeated "Add to Cart" clicks still make sense.
+*/
+
 import { createContext, useEffect, useMemo, useState, useContext } from "react";
 import AuthContext from "./AuthContext.jsx";
+import { NORMAL_MIN_KG } from "../utils/orderConstants";
 
 export const CartContext = createContext(null);
 export default CartContext;
@@ -18,14 +26,16 @@ const writeCart = (key, cartItems) => {
 };
 
 export const CartProvider = ({ children }) => {
-  const { user } = useContext(AuthContext); 
+  const { user } = useContext(AuthContext);
 
   const cartKey = user?._id ? `cartItems:${user._id}` : "cartItems:guest";
 
   const [cartItems, setCartItems] = useState(() => readCart(cartKey));
+
   useEffect(() => {
     setCartItems(readCart(cartKey));
   }, [cartKey]);
+
   useEffect(() => {
     writeCart(cartKey, cartItems);
   }, [cartKey, cartItems]);
@@ -33,11 +43,15 @@ export const CartProvider = ({ children }) => {
   const addToCart = (item) => {
     if (!item?.id) return;
 
+    // Default quantity is NORMAL_MIN_KG (20) so the cart always
+    // starts at the normal order minimum on first add.
+    const addQty = Number(item.quantity || NORMAL_MIN_KG);
+
     setCartItems((prev) => {
       const exists = prev.find((x) => x.id === item.id);
-      const addQty = Number(item.quantity || 1);
 
       if (exists) {
+        // Already in cart — increment by the same amount
         return prev.map((x) =>
           x.id === item.id
             ? { ...x, ...item, quantity: Number(x.quantity || 0) + addQty }
@@ -45,6 +59,7 @@ export const CartProvider = ({ children }) => {
         );
       }
 
+      // New item — start at addQty (20 by default)
       return [...prev, { ...item, quantity: addQty }];
     });
   };
@@ -55,7 +70,9 @@ export const CartProvider = ({ children }) => {
 
   const updateQty = (id, qty) => {
     const q = Math.max(1, Number(qty || 1));
-    setCartItems((prev) => prev.map((x) => (x.id === id ? { ...x, quantity: q } : x)));
+    setCartItems((prev) =>
+      prev.map((x) => (x.id === id ? { ...x, quantity: q } : x))
+    );
   };
 
   const clearCart = () => setCartItems([]);

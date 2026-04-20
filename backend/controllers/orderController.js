@@ -1,3 +1,11 @@
+/* backend/controllers/orderController.js
+   Added: PLATFORM_CHARGE = 25 (Rs.) applied once per order.
+   Both estimateDeliveryMultiOrigin and createOrder now include it
+   in grandTotal / totalAmount.
+   The Order schema also stores platformCharge so it appears in
+   receipts and the admin view.
+*/
+
 import Order   from "../models/Order.js";
 import Product from "../models/Product.js";
 import User    from "../models/User.js";
@@ -5,6 +13,36 @@ import { sendNotification } from "../utils/notificationHelpers.js";
 
 const toNum = (v) => Number(v);
 
+/* ─────────────────────────────────────────────────────────────
+   CONSTANTS
+───────────────────────────────────────────────────────────── */
+export const ORDER_TYPES = { NORMAL: "normal", BULK: "bulk" };
+export const NORMAL_MIN_KG   = 20;
+export const NORMAL_MAX_KG   = 99;
+export const BULK_MIN_KG     = 100;
+export const PLATFORM_CHARGE = 25;   // Rs. — flat fee per order
+
+/* ─────────────────────────────────────────────────────────────
+   QUANTITY VALIDATION
+───────────────────────────────────────────────────────────── */
+export const validateOrderTypeQty = (orderType, totalQty, unit = "kg") => {
+  if (orderType === ORDER_TYPES.NORMAL) {
+    if (totalQty < NORMAL_MIN_KG)
+      return `Normal orders require at least ${NORMAL_MIN_KG} ${unit}. You have ${totalQty} ${unit}.`;
+    if (totalQty > NORMAL_MAX_KG)
+      return `Normal orders allow up to ${NORMAL_MAX_KG} ${unit}. Switch to Bulk for 100 ${unit}+.`;
+  } else if (orderType === ORDER_TYPES.BULK) {
+    if (totalQty < BULK_MIN_KG)
+      return `Bulk orders require at least ${BULK_MIN_KG} ${unit}. You have ${totalQty} ${unit}.`;
+  } else {
+    return `Invalid order type. Choose "normal" or "bulk".`;
+  }
+  return null;
+};
+
+/* ─────────────────────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────────────────────── */
 const groupBy = (arr, keyFn) => {
   const map = new Map();
   for (const item of arr) {
@@ -16,21 +54,26 @@ const groupBy = (arr, keyFn) => {
 };
 
 const loadProductsForCart = async (items) => {
-  const productIds = items.map((x) => x.productId);
-  const products   = await Product.find({ _id: { $in: productIds } }).populate(
-    "farmer",
-    "firstName lastName email location"
+  const ids      = items.map((x) => x.productId);
+  const products = await Product.find({ _id: { $in: ids } }).populate(
+    "farmer", "firstName lastName email location"
   );
   return new Map(products.map((p) => [p._id.toString(), p]));
 };
 
-/* ─────────────────────────────────────────────────────────────
-   DELIVERY FEE CALCULATION
-   Base  : Rs. 50 for the first 10 km
-   Extra : Rs. 5  per km beyond 10 km  (rounded up to next km)
-   Min   : Rs. 50
-   Max   : Rs. 500
-───────────────────────────────────────────────────────────── */
+/* ── Bulk pricing ── */
+const effectivePrice = (product, qty, orderType) => {
+  if (
+    orderType === ORDER_TYPES.BULK &&
+    product.bulkPrice != null &&
+    product.bulkPrice > 0
+  ) {
+    return product.bulkPrice;
+  }
+  return product.price;
+};
+
+/* ── Delivery fee (distance-based, same for Normal & Bulk) ── */
 const BASE_FEE     = 50;
 const BASE_KM      = 10;
 const RATE_PER_KM  = 5;
@@ -38,19 +81,17 @@ const MIN_FEE      = 50;
 const MAX_FEE      = 500;
 const FALLBACK_FEE = 100;
 
-const haversineKm = (coords1, coords2) => {
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const [lng1, lat1] = coords1;
-  const [lng2, lat2] = coords2;
+const haversineKm = (c1, c2) => {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const [lng1, lat1] = c1;
+  const [lng2, lat2] = c2;
   const R    = 6371;
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
-  const a =
+  const a    =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLng / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
 const calcDeliveryFee = (farmerCoords, consumerCoords) => {
@@ -61,27 +102,34 @@ const calcDeliveryFee = (farmerCoords, consumerCoords) => {
   return Math.min(MAX_FEE, Math.max(MIN_FEE, Math.round(fee)));
 };
 
-/* ─────────────────────────────────────────────────────────────
-   BULK PRICING HELPER
-   FIX: shared between estimate AND createOrder so they always agree
-───────────────────────────────────────────────────────────── */
-const BULK_THRESHOLD = 100;
+/* ── Normalize cart items ── */
+const normalizeItems = (items, productById, orderType) =>
+  items.map((it) => {
+    const p         = productById.get(it.productId);
+    if (!p) return null;
+    const qty       = Math.max(1, toNum(it.quantity || 1));
+    const unitPrice = effectivePrice(p, qty, orderType);
+    return {
+      farmerId:   p.farmer?._id?.toString(),
+      farmer:     p.farmer,
+      farmerDoc:  p.farmer,
+      product:    p._id,
+      productDoc: p,
+      name:       p.name,
+      price:      unitPrice,
+      basePrice:  p.price,
+      bulkPrice:  p.bulkPrice,
+      quantity:   qty,
+      unit:       p.unit,
+    };
+  });
 
-const effectivePrice = (product, qty) => {
-  if (qty >= BULK_THRESHOLD && product.bulkPrice != null && product.bulkPrice > 0) {
-    return product.bulkPrice;
-  }
-  return product.price;
-};
-
-/* ─────────────────────────────────────────────────────────────
-   HELPER: restore stock
-───────────────────────────────────────────────────────────── */
+/* ── Restore stock ── */
 const restoreStock = async (order) => {
   try {
     await Promise.all(
-      order.shipments.flatMap((shipment) =>
-        shipment.items.map((item) =>
+      order.shipments.flatMap((s) =>
+        s.items.map((item) =>
           Product.findByIdAndUpdate(
             item.product,
             { $inc: { quantity: item.quantity } },
@@ -98,40 +146,26 @@ const restoreStock = async (order) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
-   ESTIMATE — GET /api/orders/estimate
+   ESTIMATE — POST /api/orders/estimate
 ───────────────────────────────────────────────────────────── */
 export const estimateDeliveryMultiOrigin = async (req, res) => {
   try {
-    const { items } = req.body;
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: "No items" });
-    }
+    const { items, orderType = ORDER_TYPES.NORMAL } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0)
+      return res.status(400).json({ message: "No items provided" });
+    if (![ORDER_TYPES.NORMAL, ORDER_TYPES.BULK].includes(orderType))
+      return res.status(400).json({ message: `Invalid orderType. Must be "normal" or "bulk"` });
 
     const productById = await loadProductsForCart(items);
+    const normalized  = normalizeItems(items, productById, orderType);
 
-    const normalized = items.map((it) => {
-      const p         = productById.get(it.productId);
-      if (!p) return null;
-      const qty       = Math.max(Number(p.minOrderQty || 10), toNum(it.quantity || 1));
-      const unitPrice = effectivePrice(p, qty);
-      return {
-        farmerId:    p.farmer?._id?.toString(),
-        farmer:      p.farmer,
-        productId:   p._id.toString(),
-        name:        p.name,
-        price:       unitPrice,
-        basePrice:   p.price,
-        bulkPrice:   p.bulkPrice,
-        minOrderQty: p.minOrderQty || 10,
-        isBulk:      qty >= BULK_THRESHOLD && !!p.bulkPrice,
-        quantity:    qty,
-        unit:        p.unit,
-      };
-    });
+    if (normalized.some((x) => !x || !x.farmerId))
+      return res.status(400).json({ message: "One or more products are invalid" });
 
-    if (normalized.some((x) => !x || !x.farmerId)) {
-      return res.status(400).json({ message: "Invalid products/farmers" });
-    }
+    const totalQty = normalized.reduce((s, x) => s + x.quantity, 0);
+    const qtyError = validateOrderTypeQty(orderType, totalQty, normalized[0]?.unit || "kg");
+    if (qtyError) return res.status(400).json({ message: qtyError, orderType, totalQty });
 
     const consumerCoords = req.user?.location?.coordinates || null;
     const grouped        = groupBy(normalized, (x) => x.farmerId);
@@ -156,69 +190,63 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
         deliveryFee,
         subtotal:    sub,
         items: arr.map((x) => ({
-          productId:   x.productId,
-          name:        x.name,
-          quantity:    x.quantity,
-          price:       x.price,
-          basePrice:   x.basePrice,
-          bulkPrice:   x.bulkPrice,
-          isBulk:      x.isBulk,
-          minOrderQty: x.minOrderQty,
-          unit:        x.unit,
+          productId:  x.product.toString(),
+          name:       x.name,
+          quantity:   x.quantity,
+          price:      x.price,
+          basePrice:  x.basePrice,
+          bulkPrice:  x.bulkPrice,
+          isBulk:     orderType === ORDER_TYPES.BULK,
+          unit:       x.unit,
         })),
       });
     }
 
     const deliveryTotal = shipments.reduce((s, sh) => s + sh.deliveryFee, 0);
-    const grandTotal    = itemsSubtotal + deliveryTotal;
+    // FIX: platform charge added to grand total
+    const grandTotal    = itemsSubtotal + deliveryTotal + PLATFORM_CHARGE;
 
     res.json({
+      orderType,
+      totalQty,
+      normalRange:         { min: NORMAL_MIN_KG, max: NORMAL_MAX_KG },
+      bulkMin:             BULK_MIN_KG,
       consumerLocationSet: !!consumerCoords,
       shipments,
       itemsSubtotal,
       deliveryTotal,
+      platformCharge:      PLATFORM_CHARGE,
       grandTotal,
     });
   } catch (err) {
+    console.error("Estimate error:", err);
     res.status(500).json({ message: err.message });
   }
 };
 
 /* ─────────────────────────────────────────────────────────────
    CREATE ORDER — POST /api/orders
-   FIX: now applies effectivePrice (bulk pricing) same as estimate
 ───────────────────────────────────────────────────────────── */
 export const createOrder = async (req, res) => {
   try {
-    const { items } = req.body;
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: "No items" });
-    }
+    const { items, orderType = ORDER_TYPES.NORMAL } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0)
+      return res.status(400).json({ message: "No items provided" });
+    if (![ORDER_TYPES.NORMAL, ORDER_TYPES.BULK].includes(orderType))
+      return res.status(400).json({ message: `Invalid orderType. Must be "normal" or "bulk"` });
 
     const productById = await loadProductsForCart(items);
+    const normalized  = normalizeItems(items, productById, orderType);
 
-    const normalized = items.map((it) => {
-      const p   = productById.get(it.productId);
-      if (!p) return null;
-      // FIX: enforce minOrderQty and apply bulk pricing — same logic as estimate
-      const qty = Math.max(Number(p.minOrderQty || 1), Math.max(1, toNum(it.quantity || 1)));
-      const unitPrice = effectivePrice(p, qty);
-      return {
-        farmerId:   p.farmer?._id?.toString(),
-        farmerDoc:  p.farmer,
-        product:    p._id,
-        productDoc: p,
-        name:       p.name,
-        price:      unitPrice,
-        quantity:   qty,
-      };
-    });
+    if (normalized.some((x) => !x || !x.farmerId))
+      return res.status(400).json({ message: "One or more products are invalid" });
 
-    if (normalized.some((x) => !x || !x.farmerId)) {
-      return res.status(400).json({ message: "Invalid products/farmers" });
-    }
+    const totalQty = normalized.reduce((s, x) => s + x.quantity, 0);
+    const qtyError = validateOrderTypeQty(orderType, totalQty, normalized[0]?.unit || "kg");
+    if (qtyError) return res.status(400).json({ message: qtyError, orderType, totalQty });
 
-    // stock check
+    // Stock check
     for (const item of normalized) {
       if (item.productDoc.quantity < item.quantity) {
         return res.status(400).json({
@@ -273,17 +301,20 @@ export const createOrder = async (req, res) => {
     }
 
     const deliveryTotal = shipments.reduce((s, sh) => s + sh.deliveryFee, 0);
-    const totalAmount   = itemsSubtotal + deliveryTotal;
+    // FIX: platform charge included in total stored on the order
+    const totalAmount   = itemsSubtotal + deliveryTotal + PLATFORM_CHARGE;
 
     const order = await Order.create({
-      consumer: req.user._id,
+      consumer:       req.user._id,
+      orderType,
       shipments,
       itemsSubtotal,
       deliveryTotal,
+      platformCharge: PLATFORM_CHARGE,
       totalAmount,
     });
 
-    // deduct stock
+    // Deduct stock
     await Promise.all(
       normalized.map((item) =>
         Product.findByIdAndUpdate(
@@ -294,20 +325,20 @@ export const createOrder = async (req, res) => {
       )
     );
 
+    const label = orderType === ORDER_TYPES.BULK ? "Bulk o" : "O";
     await sendNotification(
       req.user._id,
       "order_placed",
-      `Order #${order._id.toString().slice(-6)} placed!`,
-      "Your order is being processed by farmers",
+      `${label}rder #${order._id.toString().slice(-6)} placed!`,
+      `Your ${orderType} order is being processed`,
       { orderId: order._id }
     );
-
     for (const shipment of shipments) {
       await sendNotification(
         shipment.farmer,
         "order_placed",
-        `New order #${order._id.toString().slice(-6)}`,
-        `${req.user.firstName || "Consumer"} ordered ${shipment.items.length} item(s)`,
+        `New ${orderType} order #${order._id.toString().slice(-6)}`,
+        `${req.user.firstName || "Consumer"} placed a ${orderType} order for ${shipment.items.length} item(s)`,
         { orderId: order._id }
       );
     }
@@ -350,49 +381,37 @@ export const getMyOrders = async (req, res) => {
 
 /* ─────────────────────────────────────────────────────────────
    UPDATE ORDER STATUS (farmer)
-   FIX: cleaner status progression check — no misleading rank for 'cancelled'
 ───────────────────────────────────────────────────────────── */
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const allowed = ["confirmed", "shipped", "delivered"];
-
-    if (!allowed.includes(status)) {
+    const allowed    = ["confirmed", "shipped", "delivered"];
+    if (!allowed.includes(status))
       return res.status(400).json({ message: "Invalid status" });
-    }
 
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
-
-    // FIX: guard cancelled and delivered separately — don't use rank for cancelled
-    if (order.status === "cancelled") {
+    if (order.status === "cancelled")
       return res.status(400).json({ message: "Cannot update a cancelled order" });
-    }
-    if (order.status === "delivered") {
+    if (order.status === "delivered")
       return res.status(400).json({ message: "Cannot update a delivered order" });
-    }
 
     const shipmentIndex = order.shipments.findIndex(
       (s) => s.farmer.toString() === req.user._id.toString()
     );
-    if (shipmentIndex === -1) return res.status(403).json({ message: "Unauthorized" });
+    if (shipmentIndex === -1)
+      return res.status(403).json({ message: "Unauthorized" });
 
-    // FIX: explicit valid progression table — no rank-based comparisons
     const validProgressions = {
       pending:   ["confirmed"],
       confirmed: ["shipped"],
       shipped:   ["delivered"],
     };
-
-    if (!validProgressions[order.status]?.includes(status)) {
-      return res.status(400).json({
-        message: `Cannot transition from '${order.status}' to '${status}'`,
-      });
-    }
+    if (!validProgressions[order.status]?.includes(status))
+      return res.status(400).json({ message: `Cannot transition from '${order.status}' to '${status}'` });
 
     order.status = status;
     if (status === "delivered") order.deliveredAt = new Date();
-
     await order.save();
 
     await sendNotification(
@@ -416,10 +435,8 @@ export const cancelOrderConsumer = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
-
-    if (order.consumer.toString() !== req.user._id.toString()) {
+    if (order.consumer.toString() !== req.user._id.toString())
       return res.status(403).json({ message: "Unauthorized" });
-    }
 
     const nonCancellable = ["shipped", "delivered", "cancelled"];
     if (nonCancellable.includes(order.status)) {
@@ -430,9 +447,7 @@ export const cancelOrderConsumer = async (req, res) => {
       return res.status(400).json({ message: reason });
     }
 
-    const { success } = await restoreStock(order);
-    if (!success) console.error("Partial stock restore on consumer cancel");
-
+    await restoreStock(order);
     order.status      = "cancelled";
     order.cancelledBy = "consumer";
     order.cancelledAt = new Date();
@@ -447,7 +462,6 @@ export const cancelOrderConsumer = async (req, res) => {
         { orderId: order._id }
       );
     }
-
     res.json(order);
   } catch (err) {
     console.error("Cancel order error:", err);
@@ -478,9 +492,7 @@ export const cancelOrderFarmer = async (req, res) => {
       });
     }
 
-    const { success } = await restoreStock(order);
-    if (!success) console.error("Partial stock restore on farmer cancel");
-
+    await restoreStock(order);
     order.status      = "cancelled";
     order.cancelledBy = "farmer";
     order.cancelledAt = new Date();
@@ -493,7 +505,6 @@ export const cancelOrderFarmer = async (req, res) => {
       "The farmer has cancelled your order",
       { orderId: order._id }
     );
-
     res.json(order);
   } catch (err) {
     console.error("Farmer cancel order error:", err);
