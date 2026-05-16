@@ -22,9 +22,8 @@ const FarmerDashboard = () => {
   const [alertModal,   setAlertModal]   = useState({ isOpen: false, type: "", title: "", message: "" });
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, action: null, type: "", title: "", message: "" });
 
-  const showAlert = (title, message, type = "error") => {
+  const showAlert  = (title, message, type = "error") =>
     setAlertModal({ isOpen: true, title, message, type });
-  };
   const closeAlert   = () => setAlertModal((p) => ({ ...p, isOpen: false }));
   const closeConfirm = () => setConfirmModal((p) => ({ ...p, isOpen: false, action: null }));
 
@@ -97,15 +96,28 @@ const FarmerDashboard = () => {
     });
   };
 
-  // FIX: find the shipment that belongs to the currently logged-in farmer,
-  // not just the first shipment. The old code used
-  // `s.farmer?._id || s.farmer` which always returned the first truthy value.
+  // Find the shipment that belongs to the currently logged-in farmer
   const getMyShipment = (order) => {
     const myId = user?._id?.toString() || user?.id?.toString();
     return order.shipments?.find((s) => {
       const farmerId = s.farmer?._id?.toString() || s.farmer?.toString();
       return farmerId === myId;
     });
+  };
+
+  // Payment status label helper
+  const getPaymentStatusLabel = (status) => {
+    switch (status) {
+      case "paid":
+        return { text: "Paid",             color: "text-green-600" };
+      case "pending_admin_release":
+        return { text: "Held by admin",    color: "text-blue-600"  };
+      case "failed":
+        return { text: "Failed",           color: "text-red-600"   };
+      case "pending":
+      default:
+        return { text: "Pending",          color: "text-yellow-600" };
+    }
   };
 
   if (loading) {
@@ -116,7 +128,6 @@ const FarmerDashboard = () => {
     );
   }
 
-  // Separate active vs inactive for display
   const activeProducts   = products.filter((p) => p.isActive);
   const inactiveProducts = products.filter((p) => !p.isActive);
 
@@ -194,133 +205,137 @@ const FarmerDashboard = () => {
 
       {/* Products + Orders */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* ── Products ── */}
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-5">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-base font-semibold text-gray-900">
               My Products
               <span className="ml-2 text-xs text-gray-400 font-normal">
-                ({activeProducts.length} active{inactiveProducts.length > 0 ? `, ${inactiveProducts.length} disabled` : ""})
+                ({activeProducts.length} active
+                {inactiveProducts.length > 0 ? `, ${inactiveProducts.length} disabled` : ""})
               </span>
             </h2>
           </div>
 
           {products.length === 0 ? (
-            <p className="text-gray-500 text-sm">No products added yet. Click Add Product to create one.</p>
+            <p className="text-gray-500 text-sm">
+              No products added yet. Click Add Product to create one.
+            </p>
           ) : (
-            <>
-              <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {products.map((p) => {
-                  const pid    = getPid(p);
-                  const imgSrc = p.image ? `${APIBASEURL}${p.image}` : "";
+            <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {products.map((p) => {
+                const pid    = getPid(p);
+                const imgSrc = p.image ? `${APIBASEURL}${p.image}` : "";
 
-                  return (
-                    <div
-                      key={pid || `${p.name}-${Math.random()}`}
-                      className={`border rounded-lg p-3 flex flex-col gap-2 hover:shadow-sm transition ${
-                        !p.isActive ? "opacity-60 border-gray-200 bg-gray-50" : "border-gray-100"
-                      }`}
-                    >
-                      {/* Disabled badge */}
-                      {!p.isActive && (
-                        <span className="self-start text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-medium">
-                          Disabled
-                        </span>
-                      )}
+                return (
+                  <div
+                    key={pid || `${p.name}-${Math.random()}`}
+                    className={`border rounded-lg p-3 flex flex-col gap-2 hover:shadow-sm transition ${
+                      !p.isActive ? "opacity-60 border-gray-200 bg-gray-50" : "border-gray-100"
+                    }`}
+                  >
+                    {!p.isActive && (
+                      <span className="self-start text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                        Disabled
+                      </span>
+                    )}
 
-                      {p.image ? (
-                        <img
-                          src={imgSrc}
-                          className="h-28 w-full object-cover rounded-md"
-                          alt={p.name}
-                          onError={(e) => { e.currentTarget.style.display = "none"; }}
+                    {p.image ? (
+                      <img
+                        src={imgSrc}
+                        className="h-28 w-full object-cover rounded-md"
+                        alt={p.name}
+                        onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      />
+                    ) : null}
+
+                    {editingProduct === pid ? (
+                      <>
+                        <input
+                          value={editForm.name}
+                          onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                          className="border border-gray-200 rounded px-2 py-1 text-sm"
+                          placeholder="Name"
                         />
-                      ) : null}
-
-                      {editingProduct === pid ? (
-                        <>
+                        <input
+                          value={editForm.category}
+                          onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
+                          className="border border-gray-200 rounded px-2 py-1 text-sm"
+                          placeholder="Category"
+                        />
+                        <div className="flex gap-2">
                           <input
-                            value={editForm.name}
-                            onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
-                            className="border border-gray-200 rounded px-2 py-1 text-sm"
-                            placeholder="Name"
+                            type="number"
+                            value={editForm.price}
+                            onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
+                            className="border border-gray-200 rounded px-2 py-1 text-sm w-1/2"
+                            placeholder="Price"
                           />
                           <input
-                            value={editForm.category}
-                            onChange={(e) => setEditForm((p) => ({ ...p, category: e.target.value }))}
-                            className="border border-gray-200 rounded px-2 py-1 text-sm"
-                            placeholder="Category"
+                            type="number"
+                            value={editForm.quantity}
+                            onChange={(e) => setEditForm((f) => ({ ...f, quantity: e.target.value }))}
+                            className="border border-gray-200 rounded px-2 py-1 text-sm w-1/2"
+                            placeholder="Qty"
                           />
-                          <div className="flex gap-2">
-                            <input
-                              type="number"
-                              value={editForm.price}
-                              onChange={(e) => setEditForm((p) => ({ ...p, price: e.target.value }))}
-                              className="border border-gray-200 rounded px-2 py-1 text-sm w-1/2"
-                              placeholder="Price"
-                            />
-                            <input
-                              type="number"
-                              value={editForm.quantity}
-                              onChange={(e) => setEditForm((p) => ({ ...p, quantity: e.target.value }))}
-                              className="border border-gray-200 rounded px-2 py-1 text-sm w-1/2"
-                              placeholder="Qty"
-                            />
+                        </div>
+                        <div className="flex gap-2 mt-1">
+                          <button
+                            onClick={() => submitEdit(pid)}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-2 py-1.5 rounded"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="flex-1 bg-gray-200 text-gray-700 text-xs font-medium px-2 py-1.5 rounded"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-semibold text-sm text-gray-900">{p.name}</h3>
+                            <p className="text-xs text-gray-500">{p.category}</p>
                           </div>
-                          <div className="flex gap-2 mt-1">
-                            <button
-                              onClick={() => submitEdit(pid)}
-                              className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-2 py-1.5 rounded"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={cancelEdit}
-                              className="flex-1 bg-gray-200 text-gray-700 text-xs font-medium px-2 py-1.5 rounded"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-semibold text-sm text-gray-900">{p.name}</h3>
-                              <p className="text-xs text-gray-500">{p.category}</p>
-                            </div>
-                            <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
-                              Rs. {p.price} / {p.unit}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-600">
-                            Qty: <span className="font-semibold text-green-700">{p.quantity}</span> {p.unit}
-                          </p>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => startEdit(p)}
-                              className="flex-1 border border-yellow-400 text-yellow-700 text-xs font-medium px-2 py-1.5 rounded hover:bg-yellow-50"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => deleteProduct(pid)}
-                              className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-medium px-2 py-1.5 rounded"
-                            >
-                              {p.isActive ? "Disable" : "Disabled"}
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
+                          <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                            Rs. {p.price} / {p.unit}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600">
+                          Qty: <span className="font-semibold text-green-700">{p.quantity}</span> {p.unit}
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => startEdit(p)}
+                            className="flex-1 border border-yellow-400 text-yellow-700 text-xs font-medium px-2 py-1.5 rounded hover:bg-yellow-50"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteProduct(pid)}
+                            className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-medium px-2 py-1.5 rounded"
+                          >
+                            {p.isActive ? "Disable" : "Disabled"}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 
-        {/* Orders side panel */}
+        {/* ── Orders side panel ── */}
         <div className="space-y-4">
+
+          {/* Active orders */}
           <div className="bg-white rounded-xl shadow-sm p-5">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-base font-semibold text-gray-900">Active Orders</h2>
@@ -332,8 +347,10 @@ const FarmerDashboard = () => {
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 {activeOrders.map((o) => {
-                  // FIX: use corrected shipment lookup
-                  const myShipment = getMyShipment(o);
+                  const myShipment   = getMyShipment(o);
+                  const paymentLabel = myShipment
+                    ? getPaymentStatusLabel(myShipment.paymentStatus)
+                    : null;
 
                   return (
                     <div key={o.id || o._id} className="border border-gray-100 rounded-lg px-3 py-2 text-xs">
@@ -350,19 +367,30 @@ const FarmerDashboard = () => {
                       </div>
 
                       {myShipment && (
-                        <div className="mt-2 pt-2 border-t border-gray-100">
+                        <div className="mt-2 pt-2 border-t border-gray-100 space-y-1">
                           <p className="text-[11px] text-gray-600">
-                            Payment: <span className="font-semibold capitalize">{myShipment.paymentMethod || "pending"}</span>
-                          </p>
-                          <p className="text-[11px] text-gray-600">
-                            Status:{" "}
-                            <span className={`font-semibold capitalize ${
-                              myShipment.paymentStatus === "paid"   ? "text-green-600" :
-                              myShipment.paymentStatus === "failed" ? "text-red-600"   : "text-yellow-600"
-                            }`}>
-                              {myShipment.paymentStatus || "pending"}
+                            Payment method:{" "}
+                            <span className="font-semibold capitalize">
+                              {myShipment.paymentMethod || "pending"}
                             </span>
                           </p>
+                          <p className="text-[11px] text-gray-600">
+                            Payment status:{" "}
+                            <span className={`font-semibold ${paymentLabel?.color}`}>
+                              {paymentLabel?.text}
+                            </span>
+                          </p>
+                          {/* Show held-by-admin info box */}
+                          {myShipment.paymentStatus === "pending_admin_release" && (
+                            <div className="mt-1.5 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1.5 text-[11px] text-blue-700">
+                              ⏳ Funds held by admin — will be released to your account shortly
+                            </div>
+                          )}
+                          {myShipment.paymentStatus === "paid" && (
+                            <div className="mt-1.5 bg-green-50 border border-green-100 rounded-lg px-2 py-1.5 text-[11px] text-green-700">
+                              ✓ Rs. {myShipment.subtotal} released to your account
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -372,6 +400,7 @@ const FarmerDashboard = () => {
             )}
           </div>
 
+          {/* Delivered orders */}
           <div className="bg-white rounded-xl shadow-sm p-5">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-base font-semibold text-gray-900">Delivered Orders</h2>
@@ -382,25 +411,53 @@ const FarmerDashboard = () => {
               <p className="text-xs text-gray-500">No delivered orders yet.</p>
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {deliveredOrders.map((o) => (
-                  <div
-                    key={o.id || o._id}
-                    className="border border-gray-100 rounded-lg px-3 py-2 text-xs flex justify-between items-center"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-800">
-                        Order #{(o.id || o._id)?.toString().slice(-6)}
-                      </p>
-                      <p className="text-gray-500">Status: Delivered</p>
+                {deliveredOrders.map((o) => {
+                  const myShipment   = getMyShipment(o);
+                  const paymentLabel = myShipment
+                    ? getPaymentStatusLabel(myShipment.paymentStatus)
+                    : null;
+
+                  return (
+                    <div
+                      key={o.id || o._id}
+                      className="border border-gray-100 rounded-lg px-3 py-2 text-xs"
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <div>
+                          <p className="font-medium text-gray-800">
+                            Order #{(o.id || o._id)?.toString().slice(-6)}
+                          </p>
+                          <p className="text-gray-500">Status: Delivered</p>
+                        </div>
+                        <span className="text-[11px] px-2 py-1 rounded-full bg-green-50 text-green-700">
+                          Completed
+                        </span>
+                      </div>
+                      {paymentLabel && (
+                        <p className="text-[11px] text-gray-600 mt-1">
+                          Payment:{" "}
+                          <span className={`font-semibold ${paymentLabel.color}`}>
+                            {paymentLabel.text}
+                          </span>
+                        </p>
+                      )}
+                      {myShipment?.paymentStatus === "pending_admin_release" && (
+                        <div className="mt-1.5 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1.5 text-[11px] text-blue-700">
+                          ⏳ Funds held by admin — pending release
+                        </div>
+                      )}
+                      {myShipment?.paymentStatus === "paid" && (
+                        <div className="mt-1.5 bg-green-50 border border-green-100 rounded-lg px-2 py-1.5 text-[11px] text-green-700">
+                          ✓ Rs. {myShipment.subtotal} released
+                        </div>
+                      )}
                     </div>
-                    <span className="text-[11px] px-2 py-1 rounded-full bg-green-50 text-green-700">
-                      Completed
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
+
         </div>
       </section>
     </div>

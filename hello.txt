@@ -1,0 +1,55 @@
+/* ── ADD THESE ROUTES to your existing src/App.jsx ──────────────
+
+   Import the new pages at the top:
+
+   import PaymentSuccess from "./pages/PaymentSuccess";
+   import PaymentFailure from "./pages/PaymentFailure";
+
+   Then add these 4 routes inside your <Routes> block,
+   alongside the existing /payment route:
+*/
+
+// Inside <Routes>:
+hexlkpnlgubxbwat
+// existing
+<Route path="/payment" element={
+  <ProtectedRoute user={user} roles={["consumer"]}>
+    <PaymentSelection />
+  </ProtectedRoute>
+} />
+
+// NEW — eSewa redirect landing pages
+<Route path="/payment/esewa/success" element={
+  <ProtectedRoute user={user} roles={["consumer"]}>
+    <PaymentSuccess />
+  </ProtectedRoute>
+} />
+
+<Route path="/payment/esewa/failure" element={
+  <ProtectedRoute user={user} roles={["consumer"]}>
+    <PaymentFailure />
+  </ProtectedRoute>
+} />
+
+// NEW — Khalti redirect landing page (success and failure both land here)
+<Route path="/payment/khalti/success" element={
+  <ProtectedRoute user={user} roles={["consumer"]}>
+    <PaymentSuccess />
+  </ProtectedRoute>
+} />
+
+/*
+   Also install axios in the backend if not already present:
+     npm install axios
+
+   And add these to your .env file:
+     ESEWA_MERCHANT_CODE=EPAYTEST
+     ESEWA_SECRET_KEY=8gBm/:&EnhH.1/q
+     ESEWA_BASE_URL=https://rc-epay.esewa.com.np
+     KHALTI_SECRET_KEY=test_secret_key_dc74e0fd57cb46cd93832aee0a390234
+     KHALTI_BASE_URL=https://a.khalti.com
+     FRONTEND_URL=http://localhost:5173
+
+   The values above are the official sandbox test credentials.
+   Replace with production keys before going live.
+*/

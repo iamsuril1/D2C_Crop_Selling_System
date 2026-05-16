@@ -5,36 +5,21 @@ import AlertModal from "../components/AlertModal";
 import ConfirmModal from "../components/ConfirmModal";
 import { AuthContext } from "../context/AuthContext";
 
-// FIX: myShipment was found with `order.shipments?.find(s => s.farmer?._id || s.farmer)`
-// which always returns the FIRST shipment regardless of ownership, because
-// `s.farmer?._id || s.farmer` is truthy for any populated farmer field.
-// Now we compare against the logged-in user's _id from AuthContext.
-//
-// FIX: cancelOrderByFarmer now calls PUT /:id/cancel/farmer (the new dedicated
-// farmer cancel endpoint) instead of the consumer cancel endpoint /:id/cancel.
-
 const FarmerOrders = () => {
   const { user } = useContext(AuthContext);
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
-  const [updatingOrder, setUpdatingOrder] = useState(null);
-  const [expandedOrder, setExpandedOrder] = useState(null);
+  const [orders,       setOrders]       = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [filter,       setFilter]       = useState("all");
+  const [updatingOrder,setUpdatingOrder]= useState(null);
+  const [expandedOrder,setExpandedOrder]= useState(null);
 
-  const [alertModal, setAlertModal] = useState({ isOpen: false, type: "", title: "", message: "" });
+  const [alertModal,   setAlertModal]   = useState({ isOpen: false, type: "", title: "", message: "" });
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, action: null, type: "", title: "", message: "", confirmText: "" });
 
-  const showAlert = (title, message, type = "error") => {
+  const showAlert  = (title, message, type = "error") =>
     setAlertModal({ isOpen: true, title, message, type });
-  };
-
-  const closeAlert = () => {
-    setAlertModal((prev) => ({ ...prev, isOpen: false }));
-  };
-
-  const closeConfirm = () => {
-    setConfirmModal((prev) => ({ ...prev, isOpen: false, action: null }));
-  };
+  const closeAlert   = () => setAlertModal((p) => ({ ...p, isOpen: false }));
+  const closeConfirm = () => setConfirmModal((p) => ({ ...p, isOpen: false, action: null }));
 
   const loadOrders = async () => {
     try {
@@ -50,7 +35,7 @@ const FarmerOrders = () => {
 
   useEffect(() => { loadOrders(); }, []);
 
-  // FIX: find the shipment that belongs to the logged-in farmer
+  // Find the shipment that belongs to the logged-in farmer
   const getMyShipment = (order) => {
     const myId = user?._id?.toString() || user?.id?.toString();
     return order.shipments?.find((s) => {
@@ -94,7 +79,6 @@ const FarmerOrders = () => {
       action: async () => {
         try {
           setUpdatingOrder(orderId);
-          // FIX: use dedicated farmer cancel endpoint
           await api.put(`/api/orders/${orderId}/cancel/farmer`);
           await loadOrders();
           showAlert("Cancelled", "Order cancelled successfully", "success");
@@ -107,38 +91,33 @@ const FarmerOrders = () => {
     });
   };
 
-  const verifyPayment = (orderId, status) => {
-    if (!orderId || updatingOrder) return;
-    const isVerify = status === "paid";
-    setConfirmModal({
-      isOpen: true,
-      type: isVerify ? "warning" : "danger",
-      title: `${isVerify ? "Verify" : "Reject"} Payment`,
-      message: `Are you sure you want to ${isVerify ? "verify" : "reject"} this payment?`,
-      confirmText: `Yes, ${isVerify ? "Verify" : "Reject"}`,
-      action: async () => {
-        try {
-          setUpdatingOrder(orderId);
-          await api.put("/api/payments/verify", { orderId, status });
-          await loadOrders();
-          showAlert(
-            isVerify ? "Verified" : "Rejected",
-            `Payment ${isVerify ? "verified" : "rejected"}`,
-            isVerify ? "success" : "warning"
-          );
-        } catch (err) {
-          showAlert("Failed", err.response?.data?.message || "Failed", "error");
-        } finally {
-          setUpdatingOrder(null);
-        }
-      },
-    });
+  // Payment status label + colour
+  const getPaymentStatusLabel = (status) => {
+    switch (status) {
+      case "paid":
+        return { text: "Paid",           color: "text-green-600",  bg: "bg-green-100 text-green-800"  };
+      case "pending_admin_release":
+        return { text: "Held by admin",  color: "text-blue-600",   bg: "bg-blue-100 text-blue-800"    };
+      case "failed":
+        return { text: "Failed",         color: "text-red-600",    bg: "bg-red-100 text-red-800"      };
+      case "pending":
+      default:
+        return { text: "Pending",        color: "text-yellow-600", bg: "bg-yellow-100 text-yellow-800" };
+    }
   };
 
-  const filteredOrders = orders.filter(o => filter === "all" ? true : o.status === filter);
+  const filteredOrders = orders.filter((o) =>
+    filter === "all" ? true : o.status === filter
+  );
 
   const getStatusDot = (status) => {
-    const map = { pending: "bg-yellow-400", confirmed: "bg-blue-500", shipped: "bg-purple-500", delivered: "bg-green-500", cancelled: "bg-red-400" };
+    const map = {
+      pending:   "bg-yellow-400",
+      confirmed: "bg-blue-500",
+      shipped:   "bg-purple-500",
+      delivered: "bg-green-500",
+      cancelled: "bg-red-400",
+    };
     return map[status] || "bg-gray-400";
   };
 
@@ -153,24 +132,13 @@ const FarmerOrders = () => {
     return map[status] || "bg-gray-100 text-gray-800";
   };
 
-  const getPaymentStatusColor = (status) => {
-    switch (status) {
-      case "paid":    return "bg-green-100 text-green-800";
-      case "pending": return "bg-yellow-100 text-yellow-800";
-      case "failed":  return "bg-red-100 text-red-800";
-      default:        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const statusSteps = ["pending", "confirmed", "shipped", "delivered"];
-
-  // FIX: only pending and confirmed can be cancelled (mirrors backend guard)
+  const statusSteps    = ["pending", "confirmed", "shipped", "delivered"];
   const canFarmerCancel = (status) => ["pending", "confirmed"].includes(status);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600" />
       </div>
     );
   }
@@ -179,22 +147,15 @@ const FarmerOrders = () => {
     <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
 
       <AlertModal
-        isOpen={alertModal.isOpen}
-        onClose={closeAlert}
-        type={alertModal.type}
-        title={alertModal.title}
-        message={alertModal.message}
-        confirmText="OK"
+        isOpen={alertModal.isOpen}  onClose={closeAlert}
+        type={alertModal.type}      title={alertModal.title}
+        message={alertModal.message} confirmText="OK"
       />
-
       <ConfirmModal
-        isOpen={confirmModal.isOpen}
-        onClose={closeConfirm}
+        isOpen={confirmModal.isOpen} onClose={closeConfirm}
         onConfirm={confirmModal.action}
-        type={confirmModal.type}
-        title={confirmModal.title}
-        message={confirmModal.message}
-        confirmText={confirmModal.confirmText}
+        type={confirmModal.type}     title={confirmModal.title}
+        message={confirmModal.message} confirmText={confirmModal.confirmText}
         cancelText="Cancel"
       />
 
@@ -207,11 +168,11 @@ const FarmerOrders = () => {
         {/* Stats */}
         <div className="grid grid-cols-4 gap-3 mb-6">
           {[
-            { label: "Pending",   value: orders.filter(o => o.status === "pending").length,   color: "text-yellow-600", border: "border-l-yellow-400" },
-            { label: "Confirmed", value: orders.filter(o => o.status === "confirmed").length, color: "text-blue-600",   border: "border-l-blue-500"   },
-            { label: "Shipped",   value: orders.filter(o => o.status === "shipped").length,   color: "text-purple-600", border: "border-l-purple-500"  },
-            { label: "Delivered", value: orders.filter(o => o.status === "delivered").length, color: "text-green-600",  border: "border-l-green-500"   },
-          ].map(s => (
+            { label: "Pending",   value: orders.filter((o) => o.status === "pending").length,   color: "text-yellow-600", border: "border-l-yellow-400" },
+            { label: "Confirmed", value: orders.filter((o) => o.status === "confirmed").length, color: "text-blue-600",   border: "border-l-blue-500"   },
+            { label: "Shipped",   value: orders.filter((o) => o.status === "shipped").length,   color: "text-purple-600", border: "border-l-purple-500"  },
+            { label: "Delivered", value: orders.filter((o) => o.status === "delivered").length, color: "text-green-600",  border: "border-l-green-500"   },
+          ].map((s) => (
             <div key={s.label} className={`bg-white rounded-xl shadow-sm p-3 text-center border border-gray-100 border-l-4 ${s.border}`}>
               <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
               <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
@@ -219,9 +180,9 @@ const FarmerOrders = () => {
           ))}
         </div>
 
-        {/* Filter Tabs */}
+        {/* Filter tabs */}
         <div className="bg-white rounded-xl shadow-sm p-1.5 mb-6 flex gap-1 overflow-x-auto border border-gray-100">
-          {["all", "pending", "confirmed", "shipped", "delivered", "cancelled"].map(status => (
+          {["all", "pending", "confirmed", "shipped", "delivered", "cancelled"].map((status) => (
             <button
               key={status}
               onClick={() => setFilter(status)}
@@ -237,21 +198,27 @@ const FarmerOrders = () => {
         {filteredOrders.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
             <h3 className="text-lg font-semibold text-gray-900 mb-1">No Orders Found</h3>
-            <p className="text-gray-500 text-sm">{filter === "all" ? "No orders received yet" : `No ${filter} orders`}</p>
+            <p className="text-gray-500 text-sm">
+              {filter === "all" ? "No orders received yet" : `No ${filter} orders`}
+            </p>
           </div>
         ) : (
           <>
+            {/* Order cards grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {filteredOrders.map((order) => {
-                const orderId = order._id || order.id;
+                const orderId        = order._id || order.id;
                 const orderDisplayId = orderId?.toString().slice(-6);
-                const isSelected = expandedOrder === orderId;
-                // FIX: use corrected shipment lookup
-                const myShipment = getMyShipment(order);
-                const consumer = order.consumer;
-                const consumerName = consumer ? `${consumer.firstName || ""} ${consumer.lastName || ""}`.trim() : "Customer";
-                const cancellable = canFarmerCancel(order.status);
-                const needsPaymentVerification = myShipment?.paymentStatus === "pending" && myShipment?.paymentMethod !== "cash_on_delivery";
+                const isSelected     = expandedOrder === orderId;
+                const myShipment     = getMyShipment(order);
+                const consumer       = order.consumer;
+                const consumerName   = consumer
+                  ? `${consumer.firstName || ""} ${consumer.lastName || ""}`.trim()
+                  : "Customer";
+                const cancellable    = canFarmerCancel(order.status);
+
+                // Show a dot if payment is held by admin (needs attention)
+                const paymentHeld = myShipment?.paymentStatus === "pending_admin_release";
 
                 return (
                   <div key={orderId} className="relative">
@@ -269,9 +236,9 @@ const FarmerOrders = () => {
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getStatusBadge(order.status)}`}>
                             {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
                           </span>
-                          {needsPaymentVerification && (
-                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 animate-pulse">
-                              Pay Pending
+                          {paymentHeld && (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                              Pay Held
                             </span>
                           )}
                         </div>
@@ -280,18 +247,22 @@ const FarmerOrders = () => {
                         <div className="text-xl font-bold text-gray-900">#{orderDisplayId}</div>
                         <div className="text-xs text-gray-500 truncate mt-0.5">{consumerName}</div>
                         <div className="text-xs text-gray-400">
-                          {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                          {new Date(order.createdAt).toLocaleDateString("en-IN", {
+                            day: "numeric", month: "short",
+                          })}
                         </div>
                       </div>
                       <div>
-                        <div className="text-base font-bold text-gray-900">Rs.{order.totalAmount?.toFixed(0)}</div>
+                        <div className="text-base font-bold text-gray-900">
+                          Rs.{order.totalAmount?.toFixed(0)}
+                        </div>
                         <div className="text-xs text-gray-400">
-                          {myShipment?.items?.length || 0} item{(myShipment?.items?.length || 0) !== 1 ? "s" : ""}
+                          {myShipment?.items?.length || 0} item
+                          {(myShipment?.items?.length || 0) !== 1 ? "s" : ""}
                         </div>
                       </div>
                     </button>
 
-                    {/* FIX: only show cancel for pending/confirmed */}
                     {cancellable && (
                       <button
                         onClick={(e) => cancelOrderByFarmer(orderId, e)}
@@ -310,39 +281,56 @@ const FarmerOrders = () => {
               })}
             </div>
 
-            {/* Expanded Detail Panel */}
+            {/* Expanded detail panel */}
             {expandedOrder && (() => {
-              const order = filteredOrders.find(o => (o._id || o.id) === expandedOrder);
+              const order = filteredOrders.find(
+                (o) => (o._id || o.id) === expandedOrder
+              );
               if (!order) return null;
-              const orderId = order._id || order.id;
-              // FIX: use corrected shipment lookup
-              const myShipment = getMyShipment(order);
-              const consumer = order.consumer;
-              const consumerName = consumer ? `${consumer.firstName || ""} ${consumer.lastName || ""}`.trim() : "Customer";
-              const stepIndex = statusSteps.indexOf(order.status);
-              const cancellable = canFarmerCancel(order.status);
-              const needsPaymentVerification = myShipment?.paymentStatus === "pending" && myShipment?.paymentMethod !== "cash_on_delivery";
+
+              const orderId      = order._id || order.id;
+              const myShipment   = getMyShipment(order);
+              const consumer     = order.consumer;
+              const consumerName = consumer
+                ? `${consumer.firstName || ""} ${consumer.lastName || ""}`.trim()
+                : "Customer";
+              const stepIndex    = statusSteps.indexOf(order.status);
+              const cancellable  = canFarmerCancel(order.status);
+              const payLabel     = myShipment
+                ? getPaymentStatusLabel(myShipment.paymentStatus)
+                : null;
 
               return (
                 <div className="bg-white rounded-2xl border-2 border-green-500 shadow-xl overflow-hidden mt-2">
+
+                  {/* Header */}
                   <div className="bg-gray-50 px-6 py-5 border-b flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-3 mb-1">
-                        <h3 className="text-xl font-bold text-gray-900">Order #{orderId?.toString().slice(-6)}</h3>
+                        <h3 className="text-xl font-bold text-gray-900">
+                          Order #{orderId?.toString().slice(-6)}
+                        </h3>
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusBadge(order.status)}`}>
                           {order.status?.toUpperCase()}
                         </span>
                       </div>
                       <p className="text-sm text-gray-500">
-                        Customer: <span className="font-medium text-gray-700">{consumerName}</span>
-                        {consumer?.email && <span className="ml-1 text-gray-400">({consumer.email})</span>}
+                        Customer:{" "}
+                        <span className="font-medium text-gray-700">{consumerName}</span>
+                        {consumer?.email && (
+                          <span className="ml-1 text-gray-400">({consumer.email})</span>
+                        )}
                       </p>
-                      <p className="text-xs text-gray-400 mt-0.5">{new Date(order.createdAt).toLocaleString()}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {new Date(order.createdAt).toLocaleString()}
+                      </p>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <div className="text-xs text-gray-500">Total</div>
-                        <div className="text-2xl font-bold text-gray-900">Rs. {order.totalAmount?.toFixed(0)}</div>
+                        <div className="text-xs text-gray-500">Order Total</div>
+                        <div className="text-2xl font-bold text-gray-900">
+                          Rs. {order.totalAmount?.toFixed(0)}
+                        </div>
                       </div>
                       <button
                         onClick={() => setExpandedOrder(null)}
@@ -353,11 +341,19 @@ const FarmerOrders = () => {
                     </div>
                   </div>
 
+                  {/* Progress bar */}
                   {order.status !== "cancelled" && (
                     <div className="px-6 py-4 bg-gray-50 border-b">
                       <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                        {statusSteps.map(s => (
-                          <span key={s} className={`capitalize font-medium ${statusSteps.indexOf(order.status) >= statusSteps.indexOf(s) ? "text-gray-800" : ""}`}>
+                        {statusSteps.map((s) => (
+                          <span
+                            key={s}
+                            className={`capitalize font-medium ${
+                              statusSteps.indexOf(order.status) >= statusSteps.indexOf(s)
+                                ? "text-gray-800"
+                                : ""
+                            }`}
+                          >
                             {s}
                           </span>
                         ))}
@@ -365,102 +361,145 @@ const FarmerOrders = () => {
                       <div className="w-full bg-gray-200 rounded-full h-1.5">
                         <div
                           className="h-full rounded-full bg-green-500 transition-all duration-500"
-                          style={{ width: `${Math.max(5, (stepIndex / (statusSteps.length - 1)) * 100)}%` }}
+                          style={{
+                            width: `${Math.max(5, (stepIndex / (statusSteps.length - 1)) * 100)}%`,
+                          }}
                         />
                       </div>
                     </div>
                   )}
 
                   <div className="p-6 space-y-4">
+
+                    {/* Items */}
                     {myShipment && (
-                      <>
-                        <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Order Items</p>
-                          <div className="space-y-1.5">
-                            {myShipment.items?.map((item, idx) => (
-                              <div key={idx} className="flex justify-between items-center bg-gray-50 rounded-lg px-3 py-2.5 text-sm">
-                                <div>
-                                  <span className="font-medium text-gray-900">{item.name}</span>
-                                  <span className="text-gray-400 text-xs ml-2">x{item.quantity} · Rs.{item.price} each</span>
-                                </div>
-                                <span className="font-semibold text-gray-900">Rs. {(item.price * item.quantity).toFixed(0)}</span>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="flex justify-between text-sm font-semibold text-gray-700 mt-2 pt-2 border-t border-gray-100">
-                            <span>Subtotal + Delivery</span>
-                            <span>Rs. {((myShipment.subtotal || 0) + (myShipment.deliveryFee || 0)).toFixed(0)}</span>
-                          </div>
-                        </div>
-
-                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-3">Payment Info</p>
-                          <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div>
-                              <span className="text-xs text-gray-500">Method</span>
-                              <p className="font-semibold text-gray-900 capitalize">{myShipment.paymentMethod || "Not selected"}</p>
-                            </div>
-                            <div>
-                              <span className="text-xs text-gray-500">Status</span>
-                              <p>
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getPaymentStatusColor(myShipment.paymentStatus)}`}>
-                                  {myShipment.paymentStatus?.toUpperCase() || "PENDING"}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                          Order Items
+                        </p>
+                        <div className="space-y-1.5">
+                          {myShipment.items?.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="flex justify-between items-center bg-gray-50 rounded-lg px-3 py-2.5 text-sm"
+                            >
+                              <div>
+                                <span className="font-medium text-gray-900">{item.name}</span>
+                                <span className="text-gray-400 text-xs ml-2">
+                                  x{item.quantity} · Rs.{item.price} each
                                 </span>
-                              </p>
-                            </div>
-                            {myShipment.transactionId && (
-                              <div className="col-span-2">
-                                <span className="text-xs text-gray-500">Transaction ID</span>
-                                <p className="font-semibold text-gray-900 text-sm">{myShipment.transactionId}</p>
                               </div>
-                            )}
-                            {myShipment.paymentDate && (
-                              <div className="col-span-2">
-                                <span className="text-xs text-gray-500">Payment Date</span>
-                                <p className="font-medium text-gray-800 text-sm">{new Date(myShipment.paymentDate).toLocaleString()}</p>
-                              </div>
-                            )}
-                          </div>
-
-                          {myShipment.paymentProof && (
-                            <div className="mt-3">
-                              <p className="text-xs text-gray-500 mb-1">Payment Proof</p>
-                              <a href={`${APIBASEURL}${myShipment.paymentProof}`} target="_blank" rel="noopener noreferrer">
-                                <img
-                                  src={`${APIBASEURL}${myShipment.paymentProof}`}
-                                  alt="Payment proof"
-                                  className="max-w-xs rounded-lg border-2 border-blue-300 hover:border-blue-500 transition cursor-pointer"
-                                />
-                              </a>
+                              <span className="font-semibold text-gray-900">
+                                Rs. {(item.price * item.quantity).toFixed(0)}
+                              </span>
                             </div>
-                          )}
-
-                          {needsPaymentVerification && (
-                            <div className="flex gap-2 mt-3 pt-3 border-t border-blue-200">
-                              <button
-                                onClick={() => verifyPayment(orderId, "paid")}
-                                disabled={updatingOrder === orderId}
-                                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold px-4 py-2 rounded-lg text-sm transition"
-                              >
-                                Verify Payment
-                              </button>
-                              <button
-                                onClick={() => verifyPayment(orderId, "failed")}
-                                disabled={updatingOrder === orderId}
-                                className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold px-4 py-2 rounded-lg text-sm transition"
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          )}
+                          ))}
                         </div>
-                      </>
+                        <div className="flex justify-between text-sm font-semibold text-gray-700 mt-2 pt-2 border-t border-gray-100">
+                          <span>Subtotal + Delivery</span>
+                          <span>
+                            Rs. {((myShipment.subtotal || 0) + (myShipment.deliveryFee || 0)).toFixed(0)}
+                          </span>
+                        </div>
+                      </div>
                     )}
 
+                    {/* ── Payment info — NO verify/reject buttons ── */}
+                    {myShipment && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                        <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-3">
+                          Payment Info
+                        </p>
+                        <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                          <div>
+                            <span className="text-xs text-gray-500">Method</span>
+                            <p className="font-semibold text-gray-900 capitalize">
+                              {myShipment.paymentMethod || "Not selected"}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500">Status</span>
+                            <p>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${payLabel?.bg}`}>
+                                {payLabel?.text?.toUpperCase() || "PENDING"}
+                              </span>
+                            </p>
+                          </div>
+                          {myShipment.transactionId && (
+                            <div className="col-span-2">
+                              <span className="text-xs text-gray-500">Transaction ID</span>
+                              <p className="font-semibold text-gray-900 text-sm">
+                                {myShipment.transactionId}
+                              </p>
+                            </div>
+                          )}
+                          {myShipment.paymentDate && (
+                            <div className="col-span-2">
+                              <span className="text-xs text-gray-500">Payment Date</span>
+                              <p className="font-medium text-gray-800 text-sm">
+                                {new Date(myShipment.paymentDate).toLocaleString()}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Payment proof image (view only) */}
+                        {myShipment.paymentProof && (
+                          <div className="mb-3">
+                            <p className="text-xs text-gray-500 mb-1">Payment Proof</p>
+                            <a
+                              href={`${APIBASEURL}${myShipment.paymentProof}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <img
+                                src={`${APIBASEURL}${myShipment.paymentProof}`}
+                                alt="Payment proof"
+                                className="max-w-xs rounded-lg border-2 border-blue-300 hover:border-blue-500 transition cursor-pointer"
+                              />
+                            </a>
+                          </div>
+                        )}
+
+                        {/* ── Status messages (replaces verify/reject buttons) ── */}
+                        {myShipment.paymentStatus === "pending_admin_release" && (
+                          <div className="bg-blue-100 border border-blue-300 rounded-xl px-4 py-3 text-sm text-blue-800 text-center">
+                            ⏳ Payment received by platform — admin will release{" "}
+                            <span className="font-bold">Rs. {myShipment.subtotal}</span>{" "}
+                            to your account shortly
+                          </div>
+                        )}
+
+                        {myShipment.paymentStatus === "paid" && (
+                          <div className="bg-green-100 border border-green-300 rounded-xl px-4 py-3 text-sm text-green-800 text-center">
+                            ✓ <span className="font-bold">Rs. {myShipment.subtotal}</span> has been
+                            released to your account
+                          </div>
+                        )}
+
+                        {myShipment.paymentStatus === "pending" && (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-sm text-yellow-800 text-center">
+                            ⏳ Awaiting payment from consumer
+                          </div>
+                        )}
+
+                        {myShipment.paymentStatus === "failed" && (
+                          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-800 text-center">
+                            ✗ Payment failed or rejected
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── Order actions ── */}
                     <div className="bg-gray-50 rounded-xl p-4">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Actions</p>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                        Actions
+                      </p>
                       {order.status === "cancelled" ? (
-                        <p className="text-red-600 text-sm font-medium">This order has been cancelled.</p>
+                        <p className="text-red-600 text-sm font-medium">
+                          This order has been cancelled.
+                        </p>
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {order.status === "pending" && (
@@ -501,7 +540,7 @@ const FarmerOrders = () => {
                           )}
                           {updatingOrder === orderId && (
                             <div className="flex items-center gap-2 text-gray-500 text-sm">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600" />
                               Updating...
                             </div>
                           )}

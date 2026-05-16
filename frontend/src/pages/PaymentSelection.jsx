@@ -1,192 +1,137 @@
-import { useState, useEffect } from "react";
+/* src/pages/PaymentSelection.jsx
+   Two payment modes:
+     Pre Payment  → eSewa | Khalti  (pay before delivery)
+     Post Payment → Cash on Delivery (pay after delivery)
+*/
+
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/axios";
-import { APIBASEURL } from "../utils/config";
 import AlertModal from "../components/AlertModal";
+
+const PAYMENT_MODES = {
+  PRE:  "pre_payment",
+  POST: "post_payment",
+};
 
 const PaymentSelection = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const order = location.state?.order;
+  const order    = location.state?.order;
 
-  const [shipmentPayments, setShipmentPayments] = useState([]);
-  const [paymentProofs, setPaymentProofs] = useState({});
-  const [proofPreviews, setProofPreviews] = useState({});
-  const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [paymentMode,   setPaymentMode]   = useState(PAYMENT_MODES.PRE);
+  const [preMethod,     setPreMethod]     = useState("esewa");  // "esewa" | "khalti"
+  const [submitting,    setSubmitting]    = useState(false);
 
-  const [alertModal, setAlertModal] = useState({ isOpen: false, type: "", title: "", message: "", onConfirm: null });
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false, type: "", title: "", message: "", onConfirm: null,
+  });
 
-  const showAlert = (title, message, type = "error", onConfirm = null) => {
+  const showAlert = (title, message, type = "error", onConfirm = null) =>
     setAlertModal({ isOpen: true, title, message, type, onConfirm });
-  };
-
-  // FIX: closeAlert now accepts an optional callback so success alerts can
-  // trigger navigation AFTER the user dismisses the modal, not before.
   const closeAlert = () => {
     const cb = alertModal.onConfirm;
-    setAlertModal((prev) => ({ ...prev, isOpen: false, onConfirm: null }));
+    setAlertModal((p) => ({ ...p, isOpen: false, onConfirm: null }));
     if (cb) cb();
   };
 
   useEffect(() => {
-    if (!order) {
-      navigate("/cart", { replace: true });
-    }
+    if (!order) navigate("/cart", { replace: true });
   }, [order, navigate]);
 
-  if (!order) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirecting to cart...</p>
-        </div>
-      </div>
-    );
-  }
+  if (!order) return null;
 
-  const orderId = order?._id || order?.id;
+  const orderId        = order._id || order.id;
+  const orderDisplayId = orderId?.toString().slice(-6) || "N/A";
+  const farmerIds      = order.shipments?.map((s) =>
+    s.farmer?._id || s.farmer?.id || s.farmer
+  ) || [];
 
-  useEffect(() => {
-    if (!order || !Array.isArray(order.shipments)) return;
-
-    const initial = order.shipments.map(s => {
-      const farmerPaymentInfo = s.farmerPaymentInfo || {};
-      const availableMethods = ["cash_on_delivery"];
-      if (farmerPaymentInfo.esewaId)       availableMethods.push("esewa");
-      if (farmerPaymentInfo.qrCodeImage)   availableMethods.push("bank_qr");
-      if (farmerPaymentInfo.accountNumber) availableMethods.push("bank_transfer");
-
-      return {
-        farmerId: s.farmer?._id || s.farmer,
-        farmerName: s.farmer?.firstName ? `${s.farmer.firstName} ${s.farmer.lastName}` : "Farmer",
-        amount: (s.subtotal || 0) + (s.deliveryFee || 0),
-        selectedMethod: "cash_on_delivery",
-        availableMethods,
-        farmerPaymentInfo,
-        transactionId: "",
-        items: s.items || [],
-      };
-    });
-
-    setShipmentPayments(initial);
-  }, [order]);
-
-  const updatePaymentMethod = (farmerId, method) => {
-    setShipmentPayments(prev =>
-      prev.map(sp => sp.farmerId === farmerId ? { ...sp, selectedMethod: method } : sp)
-    );
-    setErrors(prev => {
-      const e = { ...prev };
-      delete e[farmerId];
-      delete e[`${farmerId}_transactionId`];
-      delete e[`${farmerId}_proof`];
-      return e;
-    });
-  };
-
-  const updateTransactionId = (farmerId, transactionId) => {
-    setShipmentPayments(prev =>
-      prev.map(sp => sp.farmerId === farmerId ? { ...sp, transactionId } : sp)
-    );
-    setErrors(prev => { const e = { ...prev }; delete e[`${farmerId}_transactionId`]; return e; });
-  };
-
-  const handleProofUpload = (farmerId, file) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setErrors(prev => ({ ...prev, [`${farmerId}_proof`]: "File size must be less than 5MB" }));
-      return;
-    }
-    if (!file.type.startsWith("image/")) {
-      setErrors(prev => ({ ...prev, [`${farmerId}_proof`]: "Please upload an image file" }));
-      return;
-    }
-    setPaymentProofs(prev => ({ ...prev, [farmerId]: file }));
-    setProofPreviews(prev => ({ ...prev, [farmerId]: URL.createObjectURL(file) }));
-    setErrors(prev => { const e = { ...prev }; delete e[`${farmerId}_proof`]; return e; });
-  };
-
-  const validatePayments = () => {
-    const newErrors = {};
-    shipmentPayments.forEach(sp => {
-      if (sp.selectedMethod !== "cash_on_delivery") {
-        if (!sp.transactionId?.trim()) {
-          newErrors[`${sp.farmerId}_transactionId`] = "Transaction ID is required for online payment";
-        }
-        if (!paymentProofs[sp.farmerId]) {
-          newErrors[`${sp.farmerId}_proof`] = "Payment proof screenshot is required";
-        }
-      }
-    });
-    return newErrors;
-  };
-
-  const handleSubmitPayments = async () => {
-    const validationErrors = validatePayments();
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      showAlert("Incomplete Payment Info", "Please complete all required payment information.", "warning");
-      return;
-    }
-
+  /* ── eSewa ── */
+  const handleEsewa = async () => {
     setSubmitting(true);
-
     try {
-      const byMethod = shipmentPayments.reduce((acc, sp) => {
-        if (!acc[sp.selectedMethod]) acc[sp.selectedMethod] = [];
-        acc[sp.selectedMethod].push(sp);
-        return acc;
-      }, {});
+      const res = await api.post("/api/payments/esewa/initiate", { orderId });
+      const d   = res.data;
 
-      for (const [method, shipments] of Object.entries(byMethod)) {
-        if (method === "cash_on_delivery") {
-          await api.post("/api/payments/submit-proof", {
-            orderId,
-            farmerIds: shipments.map(s => s.farmerId),
-            paymentMethod: "cash_on_delivery",
-          });
-        } else {
-          for (const shipment of shipments) {
-            const formData = new FormData();
-            formData.append("orderId", orderId);
-            formData.append("farmerIds", JSON.stringify([shipment.farmerId]));
-            formData.append("paymentMethod", method);
-            formData.append("transactionId", shipment.transactionId || "");
-            const proof = paymentProofs[shipment.farmerId];
-            if (proof) formData.append("paymentProof", proof);
-            await api.post("/api/payments/submit-proof", formData);
-          }
-        }
-      }
+      // Build a hidden form and submit it to eSewa
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = d.paymentUrl;
 
-      const orderDisplayId = orderId?.toString().slice(-6) || "unknown";
+      const fields = {
+        amount:                    d.amount,
+        tax_amount:                d.tax_amount,
+        total_amount:              d.total_amount,
+        transaction_uuid:          d.transaction_uuid,
+        product_code:              d.product_code,
+        product_service_charge:    d.product_service_charge,
+        product_delivery_charge:   d.product_delivery_charge,
+        success_url:               d.success_url,
+        failure_url:               d.failure_url,
+        signed_field_names:        d.signed_field_names,
+        signature:                 d.signature,
+      };
 
-      // FIX: Show alert first; navigate to /consumer only AFTER user dismisses it.
-      // Previously: navigate() was called before showAlert(), so the modal appeared
-      // on the consumer dashboard instead of the payment page.
-      showAlert(
-        "Payment Submitted",
-        `Order #${orderDisplayId} has been placed and is being processed.`,
-        "success",
-        () => navigate("/consumer", { replace: true })
-      );
+      Object.entries(fields).forEach(([key, val]) => {
+        const input = document.createElement("input");
+        input.type  = "hidden";
+        input.name  = key;
+        input.value = val;
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+      form.submit();
     } catch (err) {
-      showAlert("Payment Failed", err.response?.data?.message || "Failed to submit payment. Please try again.", "error");
-    } finally {
+      showAlert("eSewa Error", err.response?.data?.message || "Failed to initiate eSewa payment.", "error");
       setSubmitting(false);
     }
   };
 
-  const totalAmount = shipmentPayments.reduce((sum, sp) => sum + sp.amount, 0);
-  const hasCOD = shipmentPayments.some(sp => sp.selectedMethod === "cash_on_delivery");
-  const hasOnline = shipmentPayments.some(sp => sp.selectedMethod !== "cash_on_delivery");
-  const orderDisplayId = orderId?.toString().slice(-6) || "N/A";
+  /* ── Khalti ── */
+  const handleKhalti = async () => {
+    setSubmitting(true);
+    try {
+      const res = await api.post("/api/payments/khalti/initiate", { orderId });
+      // Redirect to Khalti hosted checkout
+      window.location.href = res.data.paymentUrl;
+    } catch (err) {
+      showAlert("Khalti Error", err.response?.data?.message || "Failed to initiate Khalti payment.", "error");
+      setSubmitting(false);
+    }
+  };
+
+  /* ── COD ── */
+  const handleCOD = async () => {
+    setSubmitting(true);
+    try {
+      await api.post("/api/payments/cod/confirm", { orderId, farmerIds });
+      showAlert(
+        "Order Confirmed",
+        `Order #${orderDisplayId} placed! Pay cash when your order arrives.`,
+        "success",
+        () => navigate("/my-orders", { replace: true })
+      );
+    } catch (err) {
+      showAlert("COD Error", err.response?.data?.message || "Failed to confirm COD.", "error");
+      setSubmitting(false);
+    }
+  };
+
+  const handlePay = () => {
+    if (paymentMode === PAYMENT_MODES.PRE) {
+      if (preMethod === "esewa")  handleEsewa();
+      else                        handleKhalti();
+    } else {
+      handleCOD();
+    }
+  };
+
+  const total = order.totalAmount || 0;
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
-
       <AlertModal
         isOpen={alertModal.isOpen}
         onClose={closeAlert}
@@ -197,373 +142,227 @@ const PaymentSelection = () => {
         onConfirm={closeAlert}
       />
 
-      <div className="max-w-5xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 text-white">
-            <h1 className="text-3xl font-bold mb-2">Complete Payment</h1>
-            <div className="flex items-center gap-4 text-sm opacity-90">
-              <span>Order #{orderDisplayId}</span>
-              <span>•</span>
-              <span>{shipmentPayments.length} farmer{shipmentPayments.length > 1 ? "s" : ""}</span>
-              <span>•</span>
-              <span>Total: Rs. {totalAmount.toFixed(0)}</span>
-            </div>
+      <div className="max-w-lg mx-auto">
+
+        {/* Header */}
+        <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl p-6 text-white mb-6">
+          <h1 className="text-2xl font-bold mb-1">Complete Payment</h1>
+          <div className="flex items-center gap-3 text-sm text-green-100">
+            <span>Order #{orderDisplayId}</span>
+            <span>·</span>
+            <span>{order.shipments?.length} shipment{order.shipments?.length !== 1 ? "s" : ""}</span>
+            <span>·</span>
+            <span className="font-bold text-white">Rs. {total.toFixed(0)}</span>
           </div>
+        </div>
 
-          <div className="p-6 md:p-8">
-            <div className="mb-8 bg-blue-50 border border-blue-200 rounded-xl p-4">
-              <h3 className="font-semibold text-blue-900 mb-2">Payment Instructions</h3>
-              <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-                <li>Select your preferred payment method for each farmer</li>
-                <li>For online payments: Complete the payment and upload proof</li>
-                <li>For Cash on Delivery: No action needed, pay when you receive</li>
-                <li>Click "Confirm Payment" to complete your order</li>
-              </ol>
+        {/* Order breakdown */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-5">
+          <h3 className="font-semibold text-gray-800 mb-3 text-sm">Order Summary</h3>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between text-gray-600">
+              <span>Items subtotal</span>
+              <span>Rs. {(order.itemsSubtotal || 0).toFixed(0)}</span>
             </div>
-
-            <div className="mb-6 flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-              <div className="text-sm text-gray-600">
-                {hasCOD && (
-                  <span className="mr-4">
-                    {shipmentPayments.filter(sp => sp.selectedMethod === "cash_on_delivery").length} COD
-                  </span>
-                )}
-                {hasOnline && (
-                  <span>
-                    {shipmentPayments.filter(sp => sp.selectedMethod !== "cash_on_delivery").length} Online
-                  </span>
-                )}
-              </div>
-              <div className="text-right">
-                <div className="text-sm text-gray-500">Total Amount</div>
-                <div className="text-2xl font-bold text-gray-900">Rs. {totalAmount.toFixed(0)}</div>
-              </div>
+            <div className="flex justify-between text-gray-600">
+              <span>Delivery total</span>
+              <span>Rs. {(order.deliveryTotal || 0).toFixed(0)}</span>
             </div>
-
-            <div className="space-y-6">
-              {shipmentPayments.map((sp, index) => (
-                <div key={sp.farmerId} className="border-2 rounded-xl overflow-hidden">
-                  <div className="bg-gray-50 p-4 border-b flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-lg text-gray-900">{sp.farmerName}</h3>
-                      <p className="text-sm text-gray-500">
-                        {sp.items.length} item{sp.items.length !== 1 ? "s" : ""} • Shipment {index + 1}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm text-gray-500">Amount</div>
-                      <div className="text-xl font-bold text-green-600">Rs. {sp.amount.toFixed(0)}</div>
-                    </div>
-                  </div>
-
-                  <div className="p-6 space-y-4">
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-xs font-medium text-gray-500 mb-2">Order Items:</p>
-                      <div className="space-y-1">
-                        {sp.items.map((item, idx) => (
-                          <div key={idx} className="flex justify-between text-sm">
-                            <span>{item.name}</span>
-                            <span className="text-gray-600">{item.quantity}x Rs. {item.price}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-3">Select Payment Method</label>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {/* Cash on Delivery */}
-                        <button
-                          type="button"
-                          onClick={() => updatePaymentMethod(sp.farmerId, "cash_on_delivery")}
-                          className={`border-2 rounded-xl p-4 text-left transition ${
-                            sp.selectedMethod === "cash_on_delivery"
-                              ? "border-green-500 bg-green-50 shadow-md"
-                              : "border-gray-200 hover:border-gray-300 bg-white"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                              sp.selectedMethod === "cash_on_delivery" ? "border-green-500 bg-green-500" : "border-gray-300"
-                            }`}>
-                              {sp.selectedMethod === "cash_on_delivery" && <div className="w-2 h-2 bg-white rounded-full" />}
-                            </div>
-                            <div className="font-semibold">Cash on Delivery</div>
-                          </div>
-                          <div className="text-xs text-gray-500 ml-8">Pay Rs. {sp.amount.toFixed(0)} when you receive</div>
-                        </button>
-
-                        {sp.farmerPaymentInfo?.esewaId && (
-                          <button
-                            type="button"
-                            onClick={() => updatePaymentMethod(sp.farmerId, "esewa")}
-                            className={`border-2 rounded-xl p-4 text-left transition ${
-                              sp.selectedMethod === "esewa" ? "border-blue-500 bg-blue-50 shadow-md" : "border-gray-200 hover:border-gray-300 bg-white"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                                sp.selectedMethod === "esewa" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                              }`}>
-                                {sp.selectedMethod === "esewa" && <div className="w-2 h-2 bg-white rounded-full" />}
-                              </div>
-                              <div className="font-semibold">eSewa</div>
-                            </div>
-                            <div className="text-xs text-gray-500 ml-8">ID: {sp.farmerPaymentInfo.esewaId}</div>
-                          </button>
-                        )}
-
-                        {sp.farmerPaymentInfo?.qrCodeImage && (
-                          <button
-                            type="button"
-                            onClick={() => updatePaymentMethod(sp.farmerId, "bank_qr")}
-                            className={`border-2 rounded-xl p-4 text-left transition ${
-                              sp.selectedMethod === "bank_qr" ? "border-purple-500 bg-purple-50 shadow-md" : "border-gray-200 hover:border-gray-300 bg-white"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                                sp.selectedMethod === "bank_qr" ? "border-purple-500 bg-purple-500" : "border-gray-300"
-                              }`}>
-                                {sp.selectedMethod === "bank_qr" && <div className="w-2 h-2 bg-white rounded-full" />}
-                              </div>
-                              <div className="font-semibold">Bank QR</div>
-                            </div>
-                            <div className="text-xs text-gray-500 ml-8">{sp.farmerPaymentInfo.bankName}</div>
-                          </button>
-                        )}
-
-                        {sp.farmerPaymentInfo?.accountNumber && (
-                          <button
-                            type="button"
-                            onClick={() => updatePaymentMethod(sp.farmerId, "bank_transfer")}
-                            className={`border-2 rounded-xl p-4 text-left transition ${
-                              sp.selectedMethod === "bank_transfer" ? "border-green-500 bg-green-50 shadow-md" : "border-gray-200 hover:border-gray-300 bg-white"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                                sp.selectedMethod === "bank_transfer" ? "border-green-500 bg-green-500" : "border-gray-300"
-                              }`}>
-                                {sp.selectedMethod === "bank_transfer" && <div className="w-2 h-2 bg-white rounded-full" />}
-                              </div>
-                              <div className="font-semibold">Bank Transfer</div>
-                            </div>
-                            <div className="text-xs text-gray-500 ml-8">{sp.farmerPaymentInfo.bankName}</div>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* eSewa Instructions */}
-                    {sp.selectedMethod === "esewa" && sp.farmerPaymentInfo?.esewaId && (
-                      <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
-                        <h4 className="font-semibold text-blue-900 mb-3">eSewa Payment Instructions:</h4>
-                        <ol className="text-sm space-y-2 list-decimal list-inside text-blue-800 mb-4">
-                          <li>Open eSewa app and go to "Send Money"</li>
-                          <li>Enter eSewa ID: <strong>{sp.farmerPaymentInfo.esewaId}</strong></li>
-                          <li>Enter amount: <strong>Rs. {sp.amount.toFixed(0)}</strong></li>
-                          <li>Complete the payment and upload screenshot below</li>
-                        </ol>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-sm font-medium mb-2 text-blue-900">
-                              Transaction ID <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="Enter transaction ID from eSewa"
-                              value={sp.transactionId}
-                              onChange={(e) => updateTransactionId(sp.farmerId, e.target.value)}
-                              className={`w-full border rounded-lg px-4 py-2 ${errors[`${sp.farmerId}_transactionId`] ? "border-red-500" : "border-gray-300"}`}
-                            />
-                            {errors[`${sp.farmerId}_transactionId`] && (
-                              <p className="text-red-500 text-xs mt-1">{errors[`${sp.farmerId}_transactionId`]}</p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-2 text-blue-900">
-                              Payment Screenshot <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleProofUpload(sp.farmerId, e.target.files[0])}
-                              className="w-full border border-gray-300 rounded-lg px-4 py-2 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700"
-                            />
-                            {errors[`${sp.farmerId}_proof`] && (
-                              <p className="text-red-500 text-xs mt-1">{errors[`${sp.farmerId}_proof`]}</p>
-                            )}
-                            {proofPreviews[sp.farmerId] && (
-                              <img src={proofPreviews[sp.farmerId]} alt="Payment proof" className="mt-3 w-full max-w-sm rounded-lg border" />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Bank QR Instructions */}
-                    {sp.selectedMethod === "bank_qr" && sp.farmerPaymentInfo?.qrCodeImage && (
-                      <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
-                        <h4 className="font-semibold text-purple-900 mb-3">Scan QR Code to Pay:</h4>
-                        <div className="flex flex-col md:flex-row gap-4 mb-4">
-                          <img
-                            src={`${APIBASEURL}${sp.farmerPaymentInfo.qrCodeImage}`}
-                            alt="QR Code"
-                            className="w-48 h-48 object-contain border-2 border-purple-300 rounded-lg bg-white p-2"
-                          />
-                          <ol className="text-sm space-y-2 list-decimal list-inside text-purple-800">
-                            <li>Open {sp.farmerPaymentInfo.bankName} mobile banking</li>
-                            <li>Scan the QR code</li>
-                            <li>Verify amount: <strong>Rs. {sp.amount.toFixed(0)}</strong></li>
-                            <li>Upload screenshot below</li>
-                          </ol>
-                        </div>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-sm font-medium mb-2 text-purple-900">Transaction ID (Optional)</label>
-                            <input
-                              type="text"
-                              placeholder="Enter transaction ID if available"
-                              value={sp.transactionId}
-                              onChange={(e) => updateTransactionId(sp.farmerId, e.target.value)}
-                              className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-2 text-purple-900">
-                              Payment Screenshot <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleProofUpload(sp.farmerId, e.target.files[0])}
-                              className="w-full border border-gray-300 rounded-lg px-4 py-2 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-50 file:text-purple-700"
-                            />
-                            {errors[`${sp.farmerId}_proof`] && (
-                              <p className="text-red-500 text-xs mt-1">{errors[`${sp.farmerId}_proof`]}</p>
-                            )}
-                            {proofPreviews[sp.farmerId] && (
-                              <img src={proofPreviews[sp.farmerId]} alt="Payment proof" className="mt-3 w-full max-w-sm rounded-lg border" />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Bank Transfer Instructions */}
-                    {sp.selectedMethod === "bank_transfer" && sp.farmerPaymentInfo?.accountNumber && (
-                      <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
-                        <h4 className="font-semibold text-green-900 mb-3">Bank Transfer Details:</h4>
-                        <div className="bg-white rounded-lg p-4 mb-4 space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Bank:</span>
-                            <span className="font-semibold">{sp.farmerPaymentInfo.bankName}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Account Number:</span>
-                            <span className="font-semibold">{sp.farmerPaymentInfo.accountNumber}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Account Name:</span>
-                            <span className="font-semibold">{sp.farmerPaymentInfo.accountName}</span>
-                          </div>
-                          {sp.farmerPaymentInfo.bankBranch && (
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Branch:</span>
-                              <span className="font-semibold">{sp.farmerPaymentInfo.bankBranch}</span>
-                            </div>
-                          )}
-                          <div className="flex justify-between border-t pt-2">
-                            <span className="text-gray-600">Amount:</span>
-                            <span className="font-bold text-green-700 text-lg">Rs. {sp.amount.toFixed(0)}</span>
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-sm font-medium mb-2 text-green-900">
-                              Transaction ID <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="Enter transaction ID from your bank"
-                              value={sp.transactionId}
-                              onChange={(e) => updateTransactionId(sp.farmerId, e.target.value)}
-                              className={`w-full border rounded-lg px-4 py-2 ${errors[`${sp.farmerId}_transactionId`] ? "border-red-500" : "border-gray-300"}`}
-                            />
-                            {errors[`${sp.farmerId}_transactionId`] && (
-                              <p className="text-red-500 text-xs mt-1">{errors[`${sp.farmerId}_transactionId`]}</p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-2 text-green-900">
-                              Transfer Screenshot <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleProofUpload(sp.farmerId, e.target.files[0])}
-                              className="w-full border border-gray-300 rounded-lg px-4 py-2 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-green-50 file:text-green-700"
-                            />
-                            {errors[`${sp.farmerId}_proof`] && (
-                              <p className="text-red-500 text-xs mt-1">{errors[`${sp.farmerId}_proof`]}</p>
-                            )}
-                            {proofPreviews[sp.farmerId] && (
-                              <img src={proofPreviews[sp.farmerId]} alt="Payment proof" className="mt-3 w-full max-w-sm rounded-lg border" />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* COD Confirmation */}
-                    {sp.selectedMethod === "cash_on_delivery" && (
-                      <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
-                        <h4 className="font-semibold text-green-900 mb-2">Cash on Delivery</h4>
-                        <p className="text-sm text-green-800">
-                          You will pay <strong>Rs. {sp.amount.toFixed(0)}</strong> to the farmer when you receive your order.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div className="flex justify-between text-gray-600">
+              <span>Platform charge</span>
+              <span>Rs. {(order.platformCharge || 25).toFixed(0)}</span>
             </div>
-
-            {/* Total & Submit */}
-            <div className="mt-8 border-t pt-6">
-              <div className="flex items-center justify-between mb-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl">
-                <div>
-                  <div className="text-sm text-gray-600 mb-1">Total Order Amount</div>
-                  <div className="text-4xl font-bold text-gray-900">Rs. {totalAmount.toFixed(0)}</div>
-                </div>
-                <div className="text-right text-sm text-gray-600">
-                  <div>{shipmentPayments.length} shipment{shipmentPayments.length > 1 ? "s" : ""}</div>
-                </div>
-              </div>
-
-              <button
-                onClick={handleSubmitPayments}
-                disabled={submitting}
-                className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition shadow-lg text-lg"
-              >
-                {submitting ? (
-                  <span className="flex items-center justify-center gap-3">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                    Processing Payment...
-                  </span>
-                ) : (
-                  "Confirm Payment and Place Order"
-                )}
-              </button>
-
-              <p className="text-center text-xs text-gray-500 mt-4">
-                By confirming, you agree to our terms and conditions.
-              </p>
+            <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-900">
+              <span>Total</span>
+              <span>Rs. {total.toFixed(0)}</span>
             </div>
           </div>
         </div>
+
+        {/* Payment mode tabs */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-5">
+
+          {/* Tab headers */}
+          <div className="grid grid-cols-2 border-b border-gray-100">
+            <button
+              type="button"
+              onClick={() => setPaymentMode(PAYMENT_MODES.PRE)}
+              className={`py-4 text-sm font-semibold transition-all ${
+                paymentMode === PAYMENT_MODES.PRE
+                  ? "bg-green-50 text-green-700 border-b-2 border-green-500"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              <span className="block text-base mb-0.5">💳</span>
+              Pre Payment
+              <span className="block text-xs font-normal opacity-70 mt-0.5">Pay before delivery</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentMode(PAYMENT_MODES.POST)}
+              className={`py-4 text-sm font-semibold transition-all border-l border-gray-100 ${
+                paymentMode === PAYMENT_MODES.POST
+                  ? "bg-blue-50 text-blue-700 border-b-2 border-blue-500"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              <span className="block text-base mb-0.5">🚪</span>
+              Post Payment
+              <span className="block text-xs font-normal opacity-70 mt-0.5">Pay on delivery</span>
+            </button>
+          </div>
+
+          {/* Tab content */}
+          <div className="p-6">
+
+            {/* ── Pre Payment ── */}
+            {paymentMode === PAYMENT_MODES.PRE && (
+              <div className="space-y-4">
+                <p className="text-xs text-gray-500">
+                  Pay securely online before your order is processed. Farmers confirm immediately after payment.
+                </p>
+
+                {/* eSewa */}
+                <label
+                  className={`flex items-center gap-4 border-2 rounded-2xl p-4 cursor-pointer transition-all ${
+                    preMethod === "esewa"
+                      ? "border-green-500 bg-green-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="preMethod"
+                    value="esewa"
+                    checked={preMethod === "esewa"}
+                    onChange={() => setPreMethod("esewa")}
+                    className="sr-only"
+                  />
+                  {/* eSewa logo substitute */}
+                  <div className="w-12 h-12 rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-black text-sm">eSewa</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-900">eSewa</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Nepal's most popular digital wallet</p>
+                  </div>
+                  {preMethod === "esewa" && (
+                    <span className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </span>
+                  )}
+                </label>
+
+                {/* Khalti */}
+                <label
+                  className={`flex items-center gap-4 border-2 rounded-2xl p-4 cursor-pointer transition-all ${
+                    preMethod === "khalti"
+                      ? "border-purple-500 bg-purple-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="preMethod"
+                    value="khalti"
+                    checked={preMethod === "khalti"}
+                    onChange={() => setPreMethod("khalti")}
+                    className="sr-only"
+                  />
+                  <div className="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-black text-sm">Khalti</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-900">Khalti</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Fast, secure digital payments</p>
+                  </div>
+                  {preMethod === "khalti" && (
+                    <span className="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </span>
+                  )}
+                </label>
+
+                <div className="bg-green-50 border border-green-100 rounded-xl p-3 text-xs text-green-800">
+                  <p className="font-semibold mb-0.5">✓ Benefits of pre-payment</p>
+                  <p>Order is confirmed instantly · Farmer prioritises pre-paid orders · Secure encrypted transaction</p>
+                </div>
+              </div>
+            )}
+
+            {/* ── Post Payment (COD) ── */}
+            {paymentMode === PAYMENT_MODES.POST && (
+              <div className="space-y-4">
+                <p className="text-xs text-gray-500">
+                  Pay in cash when your order arrives at your door. No online transaction needed.
+                </p>
+
+                <div className="flex items-center gap-4 border-2 border-blue-400 bg-blue-50 rounded-2xl p-4">
+                  <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900">Cash on Delivery</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Pay Rs. {total.toFixed(0)} in cash when the farmer delivers your order
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
+                  <p className="font-semibold mb-0.5">ℹ How it works</p>
+                  <p>1. Order placed → Farmer prepares your items</p>
+                  <p>2. Farmer delivers → You hand over cash</p>
+                  <p>3. Farmer marks payment as received</p>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                  <p className="font-semibold mb-0.5">⚠ Please note</p>
+                  <p>Keep exact change ready. Pre-paid orders may be processed faster.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Pay button */}
+        <button
+          onClick={handlePay}
+          disabled={submitting}
+          className={`w-full font-bold py-4 rounded-2xl text-white text-lg transition shadow-lg ${
+            submitting
+              ? "bg-gray-400 cursor-not-allowed"
+              : paymentMode === PAYMENT_MODES.PRE
+              ? preMethod === "esewa"
+                ? "bg-green-600 hover:bg-green-700"
+                : "bg-purple-600 hover:bg-purple-700"
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          {submitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Processing…
+            </span>
+          ) : paymentMode === PAYMENT_MODES.PRE ? (
+            `Pay Rs. ${total.toFixed(0)} via ${preMethod === "esewa" ? "eSewa" : "Khalti"}`
+          ) : (
+            `Confirm Cash on Delivery — Rs. ${total.toFixed(0)}`
+          )}
+        </button>
+
+        <p className="text-xs text-gray-400 text-center mt-4">
+          By confirming you agree to MeroBari's terms and conditions.
+        </p>
       </div>
     </div>
   );

@@ -1,5 +1,3 @@
-/* backend/models/Order.js — adds platformCharge field */
-
 import mongoose from "mongoose";
 
 const shipmentItemSchema = new mongoose.Schema(
@@ -18,20 +16,20 @@ const shipmentSchema = new mongoose.Schema(
     items:       [shipmentItemSchema],
     distanceKm:  { type: Number, default: null },
     deliveryFee: { type: Number, required: true, default: 50 },
-    subtotal:    { type: Number, required: true, default: 0  },
+    subtotal:    { type: Number, required: true, default: 0 },
     paymentMethod: {
-      type: String,
-      enum: ["esewa", "bank_qr", "bank_transfer", "cash_on_delivery", "pending"],
+      type:    String,
+      enum:    ["esewa", "khalti", "cash_on_delivery", "pending"],
       default: "pending",
     },
     paymentStatus: {
-      type: String,
-      enum: ["pending", "paid", "failed", "refunded"],
+      type:    String,
+      enum:    ["pending", "paid", "failed", "refunded", "pending_admin_release"],
       default: "pending",
     },
-    paymentProof:      String,
-    paymentDate:       Date,
-    transactionId:     String,
+    paymentProof:  String,
+    paymentDate:   Date,
+    transactionId: String,
     farmerPaymentInfo: {
       esewaId:       String,
       bankName:      String,
@@ -53,19 +51,61 @@ const orderSchema = new mongoose.Schema(
       default:  "normal",
       required: true,
     },
+
+    paymentType: {
+      type:    String,
+      enum:    ["pre_payment", "post_payment"],
+      default: null,
+    },
+    paymentStatus: {
+      type:    String,
+      enum:    ["pending", "paid", "failed", "refunded"],
+      default: "pending",
+    },
+
+    esewaTransactionUuid: { type: String, default: null },
+    khaltiPidx:           { type: String, default: null },
+
     shipments:      { type: [shipmentSchema], default: [] },
     itemsSubtotal:  { type: Number, required: true, default: 0 },
     deliveryTotal:  { type: Number, required: true, default: 0 },
-    platformCharge: { type: Number, required: true, default: 25 }, // Rs. 25 platform fee
+    platformCharge: { type: Number, required: true, default: 25 },
     totalAmount:    { type: Number, required: true },
+
     status: {
       type:    String,
       enum:    ["pending", "confirmed", "shipped", "delivered", "cancelled"],
       default: "pending",
     },
-    cancelledBy: { type: String, enum: ["admin", "farmer", "consumer"] },
+
+    /* ── FIX: added "system" so the expiry job can cancel orders ── */
+    cancelledBy: {
+      type: String,
+      enum: ["admin", "farmer", "consumer", "system"],
+    },
     cancelledAt: Date,
     deliveredAt: Date,
+
+    adminPayout: {
+      released:   { type: Boolean, default: false },
+      releasedAt: { type: Date,   default: null   },
+      releasedBy: {
+        type:    mongoose.Schema.Types.ObjectId,
+        ref:     "User",
+        default: null,
+      },
+      shipmentPayouts: {
+        type: [
+          {
+            farmer:     { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+            amount:     { type: Number },
+            releasedAt: { type: Date   },
+            _id: false,
+          },
+        ],
+        default: [],
+      },
+    },
   },
   { timestamps: true }
 );

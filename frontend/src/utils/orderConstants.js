@@ -1,8 +1,3 @@
-/* src/utils/orderConstants.js
-   Single source of truth for order type limits.
-   Imported by: OrderTypePicker, Orders (cart), ProductForm (tips sidebar)
-*/
-
 export const ORDER_TYPES = {
   NORMAL: "normal",
   BULK:   "bulk",
@@ -11,14 +6,6 @@ export const ORDER_TYPES = {
 export const NORMAL_MIN_KG = 20;
 export const NORMAL_MAX_KG = 99;
 export const BULK_MIN_KG   = 100;
-
-/**
- * Returns an error string if qty is out of range, or null if valid.
- * @param {"normal"|"bulk"} orderType
- * @param {number} totalQty
- * @param {string} unit
- * @returns {string|null}
- */
 export const validateOrderTypeQty = (orderType, totalQty, unit = "kg") => {
   if (orderType === ORDER_TYPES.NORMAL) {
     if (totalQty < NORMAL_MIN_KG) {
