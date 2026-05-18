@@ -16,6 +16,7 @@ import EditProfile from "./pages/EditProfile";
 import FarmerDashboard   from "./pages/FarmerDashboard";
 import ConsumerDashboard from "./pages/ConsumerDashboard";
 import AdminDashboard    from "./pages/AdminDashboard";
+import AdminFarmerPayouts from "./pages/AdminFarmerPayouts";   // ← NEW
 
 import ProductDetails from "./pages/ProductDetails";
 import ProductForm    from "./components/ProductForm";
@@ -39,9 +40,8 @@ import FarmerReturns from "./pages/FarmerReturns.jsx";
 import About   from "./pages/About";
 import Contact from "./pages/Contact";
 
-import PageWrapper from "./components/PageWrapper";
+import PageWrapper  from "./components/PageWrapper";
 import AdminPayouts from "./pages/AdminPayouts";
-
 
 /* ── ProtectedRoute ─────────────────────────────────────── */
 const ProtectedRoute = ({ user, roles, children }) => {
@@ -95,14 +95,10 @@ function App() {
           <Route path="/cart"      element={<ProtectedRoute user={user} roles={["consumer"]}><Orders /></ProtectedRoute>} />
           <Route path="/my-orders" element={<ProtectedRoute user={user} roles={["consumer"]}><ConsumerOrderTracking /></ProtectedRoute>} />
 
-          {/* Payment — main selection page */}
-          <Route path="/payment" element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentSelection /></ProtectedRoute>} />
-
-          {/* eSewa redirect landing pages */}
-          <Route path="/payment/esewa/success" element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentSuccess /></ProtectedRoute>} />
-          <Route path="/payment/esewa/failure" element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentFailure /></ProtectedRoute>} />
-
-          {/* Khalti redirect landing page (success + failure handled inside PaymentSuccess) */}
+          {/* Payment */}
+          <Route path="/payment"                element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentSelection /></ProtectedRoute>} />
+          <Route path="/payment/esewa/success"  element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentSuccess /></ProtectedRoute>} />
+          <Route path="/payment/esewa/failure"  element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentFailure /></ProtectedRoute>} />
           <Route path="/payment/khalti/success" element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentSuccess /></ProtectedRoute>} />
 
           <Route path="/return-request" element={<ProtectedRoute user={user} roles={["consumer"]}><ReturnRequest /></ProtectedRoute>} />
@@ -116,6 +112,14 @@ function App() {
 
           {/* ── Admin ── */}
           <Route path="/admin" element={<ProtectedRoute user={user} roles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/payouts" element={<ProtectedRoute user={user} roles={["admin"]}><AdminPayouts /></ProtectedRoute>} />
+
+          {/* ── NEW: per-farmer accumulated payouts ── */}
+          <Route path="/admin/farmer-payouts" element={
+            <ProtectedRoute user={user} roles={["admin"]}>
+              <AdminFarmerPayouts />
+            </ProtectedRoute>
+          } />
 
           {/* ── Shared (all logged-in roles) ── */}
           <Route path="/profile"       element={<ProtectedRoute user={user} roles={["consumer","farmer","admin"]}><Profile /></ProtectedRoute>} />
@@ -128,11 +132,6 @@ function App() {
 
           {/* ── Fallback ── */}
           <Route path="*" element={<Navigate to="/" replace />} />
-          <Route path="/admin/payouts" element={
-          <ProtectedRoute user={user} roles={["admin"]}>
-          <AdminPayouts />
-          </ProtectedRoute>
-} />
 
         </Routes>
       </main>

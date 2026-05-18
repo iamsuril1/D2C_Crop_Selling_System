@@ -1,8 +1,6 @@
 /* src/pages/ProductDetails.jsx
-   Changes:
-   - qty state starts at NORMAL_MIN_KG (20) instead of 1
-   - "Add to Cart" passes quantity: qty (so cart gets 20 by default)
-   - Platform charge (Rs. 25) shown in the price breakdown
+   Fix: handleAdd now passes bulkPrice to addToCart so the cart
+   row can correctly show the Normal/Bulk toggle with live pricing.
 */
 
 import { useEffect, useMemo, useState, useContext } from "react";
@@ -13,7 +11,7 @@ import { CartContext } from "../context/CartContext";
 import { NORMAL_MIN_KG } from "../utils/orderConstants";
 import AlertModal from "../components/AlertModal";
 
-const PLATFORM_CHARGE = 25; // Rs. — must match backend
+const PLATFORM_CHARGE = 25;
 
 const fmtDate = (v) => {
   if (!v) return "Not specified";
@@ -37,7 +35,7 @@ const ProductDetails = () => {
   const { addToCart } = useContext(CartContext);
 
   const [p,       setP]       = useState(null);
-  const [qty,     setQty]     = useState(NORMAL_MIN_KG); // start at 20
+  const [qty,     setQty]     = useState(NORMAL_MIN_KG);
   const [rawQty,  setRawQty]  = useState(String(NORMAL_MIN_KG));
   const [related, setRelated] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +43,6 @@ const ProductDetails = () => {
   const [alertModal, setAlertModal] = useState({
     isOpen: false, type: "", title: "", message: "",
   });
-
   const showAlert = (title, message, type = "error") =>
     setAlertModal({ isOpen: true, title, message, type });
   const closeAlert = () =>
@@ -53,29 +50,24 @@ const ProductDetails = () => {
 
   const imgSrc   = p?.image ? `${APIBASEURL}${p.image}` : "/placeholder-product.jpg";
   const farmName = [p?.farmer?.firstName, p?.farmer?.lastName].filter(Boolean).join(" ") || "Farm";
+  const hasBulk  = p?.bulkPrice && Number(p.bulkPrice) > 0;
+  const saving   = hasBulk ? Math.round((1 - Number(p.bulkPrice) / Number(p.price)) * 100) : null;
 
-  /* subtotal + platform charge */
-  const subtotal        = useMemo(() => Number(p?.price || 0) * qty, [p?.price, qty]);
-  const platformCharge  = PLATFORM_CHARGE;
-  const total           = subtotal + platformCharge;
+  const subtotal       = useMemo(() => Number(p?.price || 0) * qty, [p?.price, qty]);
+  const total          = subtotal + PLATFORM_CHARGE;
 
   const load = async () => {
     try {
       setLoading(true);
       const { data } = await api.get(`/api/products/${id}`);
       setP(data);
-
       const currentId = data?.id || data?._id;
       const relRes    = await api.get("/api/products?limit=60");
       const list      = Array.isArray(relRes.data) ? relRes.data : (relRes.data?.products || []);
       const pool      = list.filter((x) => (x?.id || x?._id) !== currentId);
       setRelated(shuffle(pool).slice(0, 4));
     } catch (err) {
-      showAlert(
-        "Failed to Load Product",
-        err.response?.data?.message || "Failed to load product.",
-        "error"
-      );
+      showAlert("Failed to Load Product", err.response?.data?.message || "Failed to load product.", "error");
     } finally {
       setLoading(false);
     }
@@ -83,9 +75,8 @@ const ProductDetails = () => {
 
   useEffect(() => { load(); }, [id]);
 
-  /* qty input handlers */
   const handleQtyChange = (e) => {
-    const raw    = e.target.value;
+    const raw = e.target.value;
     setRawQty(raw);
     const parsed = parseInt(raw, 10);
     if (!isNaN(parsed) && parsed >= 1) setQty(parsed);
@@ -100,26 +91,27 @@ const ProductDetails = () => {
 
   const decrement = () => {
     const next = Math.max(NORMAL_MIN_KG, qty - 1);
-    setQty(next);
-    setRawQty(String(next));
+    setQty(next); setRawQty(String(next));
   };
-
   const increment = () => {
     const next = qty + 1;
-    setQty(next);
-    setRawQty(String(next));
+    setQty(next); setRawQty(String(next));
   };
 
+  /* ─────────────────────────────────────────────────────────────
+     FIX: pass bulkPrice so Orders.jsx can show the bulk toggle
+  ───────────────────────────────────────────────────────────── */
   const handleAdd = () => {
     if (!p) return;
     addToCart({
-      id:       p.id || p._id,
-      name:     p.name,
-      price:    p.price,
-      unit:     p.unit,
-      quantity: qty,          // passes the chosen qty (default 20)
-      image:    p.image,
-      farmer:   p.farmer,
+      id:        p.id || p._id,
+      name:      p.name,
+      price:     p.price,
+      bulkPrice: p.bulkPrice ?? null,   // ← FIX
+      unit:      p.unit,
+      quantity:  qty,
+      image:     p.image,
+      farmer:    p.farmer,
     });
     showAlert(
       "Added to Cart",
@@ -140,21 +132,15 @@ const ProductDetails = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <AlertModal
-          isOpen={alertModal.isOpen}
-          onClose={closeAlert}
-          type={alertModal.type}
-          title={alertModal.title}
-          message={alertModal.message}
-          confirmText="Retry"
+          isOpen={alertModal.isOpen} onClose={closeAlert}
+          type={alertModal.type}     title={alertModal.title}
+          message={alertModal.message} confirmText="Retry"
           onConfirm={load}
         />
         <div className="bg-white border rounded-xl p-6 w-full max-w-md text-center">
           <p className="text-gray-600">Product not found.</p>
-          <button
-            type="button"
-            onClick={load}
-            className="mt-4 bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded-xl"
-          >
+          <button type="button" onClick={load}
+            className="mt-4 bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded-xl">
             Retry
           </button>
         </div>
@@ -162,23 +148,19 @@ const ProductDetails = () => {
     );
   }
 
-  const availableQty  = Number(p?.quantity || 0);
-  const inStock       = availableQty > 0;
-  const harvestDate   = fmtDate(p?.harvestDate);
-  const expiryDate    = p?.expiresAt ? fmtDate(p.expiresAt) : "No expiry";
-  const createdAt     = fmtDate(p?.createdAt);
-  const updatedAt     = fmtDate(p?.updatedAt);
+  const availableQty = Number(p?.quantity || 0);
+  const inStock      = availableQty > 0;
+  const harvestDate  = fmtDate(p?.harvestDate);
+  const expiryDate   = p?.expiresAt ? fmtDate(p.expiresAt) : "No expiry";
+  const updatedAt    = fmtDate(p?.updatedAt);
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
 
       <AlertModal
-        isOpen={alertModal.isOpen}
-        onClose={closeAlert}
-        type={alertModal.type}
-        title={alertModal.title}
-        message={alertModal.message}
-        confirmText="OK"
+        isOpen={alertModal.isOpen} onClose={closeAlert}
+        type={alertModal.type}     title={alertModal.title}
+        message={alertModal.message} confirmText="OK"
       />
 
       <div className="max-w-6xl mx-auto space-y-6">
@@ -188,9 +170,7 @@ const ProductDetails = () => {
           <button className="hover:underline" onClick={() => navigate("/")}>Home</button>
           <span className="mx-2">›</span>
           <span>{p?.category || "Products"}</span>
-          {p?.subcategory ? (
-            <><span className="mx-2">›</span><span>{p.subcategory}</span></>
-          ) : null}
+          {p?.subcategory && <><span className="mx-2">›</span><span>{p.subcategory}</span></>}
           <span className="mx-2">›</span>
           <span className="text-gray-800 font-medium">{p?.name}</span>
         </div>
@@ -202,20 +182,16 @@ const ProductDetails = () => {
           <div className="p-4 md:p-6">
             <div className="bg-gray-50 rounded-2xl overflow-hidden">
               <img
-                src={imgSrc}
-                alt={p?.name}
+                src={imgSrc} alt={p?.name}
                 className="w-full h-80 object-cover"
                 onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
               />
             </div>
-
-            {/* Thumbnail strip */}
             <div className="mt-4 grid grid-cols-4 gap-3">
-              {[0, 1, 2, 3].map((k) => (
-                <button key={k} type="button" className="bg-gray-50 rounded-xl overflow-hidden border hover:border-green-300 transition">
-                  <img
-                    src={imgSrc}
-                    alt={`${p?.name} ${k + 1}`}
+              {[0,1,2,3].map((k) => (
+                <button key={k} type="button"
+                  className="bg-gray-50 rounded-xl overflow-hidden border hover:border-green-300 transition">
+                  <img src={imgSrc} alt={`${p?.name} ${k+1}`}
                     className="w-full h-16 object-cover"
                     onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
                   />
@@ -227,27 +203,43 @@ const ProductDetails = () => {
           {/* Details panel */}
           <div className="p-4 md:p-6 space-y-5">
 
-            {/* Title */}
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h1 className="text-3xl font-extrabold text-gray-900 truncate">{p?.name}</h1>
                 <p className="text-sm text-gray-500 mt-1 truncate">{farmName}</p>
               </div>
-              <button
-                className="text-gray-400 hover:text-red-500 transition flex-shrink-0"
-                type="button"
-                aria-label="Add to wishlist"
-              >
+              <button className="text-gray-400 hover:text-red-500 transition flex-shrink-0" type="button">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
                 </svg>
               </button>
             </div>
 
-            {/* Price */}
-            <div className="text-3xl font-extrabold text-gray-900">
-              Rs. {p?.price}
-              <span className="text-base font-semibold text-gray-500"> /{p?.unit}</span>
+            {/* Pricing section */}
+            <div className="bg-gray-50 rounded-2xl p-4 space-y-2">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="text-3xl font-extrabold text-gray-900">
+                  Rs. {p?.price}
+                  <span className="text-base font-semibold text-gray-500"> /{p?.unit}</span>
+                </div>
+                <span className="text-xs bg-green-50 text-green-700 border border-green-200 font-semibold px-2.5 py-1 rounded-full">
+                  Normal (20–99 {p?.unit})
+                </span>
+              </div>
+              {hasBulk && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="text-xl font-bold text-amber-700">
+                    Rs. {p.bulkPrice}
+                    <span className="text-sm font-semibold text-gray-500"> /{p?.unit}</span>
+                  </div>
+                  <span className="text-xs bg-amber-50 text-amber-800 border border-amber-200 font-semibold px-2.5 py-1 rounded-full">
+                    Bulk (≥100 {p?.unit}) — save {saving}%
+                  </span>
+                </div>
+              )}
+              {!hasBulk && (
+                <p className="text-xs text-gray-400">No bulk price set by farmer</p>
+              )}
             </div>
 
             {/* Badges */}
@@ -295,7 +287,7 @@ const ProductDetails = () => {
               <p className="text-gray-600 leading-relaxed">{p?.description || "No description available."}</p>
             </div>
 
-            {/* ── Quantity selector ── */}
+            {/* Quantity selector */}
             <div className="space-y-2">
               <div className="text-sm font-semibold text-gray-700">
                 Quantity
@@ -303,83 +295,73 @@ const ProductDetails = () => {
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center border-2 border-gray-200 rounded-xl overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={decrement}
+                  <button type="button" onClick={decrement}
                     disabled={qty <= NORMAL_MIN_KG}
-                    className="px-3 py-2 text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition font-bold"
-                  >
+                    className="px-3 py-2 text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition font-bold">
                     –
                   </button>
                   <input
-                    type="number"
-                    inputMode="numeric"
+                    type="number" inputMode="numeric"
                     value={rawQty}
                     onChange={handleQtyChange}
                     onBlur={handleQtyBlur}
                     min={NORMAL_MIN_KG}
                     className="w-16 text-center font-bold text-gray-900 border-none outline-none py-2 text-sm bg-white"
-                    aria-label="Quantity"
                   />
-                  <button
-                    type="button"
-                    onClick={increment}
+                  <button type="button" onClick={increment}
                     disabled={!inStock}
-                    className="px-3 py-2 text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition font-bold"
-                  >
+                    className="px-3 py-2 text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition font-bold">
                     +
                   </button>
                 </div>
+                {hasBulk && qty >= 100 && (
+                  <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full font-semibold">
+                    Bulk price applies in cart
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* ── Price breakdown ── */}
+            {/* Price breakdown */}
             <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
               <div className="flex justify-between text-gray-600">
-                <span>
-                  Rs. {p?.price} × {qty} {p?.unit}
-                </span>
+                <span>Rs. {p?.price} × {qty} {p?.unit} (regular)</span>
                 <span>Rs. {subtotal.toFixed(0)}</span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>Platform charge</span>
-                <span>Rs. {platformCharge}</span>
+                <span>Rs. {PLATFORM_CHARGE}</span>
               </div>
               <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900">
                 <span>Total (excl. delivery)</span>
                 <span>Rs. {total.toFixed(0)}</span>
               </div>
+              {hasBulk && (
+                <p className="text-xs text-amber-600 font-medium">
+                  💡 Add ≥100 {p?.unit} to cart and switch to Bulk to pay Rs. {p.bulkPrice}/{p?.unit}
+                </p>
+              )}
               <p className="text-xs text-gray-400">Delivery fee calculated at checkout based on distance.</p>
             </div>
 
             {/* Actions */}
             <div className="flex gap-3 pt-1">
-              <button
-                type="button"
-                onClick={handleAdd}
-                disabled={!inStock}
+              <button type="button" onClick={handleAdd} disabled={!inStock}
                 className={`flex-1 font-semibold py-3 rounded-xl transition ${
                   inStock
                     ? "bg-green-600 hover:bg-green-700 text-white"
                     : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                }`}
-              >
+                }`}>
                 Add to Cart
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!inStock) return;
-                  handleAdd();
-                  navigate("/cart");
-                }}
+              <button type="button"
+                onClick={() => { if (!inStock) return; handleAdd(); navigate("/cart"); }}
                 disabled={!inStock}
                 className={`flex-1 font-semibold py-3 rounded-xl transition ${
                   inStock
                     ? "bg-gray-900 hover:bg-black text-white"
                     : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                }`}
-              >
+                }`}>
                 Buy Now
               </button>
             </div>
@@ -410,15 +392,10 @@ const ProductDetails = () => {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-extrabold text-gray-900">You may also like</h2>
-            <button
-              className="text-sm text-green-700 hover:underline"
-              onClick={() => navigate("/")}
-              type="button"
-            >
+            <button className="text-sm text-green-700 hover:underline" onClick={() => navigate("/")} type="button">
               View all
             </button>
           </div>
-
           {related.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-gray-500">
               No related products available
@@ -429,15 +406,10 @@ const ProductDetails = () => {
                 const rid  = rp?.id || rp?._id;
                 const rimg = rp?.image ? `${APIBASEURL}${rp.image}` : "/placeholder-product.jpg";
                 return (
-                  <button
-                    key={rid}
-                    type="button"
+                  <button key={rid} type="button"
                     onClick={() => navigate(`/product/${rid}`)}
-                    className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden text-left hover:shadow-md transition"
-                  >
-                    <img
-                      src={rimg}
-                      alt={rp?.name}
+                    className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden text-left hover:shadow-md transition">
+                    <img src={rimg} alt={rp?.name}
                       className="h-40 w-full object-cover"
                       onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
                     />
@@ -448,6 +420,11 @@ const ProductDetails = () => {
                         Rs. {rp?.price}
                         <span className="text-sm font-medium text-gray-500"> /{rp?.unit}</span>
                       </div>
+                      {rp?.bulkPrice && Number(rp.bulkPrice) > 0 && (
+                        <div className="text-xs text-amber-600 font-medium mt-0.5">
+                          Bulk Rs. {rp.bulkPrice}
+                        </div>
+                      )}
                     </div>
                   </button>
                 );

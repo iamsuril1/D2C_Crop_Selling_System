@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
-import AlertModal from '../components/AlertModal';
+import AlertModal   from '../components/AlertModal';
 import ConfirmModal from '../components/ConfirmModal';
 
 const AdminDashboard = () => {
@@ -29,6 +29,9 @@ const AdminDashboard = () => {
   const [expandedPay,   setExpandedPay]   = useState(null);
   const [releasing,     setReleasing]     = useState(null);
 
+  // ── farmer payout stats (for the tab badge) ──────────────────
+  const [farmerPayoutStats, setFarmerPayoutStats] = useState(null);
+
   // ── modals ────────────────────────────────────────────────────
   const [alertModal, setAlertModal] = useState({
     isOpen: false, title: '', message: '', type: 'info',
@@ -37,9 +40,9 @@ const AdminDashboard = () => {
     isOpen: false, action: null, type: 'warning', title: '', message: '',
   });
 
-  const showAlert   = (title, message, type = 'error') =>
+  const showAlert    = (title, message, type = 'error') =>
     setAlertModal({ isOpen: true, title, message, type });
-  const closeAlert  = () => setAlertModal(p => ({ ...p, isOpen: false }));
+  const closeAlert   = () => setAlertModal(p => ({ ...p, isOpen: false }));
   const closeConfirm = () => setConfirmModal(p => ({ ...p, isOpen: false, action: null }));
 
   // ── load overview ─────────────────────────────────────────────
@@ -81,11 +84,19 @@ const AdminDashboard = () => {
     }
   };
 
-  // ── load payouts ──────────────────────────────────────────────
+  // ── load order-level payout stats ────────────────────────────
   const loadPayoutStats = async () => {
     try {
       const res = await api.get('/api/payouts/stats');
       setPayoutStats(res.data);
+    } catch { /* non-critical */ }
+  };
+
+  // ── load farmer-level payout stats ───────────────────────────
+  const loadFarmerPayoutStats = async () => {
+    try {
+      const res = await api.get('/api/farmer-payouts/stats');
+      setFarmerPayoutStats(res.data);
     } catch { /* non-critical */ }
   };
 
@@ -103,14 +114,19 @@ const AdminDashboard = () => {
     }
   };
 
-  useEffect(() => { loadDashboard(); loadPayoutStats(); }, []);
+  useEffect(() => {
+    loadDashboard();
+    loadPayoutStats();
+    loadFarmerPayoutStats();
+  }, []);
+
   useEffect(() => {
     if (activeTab === 'payouts') loadPayoutOrders(payoutTab);
   }, [activeTab, payoutTab]);
 
   // ── release payout ────────────────────────────────────────────
   const confirmRelease = (orderId, farmerId = null) => {
-    const isAll   = !farmerId;
+    const isAll = !farmerId;
     setConfirmModal({
       isOpen:  true,
       type:    'warning',
@@ -127,7 +143,7 @@ const AdminDashboard = () => {
             : `/api/payouts/${orderId}/release`;
           await api.put(url);
           showAlert('Released', 'Payment released successfully.', 'success');
-          await Promise.all([loadPayoutOrders(payoutTab), loadPayoutStats()]);
+          await Promise.all([loadPayoutOrders(payoutTab), loadPayoutStats(), loadFarmerPayoutStats()]);
         } catch (err) {
           showAlert('Failed', err.response?.data?.message || 'Release failed.', 'error');
         } finally {
@@ -142,12 +158,22 @@ const AdminDashboard = () => {
 
   // ── tabs config ───────────────────────────────────────────────
   const TABS = [
-    { id: 'overview', label: 'Overview',  icon: '📊' },
-    { id: 'payouts',  label: 'Payouts',   icon: '💰' },
-    { id: 'orders',   label: 'Orders',    icon: '📦' },
-    { id: 'users',    label: 'Users',     icon: '👥' },
-    { id: 'products', label: 'Products',  icon: '🌾' },
+    { id: 'overview',       label: 'Overview',    icon: '📊' },
+    { id: 'payouts',        label: 'Release',     icon: '🔓' },
+    { id: 'farmer-payouts', label: 'Pay Farmers', icon: '💸' },  // ← NEW
+    { id: 'orders',         label: 'Orders',      icon: '📦' },
+    { id: 'users',          label: 'Users',       icon: '👥' },
+    { id: 'products',       label: 'Products',    icon: '🌾' },
   ];
+
+  const handleTabClick = (tabId) => {
+    // "Pay Farmers" navigates to its own page
+    if (tabId === 'farmer-payouts') {
+      navigate('/admin/farmer-payouts');
+      return;
+    }
+    setActiveTab(tabId);
+  };
 
   if (loading) {
     return (
@@ -183,15 +209,26 @@ const AdminDashboard = () => {
             <h1 className="text-4xl font-bold text-gray-900">Admin Dashboard</h1>
             <p className="text-gray-500 mt-1">MeroBari platform management</p>
           </div>
-          {payoutStats?.pendingCount > 0 && (
-            <button
-              onClick={() => { setActiveTab('payouts'); setPayoutTab('pending'); }}
-              className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm animate-pulse"
-            >
-              <span>💰</span>
-              {payoutStats.pendingCount} pending payout{payoutStats.pendingCount !== 1 ? 's' : ''}
-            </button>
-          )}
+          <div className="flex gap-3 flex-wrap">
+            {payoutStats?.pendingCount > 0 && (
+              <button
+                onClick={() => handleTabClick('payouts')}
+                className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm"
+              >
+                <span>🔓</span>
+                {payoutStats.pendingCount} order payout{payoutStats.pendingCount !== 1 ? 's' : ''} to release
+              </button>
+            )}
+            {farmerPayoutStats?.pendingFarmers > 0 && (
+              <button
+                onClick={() => navigate('/admin/farmer-payouts')}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm animate-pulse"
+              >
+                <span>💸</span>
+                {farmerPayoutStats.pendingFarmers} farmer{farmerPayoutStats.pendingFarmers !== 1 ? 's' : ''} to pay
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── Tab Bar ── */}
@@ -199,7 +236,7 @@ const AdminDashboard = () => {
           {TABS.map(t => (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => handleTabClick(t.id)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold flex-1 justify-center whitespace-nowrap transition ${
                 activeTab === t.id
                   ? 'bg-green-600 text-white shadow-sm'
@@ -208,9 +245,16 @@ const AdminDashboard = () => {
             >
               <span>{t.icon}</span>
               <span>{t.label}</span>
+              {/* Badge: unreleased orders */}
               {t.id === 'payouts' && payoutStats?.pendingCount > 0 && (
                 <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-1.5 py-0.5 rounded-full">
                   {payoutStats.pendingCount}
+                </span>
+              )}
+              {/* Badge: farmers awaiting payment */}
+              {t.id === 'farmer-payouts' && farmerPayoutStats?.pendingFarmers > 0 && (
+                <span className="bg-green-400 text-green-900 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                  {farmerPayoutStats.pendingFarmers}
                 </span>
               )}
             </button>
@@ -264,33 +308,78 @@ const AdminDashboard = () => {
               ))}
             </div>
 
-            {/* Payout quick-stats */}
-            {payoutStats && (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-lg font-bold text-gray-900">Payout Summary</h3>
-                  <button
-                    onClick={() => setActiveTab('payouts')}
-                    className="text-sm text-green-600 hover:underline font-medium"
-                  >
-                    Manage payouts →
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  {[
-                    { label: 'Pending Payouts',  value: payoutStats.pendingCount,             color: 'text-yellow-600', bg: 'bg-yellow-50' },
-                    { label: 'Pending Amount',   value: `Rs. ${payoutStats.pendingAmount}`,   color: 'text-yellow-700', bg: 'bg-yellow-50' },
-                    { label: 'Released Payouts', value: payoutStats.releasedCount,            color: 'text-green-600',  bg: 'bg-green-50'  },
-                    { label: 'Admin Revenue',    value: `Rs. ${payoutStats.adminRevenue}`,    color: 'text-blue-600',   bg: 'bg-blue-50'   },
-                  ].map(s => (
-                    <div key={s.label} className={`${s.bg} rounded-xl p-4 text-center`}>
-                      <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                      <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+            {/* Payout quick-actions */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              {/* Order-level release summary */}
+              {payoutStats && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-base font-bold text-gray-900">Order Payout Release</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Consumer paid → admin releases to farmers</p>
                     </div>
-                  ))}
+                    <button
+                      onClick={() => handleTabClick('payouts')}
+                      className="text-sm text-green-600 hover:underline font-medium"
+                    >
+                      Manage →
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: 'Pending Release',  value: payoutStats.pendingCount,             color: 'text-yellow-600', bg: 'bg-yellow-50' },
+                      { label: 'Pending Amount',   value: `Rs. ${payoutStats.pendingAmount}`,   color: 'text-yellow-700', bg: 'bg-yellow-50' },
+                      { label: 'Released',         value: payoutStats.releasedCount,            color: 'text-green-600',  bg: 'bg-green-50'  },
+                      { label: 'Admin Revenue',    value: `Rs. ${payoutStats.adminRevenue}`,    color: 'text-blue-600',   bg: 'bg-blue-50'   },
+                    ].map(s => (
+                      <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}>
+                        <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+
+              {/* Farmer payment summary */}
+              {farmerPayoutStats && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-base font-bold text-gray-900">Farmer Payments</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Accumulated balances paid to farmers</p>
+                    </div>
+                    <button
+                      onClick={() => navigate('/admin/farmer-payouts')}
+                      className="text-sm text-green-600 hover:underline font-medium"
+                    >
+                      Pay Farmers →
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: 'Farmers to Pay',   value: farmerPayoutStats.pendingFarmers,                        color: 'text-orange-600', bg: 'bg-orange-50' },
+                      { label: 'Pending Amount',   value: `Rs. ${farmerPayoutStats.pendingAmount.toLocaleString()}`, color: 'text-orange-700', bg: 'bg-orange-50' },
+                      { label: 'Total Paid Out',   value: `Rs. ${farmerPayoutStats.paidAmount.toLocaleString()}`,   color: 'text-green-600',  bg: 'bg-green-50'  },
+                    ].map(s => (
+                      <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}>
+                        <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {farmerPayoutStats.pendingFarmers > 0 && (
+                    <button
+                      onClick={() => navigate('/admin/farmer-payouts')}
+                      className="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-xl text-sm transition"
+                    >
+                      💸 Pay {farmerPayoutStats.pendingFarmers} Farmer{farmerPayoutStats.pendingFarmers !== 1 ? 's' : ''} Now
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Order status + user distribution */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -346,7 +435,7 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            {/* Recent orders table */}
+            {/* Recent orders */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-gray-900">Recent Orders</h3>
@@ -421,11 +510,19 @@ const AdminDashboard = () => {
         )}
 
         {/* ════════════════════════════════════════════════════════
-            TAB: PAYOUTS
+            TAB: RELEASE PAYOUTS (order-level)
         ════════════════════════════════════════════════════════ */}
         {activeTab === 'payouts' && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Payout Management</h2>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h2 className="text-2xl font-bold text-gray-900">Release Order Payouts</h2>
+              <p className="text-sm text-gray-500">
+                Release funds from consumer payments to farmers. After releasing, pay farmers via{' '}
+                <button onClick={() => navigate('/admin/farmer-payouts')} className="text-green-600 hover:underline font-semibold">
+                  Pay Farmers →
+                </button>
+              </p>
+            </div>
 
             {/* Payout stats */}
             {payoutStats && (
@@ -542,7 +639,6 @@ const AdminDashboard = () => {
                       {/* Expanded detail */}
                       {isExpanded && (
                         <div className="border-t border-gray-100 px-6 py-5 space-y-5">
-
                           {/* Money breakdown */}
                           <div className="grid grid-cols-3 gap-4 bg-gray-50 rounded-2xl p-5 text-center">
                             <div>
@@ -610,8 +706,6 @@ const AdminDashboard = () => {
                                       ) : null}
                                     </div>
                                   </div>
-
-                                  {/* Items list */}
                                   <div className="space-y-1">
                                     {shipment.items?.map((item, i) => (
                                       <div key={i} className="flex justify-between text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-1.5">

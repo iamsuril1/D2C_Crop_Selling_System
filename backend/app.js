@@ -1,3 +1,4 @@
+/* backend/app.js */
 import express from "express";
 import cors    from "cors";
 import path    from "path";
@@ -12,9 +13,10 @@ import notificationRoutes   from "./routes/notificationRoutes.js";
 import paymentRoutes        from "./routes/paymentRoutes.js";
 import otpRoutes            from "./routes/otpRoutes.js";
 import forgotPasswordRoutes from "./routes/forgotPasswordRoutes.js";
-import returnRoutes         from "./routes/ReturnRoutes.js";   // FIX: matched to actual filename casing
+import returnRoutes         from "./routes/ReturnRoutes.js";
 import contactRoutes        from "./routes/contactRoutes.js";
-import payoutRoutes from "./routes/payoutRoutes.js";
+import payoutRoutes         from "./routes/payoutRoutes.js";
+import farmerPayoutRoutes   from "./routes/farmerPayoutRoutes.js";   
 
 import { errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -57,8 +59,8 @@ app.use("/api/otp",             otpRoutes);
 app.use("/api/forgot-password", forgotPasswordRoutes);
 app.use("/api/returns",         returnRoutes);
 app.use("/api/contact",         contactRoutes);
-app.use("/api/payouts", payoutRoutes);
-
+app.use("/api/payouts",         payoutRoutes);
+app.use("/api/farmer-payouts",  farmerPayoutRoutes);   // ← NEW
 
 app.use(errorHandler);
 

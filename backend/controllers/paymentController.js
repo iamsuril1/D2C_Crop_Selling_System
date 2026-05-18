@@ -1,3 +1,17 @@
+/* backend/controllers/paymentController.js
+   Fixes applied:
+   1. ES704 — initiateEsewa: platformCharge moved to product_service_charge
+      so amount + service_charge = total_amount exactly.
+   2. verifyEsewa — added console.error logging at every 400 branch so you
+      can see exactly which check fails in your server terminal.
+   3. verifyEsewa — orderId extraction: uses slice(0,24) instead of split("-")[0]
+      because MongoDB ObjectIds are always exactly 24 hex chars with no dashes.
+   4. verifyEsewa — status check is now case-insensitive (sandbox may return
+      "COMPLETE" or "complete" depending on API version).
+   5. verifyEsewa — signature verification logs the exact message string being
+      signed so you can compare it against eSewa's signed_field_names payload.
+*/
+
 import crypto   from "crypto";
 import axios    from "axios";
 import Order    from "../models/Order.js";
@@ -6,6 +20,9 @@ import fs       from "fs";
 import path     from "path";
 import { sendNotification } from "../utils/notificationHelpers.js";
 
+/* ─────────────────────────────────────────────────────────────
+   ENV CONSTANTS
+───────────────────────────────────────────────────────────── */
 const ESEWA_MERCHANT_CODE = process.env.ESEWA_MERCHANT_CODE || "EPAYTEST";
 const ESEWA_SECRET_KEY    = process.env.ESEWA_SECRET_KEY    || "8gBm/:&EnhH.1/q";
 const ESEWA_BASE_URL      = process.env.ESEWA_BASE_URL      || "https://rc-epay.esewa.com.np";
@@ -16,7 +33,14 @@ const FRONTEND_URL        = process.env.FRONTEND_URL        || "http://localhost
 const PRIVATE_DIR = path.join(process.cwd(), "uploads", "private");
 if (!fs.existsSync(PRIVATE_DIR)) fs.mkdirSync(PRIVATE_DIR, { recursive: true });
 
+/* ─────────────────────────────────────────────────────────────
+   ESEWA SIGNATURE HELPERS
+───────────────────────────────────────────────────────────── */
 
+/**
+ * Generate HMAC-SHA256 signature for eSewa v2.
+ * Message format: "total_amount=X,transaction_uuid=Y,product_code=Z"
+ */
 const generateEsewaSignature = (totalAmount, transactionUuid, productCode) => {
   const message = `total_amount=${totalAmount},transaction_uuid=${transactionUuid},product_code=${productCode}`;
   return crypto
@@ -25,6 +49,11 @@ const generateEsewaSignature = (totalAmount, transactionUuid, productCode) => {
     .digest("base64");
 };
 
+/**
+ * Verify eSewa response signature.
+ * Rebuilds the signed message using signed_field_names from the decoded response,
+ * then compares HMAC with the received signature.
+ */
 const verifyEsewaSignature = (responseData) => {
   const { signed_field_names, signature } = responseData;
 
@@ -50,6 +79,10 @@ const verifyEsewaSignature = (responseData) => {
 
   return expected === signature;
 };
+
+/* ─────────────────────────────────────────────────────────────
+   GET FARMER PAYMENT METHODS
+───────────────────────────────────────────────────────────── */
 export const getFarmerPaymentMethods = async (req, res) => {
   try {
     const farmer = await User.findById(req.params.farmerId).select(
@@ -95,6 +128,18 @@ export const uploadPaymentQR = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   INITIATE ESEWA — POST /api/payments/esewa/initiate
+
+   FIX ES704:
+     amount                  = itemsSubtotal + deliveryTotal
+     tax_amount              = 0
+     product_service_charge  = platformCharge (Rs. 25)  ← was 0
+     product_delivery_charge = 0
+     total_amount            = order.totalAmount
+     ──────────────────────────────────────────────────────────
+     amount + 0 + platformCharge + 0 = total_amount  ✓
+───────────────────────────────────────────────────────────── */
 export const initiateEsewa = async (req, res) => {
   try {
     const { orderId } = req.body;
@@ -138,6 +183,15 @@ export const initiateEsewa = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   VERIFY ESEWA — POST /api/payments/esewa/verify
+
+   eSewa redirects to /payment/esewa/success?data=<base64>
+   PaymentSuccess.jsx POSTs { data } to this endpoint.
+
+   Every 400 branch now has a console.error so you can see in
+   your terminal exactly which guard is failing.
+───────────────────────────────────────────────────────────── */
 export const verifyEsewa = async (req, res) => {
   try {
     const { data: encodedData } = req.body;
@@ -185,6 +239,9 @@ export const verifyEsewa = async (req, res) => {
       });
     }
 
+    // ── Extract orderId ───────────────────────────────────────────────────────
+    // transaction_uuid = "${orderId}-${Date.now()}"
+    // MongoDB ObjectIds are exactly 24 hex chars, no dashes, so slice(0,24) is safe.
     const txUuid  = decoded.transaction_uuid || "";
     const orderId = txUuid.slice(0, 24);
 
@@ -248,6 +305,9 @@ export const verifyEsewa = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   INITIATE KHALTI — POST /api/payments/khalti/initiate
+───────────────────────────────────────────────────────────── */
 export const initiateKhalti = async (req, res) => {
   try {
     const { orderId } = req.body;
@@ -298,6 +358,9 @@ export const initiateKhalti = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   VERIFY KHALTI — POST /api/payments/khalti/verify
+───────────────────────────────────────────────────────────── */
 export const verifyKhalti = async (req, res) => {
   try {
     const { pidx, orderId } = req.body;
@@ -367,6 +430,9 @@ export const verifyKhalti = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   CASH ON DELIVERY — POST /api/payments/cod/confirm
+───────────────────────────────────────────────────────────── */
 export const confirmCOD = async (req, res) => {
   try {
     const { orderId, farmerIds } = req.body;
@@ -411,6 +477,9 @@ export const confirmCOD = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   FARMER MARKS COD AS RECEIVED — PUT /api/payments/cod/received
+───────────────────────────────────────────────────────────── */
 export const markCODReceived = async (req, res) => {
   try {
     const { orderId } = req.body;
@@ -441,6 +510,9 @@ export const markCODReceived = async (req, res) => {
   }
 };
 
+/* ─────────────────────────────────────────────────────────────
+   SERVE PRIVATE FILE — GET /api/payments/files/:filename
+───────────────────────────────────────────────────────────── */
 export const servePaymentFile = async (req, res) => {
   try {
     const filename = path.basename(req.params.filename);
@@ -469,7 +541,9 @@ export const servePaymentFile = async (req, res) => {
   }
 };
 
-
+/* ─────────────────────────────────────────────────────────────
+   FARMER VERIFIES MANUAL PAYMENT — PUT /api/payments/verify
+───────────────────────────────────────────────────────────── */
 export const verifyPayment = async (req, res) => {
   try {
     const { orderId, status } = req.body;

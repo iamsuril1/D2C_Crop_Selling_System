@@ -1,3 +1,5 @@
+/* backend/models/Order.js */
+
 import mongoose from "mongoose";
 
 const shipmentItemSchema = new mongoose.Schema(
@@ -22,6 +24,7 @@ const shipmentSchema = new mongoose.Schema(
       enum:    ["esewa", "khalti", "cash_on_delivery", "pending"],
       default: "pending",
     },
+    /* paymentStatus = consumer → platform */
     paymentStatus: {
       type:    String,
       enum:    ["pending", "paid", "failed", "refunded", "pending_admin_release"],
@@ -37,6 +40,18 @@ const shipmentSchema = new mongoose.Schema(
       accountName:   String,
       bankBranch:    String,
       qrCodeImage:   String,
+    },
+
+    /* ── platform → farmer settlement ── */
+    farmerPaid: {
+      type:    Boolean,
+      default: false,
+    },
+    farmerPaymentRecord: {
+      method:    { type: String },   // "esewa" | "bank_qr" | "bank_transfer" | "cash"
+      reference: { type: String },   // UTR / transaction ID / note
+      paidAt:    { type: Date   },
+      paidBy:    { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     },
   },
   { _id: false }
@@ -77,8 +92,6 @@ const orderSchema = new mongoose.Schema(
       enum:    ["pending", "confirmed", "shipped", "delivered", "cancelled"],
       default: "pending",
     },
-
-    /* ── FIX: added "system" so the expiry job can cancel orders ── */
     cancelledBy: {
       type: String,
       enum: ["admin", "farmer", "consumer", "system"],
@@ -88,7 +101,7 @@ const orderSchema = new mongoose.Schema(
 
     adminPayout: {
       released:   { type: Boolean, default: false },
-      releasedAt: { type: Date,   default: null   },
+      releasedAt: { type: Date,    default: null  },
       releasedBy: {
         type:    mongoose.Schema.Types.ObjectId,
         ref:     "User",
