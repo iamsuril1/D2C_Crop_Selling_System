@@ -1,259 +1,127 @@
-import { Link } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+/* src/pages/Home.jsx — completely new design
+   Direction: Editorial brutalism meets organic warmth
+   Palette: Cream (#F5F0E8), deep forest (#0A1F0A), living green (#1E9C17),
+            harvest gold (#E8A020), raw clay (#C4846A)
+   Type: Clash Display (display) + DM Sans (body) via Google Fonts
+   Unforgettable element: The massive rotating crop wheel + the
+   "price comparison" split screen that reveals on scroll
+*/
 
-/* ── tiny in-view hook ── */
-const useInView = (threshold = 0.15) => {
-  const ref = useRef(null);
-  const [visible, setVisible] = useState(false);
+import { Link } from "react-router-dom";
+import { useEffect, useRef, useState, useCallback } from "react";
+
+/* ────────────────────────────────────────────────────────────
+   HOOK: Intersection Observer (fires once)
+──────────────────────────────────────────────────────────── */
+const useReveal = (threshold = 0.12) => {
+  const ref            = useRef(null);
+  const [on, setOn]    = useState(false);
   useEffect(() => {
+    const el  = ref.current;
+    if (!el)  return;
     const obs = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      ([e]) => { if (e.isIntersecting) { setOn(true); obs.disconnect(); } },
       { threshold }
     );
-    if (ref.current) obs.observe(ref.current);
+    obs.observe(el);
     return () => obs.disconnect();
-  }, [threshold]);
-  return [ref, visible];
+  }, []);
+  return [ref, on];
 };
 
-const Counter = ({ target, suffix = "" }) => {
-  const [count, setCount] = useState(0);
-  const [ref, visible] = useInView();
+/* ────────────────────────────────────────────────────────────
+   HOOK: Animated counter
+──────────────────────────────────────────────────────────── */
+const Counter = ({ to, suffix = "" }) => {
+  const [val, setVal]   = useState(0);
+  const [ref, on]       = useReveal(0.3);
   useEffect(() => {
-    if (!visible) return;
-    let start = 0;
-    const step = Math.ceil(target / 60);
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= target) { setCount(target); clearInterval(timer); }
-      else setCount(start);
-    }, 16);
-    return () => clearInterval(timer);
-  }, [visible, target]);
-  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
+    if (!on) return;
+    let cur = 0;
+    const step = Math.max(1, Math.ceil(to / 72));
+    const id   = setInterval(() => {
+      cur += step;
+      if (cur >= to) { setVal(to); clearInterval(id); }
+      else setVal(cur);
+    }, 14);
+    return () => clearInterval(id);
+  }, [on, to]);
+  return <span ref={ref}>{val.toLocaleString()}{suffix}</span>;
 };
 
-const categories = [
-  { name: "Vegetables", img: "/home/vegetables.webp", tag: "Fresh Daily",  price: "From Rs. 20/kg"  },
-  { name: "Fruits",     img: "/home/fruits.jpg",      tag: "Seasonal",     price: "From Rs. 40/kg"  },
-  { name: "Herbs",      img: "/home/Spices.webp",     tag: "Aromatic",     price: "From Rs. 15/kg"  },
-  { name: "Grains",     img: "/home/Grains.jpg",      tag: "Staple",       price: "From Rs. 50/kg"  },
+/* ────────────────────────────────────────────────────────────
+   DATA
+──────────────────────────────────────────────────────────── */
+const CROPS = [
+  { name: "Tomato",    kg: "Rs.28",  emoji: "🍅" },
+  { name: "Spinach",   kg: "Rs.15",  emoji: "🥬" },
+  { name: "Potato",    kg: "Rs.22",  emoji: "🥔" },
+  { name: "Carrot",    kg: "Rs.35",  emoji: "🥕" },
+  { name: "Garlic",    kg: "Rs.120", emoji: "🧄" },
+  { name: "Ginger",    kg: "Rs.80",  emoji: "🫚" },
+  { name: "Onion",     kg: "Rs.30",  emoji: "🧅" },
+  { name: "Coriander", kg: "Rs.20",  emoji: "🌿" },
+  { name: "Cabbage",   kg: "Rs.18",  emoji: "🥦" },
+  { name: "Radish",    kg: "Rs.16",  emoji: "🌾" },
 ];
 
-const steps = [
+const HOW = [
   {
-    num: "01",
-    title: "Register Once",
-    desc: "Create your free account as a farmer or consumer in under 2 minutes. No hidden fees, no commitments.",
-    color: "from-green-400 to-emerald-500",
-    accent: "#1E9C17",
+    n:     "01",
+    head:  "Farmers list their crops",
+    body:  "Set your price, upload a photo, choose regular and bulk rates. Live in under 3 minutes.",
+    color: "#1E9C17",
   },
   {
-    num: "02",
-    title: "Browse & List",
-    desc: "Farmers publish fresh produce with real prices. Consumers discover nearby farms sorted by distance.",
-    color: "from-amber-400 to-orange-400",
-    accent: "#FDB933",
+    n:     "02",
+    head:  "Consumers browse nearby",
+    body:  "Location-based discovery surfaces farms closest to you first. Fresher produce, lower delivery fees.",
+    color: "#E8A020",
   },
   {
-    num: "03",
-    title: "Pay & Receive",
-    desc: "Multiple local payment options — eSewa, bank QR, or cash on delivery. Direct delivery, zero middlemen.",
-    color: "from-teal-400 to-cyan-500",
-    accent: "#0ea5e9",
-  },
-];
-
-const cheapPicks = [
-  { name: "Spinach",   price: "Rs. 15/kg",   tag: "🥬" },
-  { name: "Potato",    price: "Rs. 22/kg",   tag: "🥔" },
-  { name: "Tomato",    price: "Rs. 28/kg",   tag: "🍅" },
-  { name: "Onion",     price: "Rs. 30/kg",   tag: "🧅" },
-  { name: "Carrot",    price: "Rs. 35/kg",   tag: "🥕" },
-  { name: "Cabbage",   price: "Rs. 18/kg",   tag: "🥦" },
-  { name: "Garlic",    price: "Rs. 120/kg",  tag: "🧄" },
-  { name: "Ginger",    price: "Rs. 80/kg",   tag: "🫚" },
-  { name: "Coriander", price: "Rs. 20/bunch",tag: "🌿" },
-  { name: "Radish",    price: "Rs. 16/kg",   tag: "🌾" },
-];
-
-const testimonials = [
-  {
-    quote: "I earn 60% more per kilogram since joining MeroBari. No more middlemen taking my profit.",
-    name: "Ramesh B.",
-    role: "Vegetable Farmer, Bhaktapur",
-    init: "RB",
-    color: "from-green-400 to-emerald-500",
-  },
-  {
-    quote: "I know exactly which farm my tomatoes come from. That transparency is priceless.",
-    name: "Sita M.",
-    role: "Consumer, Lalitpur",
-    init: "SM",
-    color: "from-amber-400 to-orange-400",
-  },
-  {
-    quote: "The geo-based discovery helped me find a local herb farm 2km away. Game changer.",
-    name: "Bikash T.",
-    role: "Consumer, Kathmandu",
-    init: "BT",
-    color: "from-teal-400 to-cyan-500",
+    n:     "03",
+    head:  "Direct payment & delivery",
+    body:  "eSewa, Khalti, Bank QR or Cash on Delivery. Farmer ships directly to your door.",
+    color: "#C4846A",
   },
 ];
 
-/* ─────────────────────────────────────────────────────────────
-   SUB-COMPONENTS
-   FIX: every component that calls useInView() is now a proper
-   named component — hooks can never be called inside IIFEs,
-   conditionally, or inside render-time callbacks. The original
-   code had two `{(() => { const [ref,visible]=useInView(); ... })()}`
-   patterns inside Home's JSX which violates the Rules of Hooks.
-───────────────────────────────────────────────────────────── */
+const VOICES = [
+  {
+    quote: "I set my own price for the first time in 12 years of farming.",
+    name:  "Ramesh B.", place: "Bhaktapur",    init: "RB",
+  },
+  {
+    quote: "My restaurant saves Rs. 7,000 a month on vegetables alone.",
+    name:  "Bikash T.", place: "Kathmandu",    init: "BT",
+  },
+  {
+    quote: "I know exactly which farm my food comes from and when it was harvested.",
+    name:  "Sita M.",   place: "Lalitpur",     init: "SM",
+  },
+];
 
-const StepCard = ({ step, index }) => {
-  const [ref, visible] = useInView(0.25);
+/* ────────────────────────────────────────────────────────────
+   TICKER (horizontal scroll marquee)
+──────────────────────────────────────────────────────────── */
+const Ticker = () => {
+  const items = [...CROPS, ...CROPS];
   return (
-    <div
-      ref={ref}
-      className="relative"
-      style={{
-        opacity:    visible ? 1 : 0,
-        transform:  visible ? "translateY(0)" : "translateY(40px)",
-        transition: `opacity 0.65s ease ${index * 180}ms, transform 0.65s ease ${index * 180}ms`,
-      }}
-    >
-      {index < steps.length - 1 && (
-        <div
-          className="hidden lg:block absolute top-10 left-[calc(100%+0px)] w-full h-px z-0 pointer-events-none"
-          style={{
-            background: `linear-gradient(to right, ${step.accent}60, transparent)`,
-            width: "calc(100% - 3rem)",
-            left: "calc(100% - 1.5rem)",
-          }}
-        />
-      )}
-
-      <div className="group relative bg-white rounded-3xl p-8 border border-gray-100
-                      hover:border-transparent hover:shadow-2xl hover:shadow-green-900/8
-                      hover:-translate-y-2 transition-all duration-400 overflow-hidden z-10">
-        <div
-          className="absolute inset-0 opacity-0 group-hover:opacity-5 transition-opacity duration-500 rounded-3xl"
-          style={{ background: `radial-gradient(circle at 30% 40%, ${step.accent}, transparent 70%)` }}
-        />
-        <div
-          className="absolute -top-4 -right-2 font-[Montserrat] font-black text-8xl
-                     leading-none select-none pointer-events-none opacity-5"
-          style={{ color: step.accent }}
-        >
-          {step.num}
-        </div>
-        <div
-          className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${step.color}
-                      flex items-center justify-center text-white font-[Montserrat]
-                      font-black text-lg mb-6 shadow-lg
-                      group-hover:scale-110 transition-transform duration-300`}
-        >
-          {step.num}
-        </div>
-        <div className="flex items-center gap-3 mb-4">
-          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: step.accent }} />
-          <div
-            className="h-px flex-1 rounded-full transition-all duration-700"
-            style={{
-              backgroundColor: step.accent,
-              opacity: 0.25,
-              transform: visible ? "scaleX(1)" : "scaleX(0)",
-              transformOrigin: "left",
-              transitionDelay: `${index * 180 + 400}ms`,
-            }}
-          />
-        </div>
-        <h3 className="font-[Montserrat] font-bold text-[#0D1F0D] text-xl mb-3">{step.title}</h3>
-        <p className="text-gray-500 text-sm leading-relaxed">{step.desc}</p>
-        <div
-          className="absolute bottom-0 left-8 right-8 h-0.5 rounded-full
-                     scale-x-0 group-hover:scale-x-100 transition-transform
-                     duration-400 origin-left"
-          style={{ background: `linear-gradient(to right, ${step.accent}, transparent)` }}
-        />
-      </div>
-    </div>
-  );
-};
-
-/* FIX: was an IIFE inside Home's JSX — now a proper component */
-const HowItWorksHeader = () => {
-  const [hdrRef, hdrVisible] = useInView();
-  return (
-    <div
-      ref={hdrRef}
-      className="mb-20"
-      style={{
-        opacity:    hdrVisible ? 1 : 0,
-        transform:  hdrVisible ? "translateY(0)" : "translateY(24px)",
-        transition: "all 0.7s ease",
-      }}
-    >
-      <span className="text-[#1E9C17] text-xs font-semibold uppercase tracking-[0.25em]">
-        Simple Process
-      </span>
-      <h2
-        className="font-[Montserrat] font-black text-[#0D1F0D] mt-3"
-        style={{ fontSize: "clamp(2rem, 4vw, 3rem)" }}
-      >
-        How MeroBari Works
-      </h2>
-      <p className="mt-3 text-gray-500 text-base max-w-md">
-        Three steps separate you from fresh, farmer-direct produce. Scroll to discover each one.
-      </p>
-    </div>
-  );
-};
-
-/* FIX: was an IIFE inside Home's JSX — now a proper component */
-const StepDots = () => {
-  const [hintRef, hintVisible] = useInView(0.5);
-  return (
-    <div
-      ref={hintRef}
-      className="mt-16 flex items-center justify-center gap-3"
-      style={{ opacity: hintVisible ? 1 : 0, transition: "opacity 0.7s ease 400ms" }}
-    >
-      {steps.map((s, i) => (
-        <div key={i} className="flex items-center gap-3">
-          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.accent }} />
-          {i < steps.length - 1 && (
-            <div className="h-px w-12 rounded-full" style={{ backgroundColor: `${s.accent}40` }} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const Marquee = ({ items, reverse = false }) => {
-  const doubled = [...items, ...items];
-  return (
-    <div className="overflow-hidden py-2">
+    <div className="overflow-hidden py-5 border-y-2 border-[#0A1F0A]/12 bg-[#F5F0E8]">
       <div
-        className="flex gap-4 w-max"
-        style={{ animation: `marquee${reverse ? "Rev" : ""} 30s linear infinite` }}
+        className="flex gap-0 w-max"
+        style={{ animation: "tickerSlide 32s linear infinite" }}
       >
-        {doubled.map((item, i) => (
+        {items.map((c, i) => (
           <div
             key={i}
-            className="flex items-center gap-3 bg-white border border-gray-100
-                       rounded-2xl px-5 py-3 shadow-sm flex-shrink-0
-                       hover:border-[#1E9C17]/40 hover:shadow-md transition-all duration-200"
+            className="flex items-center gap-5 px-10 border-r-2 border-[#0A1F0A]/10 shrink-0"
           >
-            <span className="text-2xl">{item.tag}</span>
+            <span className="text-3xl leading-none">{c.emoji}</span>
             <div>
-              <p className="font-semibold text-gray-900 text-sm leading-none">{item.name}</p>
-              <p className="text-[#1E9C17] font-bold text-xs mt-0.5">{item.price}</p>
+              <p className="font-bold text-[#0A1F0A] text-lg leading-tight">{c.name}</p>
+              <p className="text-[#1E9C17] text-xs font-semibold tracking-wide">{c.kg} / kg</p>
             </div>
-            <span className="ml-1 text-xs bg-green-50 text-green-700 font-semibold px-2 py-0.5 rounded-full">
-              Cheapest
-            </span>
           </div>
         ))}
       </div>
@@ -261,267 +129,615 @@ const Marquee = ({ items, reverse = false }) => {
   );
 };
 
-/* ─────────────────────────────────────────────────────────────
+/* ────────────────────────────────────────────────────────────
+   ROTATING WHEEL OF CROPS (SVG)
+──────────────────────────────────────────────────────────── */
+const CropWheel = () => {
+  const [angle, setAngle] = useState(0);
+  const raf               = useRef(null);
+  useEffect(() => {
+    const tick = () => {
+      setAngle((a) => (a + 0.18) % 360);
+      raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, []);
+
+  const radius = 110;
+  const cx     = 160;
+  const cy     = 160;
+
+  return (
+    <svg viewBox="0 0 320 320" className="w-full h-full" aria-hidden="true">
+      {/* Outer decorative ring */}
+      <circle cx={cx} cy={cy} r={148} fill="none" stroke="#1E9C17" strokeWidth="1" opacity="0.25" strokeDasharray="6 4" />
+      <circle cx={cx} cy={cy} r={132} fill="none" stroke="#E8A020" strokeWidth="0.5" opacity="0.2" />
+
+      {/* Rotating crop emojis */}
+      {CROPS.map((crop, i) => {
+        const a    = (i * (360 / CROPS.length) + angle) * (Math.PI / 180);
+        const x    = cx + radius * Math.cos(a);
+        const y    = cy + radius * Math.sin(a);
+        const size = 18 + 6 * Math.abs(Math.sin(a));
+        return (
+          <text
+            key={i}
+            x={x}
+            y={y}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={size}
+            style={{ userSelect: "none" }}
+          >
+            {crop.emoji}
+          </text>
+        );
+      })}
+
+      {/* Center badge */}
+      <circle cx={cx} cy={cy} r={56} fill="#0A1F0A" />
+      <circle cx={cx} cy={cy} r={52} fill="#0A1F0A" stroke="#1E9C17" strokeWidth="1.5" />
+      <text x={cx} y={cy - 10} textAnchor="middle" fill="#1E9C17"
+        fontFamily="Montserrat, sans-serif" fontWeight="900" fontSize="13">
+        MERO
+      </text>
+      <text x={cx} y={cy + 8} textAnchor="middle" fill="white"
+        fontFamily="Montserrat, sans-serif" fontWeight="900" fontSize="13">
+        BARI
+      </text>
+      <text x={cx} y={cy + 24} textAnchor="middle" fill="#E8A020"
+        fontFamily="sans-serif" fontSize="9" letterSpacing="2">
+        D2C
+      </text>
+    </svg>
+  );
+};
+
+/* ────────────────────────────────────────────────────────────
    MAIN COMPONENT
-───────────────────────────────────────────────────────────── */
+──────────────────────────────────────────────────────────── */
 const Home = () => {
-  const [heroLoaded, setHeroLoaded] = useState(false);
-  const [heroRef,          heroVisible]          = useInView(0.01);
-  const [cheapRef,         cheapVisible]         = useInView(0.1);
-  const [whyRef,           whyVisible]           = useInView();
-  const [catRef,           catVisible]           = useInView();
-  const [testimonialRef,   testimonialVisible]   = useInView();
+  const [ready, setReady] = useState(false);
+
+  const [howRef,    howOn]    = useReveal(0.1);
+  const [statsRef,  statsOn]  = useReveal(0.2);
+  const [voiceRef,  voiceOn]  = useReveal(0.1);
+  const [ctaRef,    ctaOn]    = useReveal(0.15);
 
   useEffect(() => {
-    const t = setTimeout(() => setHeroLoaded(true), 100);
+    const t = setTimeout(() => setReady(true), 40);
     return () => clearTimeout(t);
   }, []);
 
   return (
     <>
+      {/* ── Global styles ── */}
       <style>{`
-        @keyframes marquee {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+        @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap');
+
+        @keyframes tickerSlide {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
         }
-        @keyframes marqueeRev {
-          0%   { transform: translateX(-50%); }
-          100% { transform: translateX(0); }
+        @keyframes heroIn {
+          from { opacity: 0; transform: translateY(40px); }
+          to   { opacity: 1; transform: translateY(0);    }
         }
+        @keyframes fadeSlideUp {
+          from { opacity: 0; transform: translateY(28px); }
+          to   { opacity: 1; transform: translateY(0);    }
+        }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.92); }
+          to   { opacity: 1; transform: scale(1);    }
+        }
+        @keyframes lineGrow {
+          from { transform: scaleX(0); }
+          to   { transform: scaleX(1); }
+        }
+
+        .hero-word {
+          display: inline-block;
+          opacity: 0;
+          animation: heroIn 0.9s cubic-bezier(.16,1,.3,1) forwards;
+        }
+        .w1 { animation-delay: 0.05s; }
+        .w2 { animation-delay: 0.18s; }
+        .w3 { animation-delay: 0.32s; }
+        .w4 { animation-delay: 0.46s; }
+        .w5 { animation-delay: 0.58s; }
+        .w6 { animation-delay: 0.70s; }
+
+        .cd { font-family: 'Clash Display', 'Montserrat', sans-serif; }
+        .dm { font-family: 'DM Sans', 'Poppins', sans-serif; }
       `}</style>
 
-      <div className="w-full font-[Poppins] text-[#1D1D1D] overflow-x-hidden">
+      <div className="dm text-[#0A1F0A] overflow-x-hidden bg-[#F5F0E8]">
 
-        {/* ══ HERO ══════════════════════════════════════════════ */}
-        <section
-          ref={heroRef}
-          className="relative h-screen flex flex-col justify-center overflow-hidden"
-          style={{ backgroundImage: "url('/home/hero.jpg')", backgroundSize: "cover", backgroundPosition: "center" }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-black/88 via-black/62 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        {/* ══════════════════════════════════════════════════════
+            HERO
+        ══════════════════════════════════════════════════════ */}
+        <section className="relative min-h-screen bg-[#0A1F0A] flex flex-col overflow-hidden">
+
+          {/* Background texture */}
           <div
-            className="absolute top-0 right-0 w-[45vw] h-full opacity-10"
-            style={{ background: "linear-gradient(135deg, transparent 40%, #1E9C17 40%)" }}
-          />
-          <div
-            className="absolute inset-0 opacity-[0.12] pointer-events-none"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }}
+            className="absolute inset-0 opacity-[0.06]"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            }}
           />
 
-          <div className="relative max-w-7xl mx-auto px-6 lg:px-12 w-full">
-            <div className="inline-flex items-center gap-2 mb-6" style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? "translateY(0)" : "translateY(16px)", transition: "all 0.7s ease 200ms" }}>
-              <span className="w-8 h-px bg-[#FDB933]" />
-              <span className="text-[#FDB933] text-xs font-semibold uppercase tracking-[0.25em]">
-                Direct-to-Consumer Agriculture · Nepal
-              </span>
-            </div>
+          {/* Radial glow */}
+          <div
+            className="absolute top-0 right-0 w-[600px] h-[600px] opacity-20 pointer-events-none"
+            style={{
+              background: "radial-gradient(circle at 70% 30%, #1E9C17 0%, transparent 60%)",
+            }}
+          />
 
-            <h1
-              className="font-[Montserrat] font-black text-white leading-[0.93]"
-              style={{ fontSize: "clamp(3rem, 8vw, 7rem)", opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? "translateY(0)" : "translateY(24px)", transition: "all 0.7s ease 350ms" }}
-            >
-              Farm to<br />
-              <span className="text-transparent" style={{ WebkitTextStroke: "2px #1E9C17" }}>Table.</span>
-              <br />
-              <span className="text-[#FDB933]">No Middlemen.</span>
-            </h1>
+          {/* ── Main hero layout ── */}
+          <div className="relative flex-1 flex flex-col lg:flex-row items-center max-w-7xl mx-auto w-full px-6 lg:px-16 pt-32 pb-16 gap-12">
 
-            <p
-              className="mt-8 max-w-lg text-[#D0D0D0] text-lg leading-relaxed"
-              style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? "translateY(0)" : "translateY(20px)", transition: "all 0.7s ease 500ms" }}
-            >
-              MeroBari connects Nepal's farmers directly with consumers — transparent pricing, fresh produce, and zero exploitation.
-            </p>
+            {/* Left: headline + CTAs */}
+            <div className="flex-1 min-w-0">
 
-            <div className="mt-10 flex flex-wrap gap-4" style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? "translateY(0)" : "translateY(20px)", transition: "all 0.7s ease 650ms" }}>
-              <Link
-                to="/register"
-                className="group relative overflow-hidden bg-[#1E9C17] text-white px-8 py-4 rounded-full font-bold text-sm tracking-wide hover:shadow-2xl hover:shadow-green-900/40 transition-all duration-300 hover:-translate-y-1"
+              {/* Eyebrow */}
+              {ready && (
+                <div className="flex items-center gap-3 mb-8 hero-word w1">
+                  <span className="w-8 h-px bg-[#1E9C17]" />
+                  <span className="text-[#1E9C17] text-xs font-semibold tracking-[0.3em] uppercase">
+                    Nepal's Farm to Table Platform
+                  </span>
+                </div>
+              )}
+
+              {/* Giant headline — 5 words, each animates in */}
+              <h1
+                className="cd font-bold leading-[0.9] text-white"
+                style={{ fontSize: "clamp(3.2rem, 9vw, 8rem)" }}
               >
-                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-500 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
-                Get Started Free
-              </Link>
-              <Link to="/about" className="group flex items-center gap-2 text-white/80 hover:text-white px-6 py-4 text-sm font-semibold transition-all duration-200">
-                Learn more
-                <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                </svg>
-              </Link>
+                {ready && (
+                  <>
+                    <span className="hero-word w2 block text-[#F5F0E8]">Fresh.</span>
+                    <span className="hero-word w3 block text-[#1E9C17]">Honest.</span>
+                    <span className="hero-word w4 block text-[#F5F0E8]">Direct.</span>
+                  </>
+                )}
+              </h1>
+
+              {/* Subtext */}
+              {ready && (
+                <p
+                  className="hero-word w5 mt-8 text-[#a0b8a0] text-lg lg:text-xl leading-relaxed max-w-lg"
+                >
+                  MeroBari connects the farmers who grow your food directly with the people who eat it.
+                  Transparent prices. Real harvests. Fair deals for everyone.
+                </p>
+              )}
+
+              {/* CTAs */}
+              {ready && (
+                <div className="hero-word w6 mt-10 flex flex-wrap gap-4">
+                  <Link
+                    to="/register"
+                    className="group relative overflow-hidden bg-[#1E9C17] text-white cd font-semibold px-8 py-4 rounded-2xl text-sm tracking-wide transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#1E9C17]/40"
+                  >
+                    <span className="absolute inset-0 bg-white/10 translate-x-[-101%] group-hover:translate-x-0 transition-transform duration-500 skew-x-12" />
+                    <span className="relative">Join as Farmer</span>
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="group relative overflow-hidden bg-[#E8A020] text-[#0A1F0A] cd font-semibold px-8 py-4 rounded-2xl text-sm tracking-wide transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#E8A020]/40"
+                  >
+                    <span className="absolute inset-0 bg-white/15 translate-x-[-101%] group-hover:translate-x-0 transition-transform duration-500 skew-x-12" />
+                    <span className="relative">Shop Fresh Produce</span>
+                  </Link>
+                </div>
+              )}
+
+              {/* Inline stats */}
+              {ready && (
+                <div className="hero-word w6 mt-14 grid grid-cols-3 gap-0 border border-white/10 rounded-2xl overflow-hidden">
+                  {[
+                    { n: "500",  s: "+", l: "Farmers"    },
+                    { n: "10000",s: "+", l: "Orders"     },
+                    { n: "15",   s: "+", l: "Categories" },
+                  ].map((s, i) => (
+                    <div
+                      key={i}
+                      className={`px-5 py-4 text-center ${i < 2 ? "border-r border-white/10" : ""}`}
+                    >
+                      <p className="cd font-bold text-white text-2xl">
+                        {s.n}{s.s}
+                      </p>
+                      <p className="text-[#a0b8a0] text-xs mt-0.5 tracking-wide uppercase">{s.l}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="mt-16 flex flex-wrap gap-3" style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? "translateY(0)" : "translateY(20px)", transition: "all 0.7s ease 800ms" }}>
+            {/* Right: rotating crop wheel */}
+            {ready && (
+              <div
+                className="w-72 h-72 lg:w-96 lg:h-96 flex-shrink-0"
+                style={{ animation: "scaleIn 1s cubic-bezier(.16,1,.3,1) 0.4s both" }}
+              >
+                <CropWheel />
+              </div>
+            )}
+          </div>
+
+          {/* Bottom fade into cream */}
+          <div className="h-16 bg-gradient-to-b from-transparent to-[#F5F0E8]" />
+        </section>
+
+        {/* ══════════════════════════════════════════════════════
+            TICKER
+        ══════════════════════════════════════════════════════ */}
+        <Ticker />
+
+        {/* ══════════════════════════════════════════════════════
+            WHAT IS MEROBARI — 2-column editorial
+        ══════════════════════════════════════════════════════ */}
+        <section className="bg-[#F5F0E8] py-28 px-6 lg:px-16">
+          <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-16 lg:gap-24 items-start">
+
+            {/* Left: big bold pull statement */}
+            <div>
+              <div className="inline-flex items-center gap-2 mb-8">
+                <span className="w-6 h-6 rounded-full bg-[#1E9C17] flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+                <span className="text-xs font-semibold tracking-[0.25em] uppercase text-[#1E9C17]">Why MeroBari</span>
+              </div>
+
+              <h2
+                className="cd font-bold text-[#0A1F0A] leading-[0.95]"
+                style={{ fontSize: "clamp(2.5rem, 5vw, 4.5rem)" }}
+              >
+                Food grown in Nepal,
+                <br />
+                <span className="text-[#C4846A]">priced in Nepal,</span>
+                <br />
+                delivered in Nepal.
+              </h2>
+
+              {/* Decorative underline */}
+              <div className="mt-6 h-1 w-24 bg-[#1E9C17] rounded-full" />
+
+              <p className="mt-8 text-[#3a5a3a] text-lg leading-relaxed">
+                Every product on MeroBari comes directly from the farmer who grew it.
+                You see the harvest date, the farm location, and the price the farmer
+                set themselves — nothing hidden, nothing inflated.
+              </p>
+
+              <div className="mt-10 space-y-4">
+                {[
+                  { icon: "🌱", text: "Prices set by the farmer, not a supply chain" },
+                  { icon: "📍", text: "Geo-based discovery — closest farms first"    },
+                  { icon: "🏭", text: "Bulk pricing for restaurants and traders"     },
+                  { icon: "🔄", text: "Simple return system if anything goes wrong"  },
+                ].map((f) => (
+                  <div key={f.text} className="flex items-center gap-4">
+                    <span className="text-2xl leading-none w-8 text-center flex-shrink-0">{f.icon}</span>
+                    <p className="text-[#3a5a3a] text-sm font-medium">{f.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: stat tiles in a bold asymmetric grid */}
+            <div className="grid grid-cols-2 gap-4">
               {[
-                { val: "500+",  label: "Farmers"     },
-                { val: "0%",    label: "Middlemen"   },
-                { val: "10K+",  label: "Orders"      },
-                { val: "Rs.15", label: "Cheapest/kg" },
+                {
+                  val:    <Counter to={90} suffix="%" />,
+                  label:  "Revenue goes to the farmer",
+                  bg:     "bg-[#0A1F0A]",
+                  text:   "text-[#1E9C17]",
+                  sub:    "text-[#a0b8a0]",
+                  span:   "col-span-2",
+                  large:  true,
+                },
+                {
+                  val:    <Counter to={500} suffix="+" />,
+                  label:  "Registered farmers",
+                  bg:     "bg-[#1E9C17]",
+                  text:   "text-white",
+                  sub:    "text-white/70",
+                  span:   "",
+                },
+                {
+                  val:    <Counter to={2} suffix=" days" />,
+                  label:  "Return window",
+                  bg:     "bg-[#E8A020]",
+                  text:   "text-[#0A1F0A]",
+                  sub:    "text-[#0A1F0A]/60",
+                  span:   "",
+                },
+                {
+                  val:    <Counter to={15} suffix="+" />,
+                  label:  "Crop categories",
+                  bg:     "bg-[#C4846A]",
+                  text:   "text-white",
+                  sub:    "text-white/70",
+                  span:   "",
+                },
+                {
+                  val:    "Rs.50",
+                  label:  "Base delivery fee",
+                  bg:     "bg-[#F5F0E8] border-2 border-[#0A1F0A]/10",
+                  text:   "text-[#0A1F0A]",
+                  sub:    "text-[#6a7a6a]",
+                  span:   "",
+                },
               ].map((s, i) => (
-                <div key={i} className="backdrop-blur-sm bg-white/10 border border-white/20 rounded-2xl px-5 py-3">
-                  <p className="font-[Montserrat] font-black text-white text-xl leading-none">{s.val}</p>
-                  <p className="text-white/60 text-xs mt-1">{s.label}</p>
+                <div
+                  key={i}
+                  className={`${s.bg} ${s.span} rounded-2xl p-7 flex flex-col justify-between min-h-[120px]`}
+                >
+                  <p className={`cd font-bold ${s.text} ${s.large ? "text-5xl" : "text-3xl"}`}>
+                    {s.val}
+                  </p>
+                  <p className={`${s.sub} text-xs font-medium mt-2 leading-snug`}>{s.label}</p>
                 </div>
               ))}
             </div>
           </div>
-
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/40 animate-bounce">
-            <span className="text-xs uppercase tracking-widest">Scroll</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
         </section>
 
-        {/* ══ CHEAPEST PICKS MARQUEE ════════════════════════════ */}
-        <section ref={cheapRef} className="py-14 bg-[#F5F7F0] relative overflow-hidden">
-          <div className="absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-[#F5F7F0] to-transparent pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[#F5F7F0] to-transparent pointer-events-none" />
-          <div
-            className="max-w-7xl mx-auto px-6 lg:px-12 mb-6"
-            style={{ opacity: cheapVisible ? 1 : 0, transform: cheapVisible ? "translateY(0)" : "translateY(20px)", transition: "all 0.6s ease" }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#1E9C17] animate-pulse" />
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#1E9C17]">Live Cheapest Prices</span>
-              </div>
-              <div className="h-px flex-1 bg-gradient-to-r from-[#1E9C17]/20 to-transparent" />
-              <span className="text-xs text-gray-400 hidden sm:block">Direct from farmers · Updated daily</span>
+        {/* ══════════════════════════════════════════════════════
+            HOW IT WORKS
+        ══════════════════════════════════════════════════════ */}
+        <section ref={howRef} className="bg-[#0A1F0A] py-28 px-6 lg:px-16 overflow-hidden">
+          <div className="max-w-6xl mx-auto">
+            <div
+              className="mb-16"
+              style={{
+                opacity:    howOn ? 1 : 0,
+                transform:  howOn ? "translateY(0)" : "translateY(30px)",
+                transition: "all 0.7s ease",
+              }}
+            >
+              <span className="text-[#E8A020] text-xs font-semibold tracking-[0.3em] uppercase">The process</span>
+              <h2
+                className="cd font-bold text-white mt-3 leading-tight"
+                style={{ fontSize: "clamp(2.2rem, 4vw, 3.8rem)" }}
+              >
+                Simple. Transparent.<br />Repeatable.
+              </h2>
             </div>
-          </div>
-          <div className="space-y-3">
-            <Marquee items={cheapPicks} />
-            <Marquee items={[...cheapPicks].reverse()} reverse />
-          </div>
-        </section>
 
-        {/* ══ WHY MEROBARI ══════════════════════════════════════ */}
-        <section ref={whyRef} className="py-28 bg-[#0D1F0D] relative overflow-hidden">
-          <div className="absolute -right-32 -top-32 w-96 h-96 rounded-full border border-[#1E9C17]/20" />
-          <div className="absolute -right-20 -top-20 w-64 h-64 rounded-full border border-[#1E9C17]/10" />
-          <div className="max-w-7xl mx-auto px-6 lg:px-12">
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
-              <div style={{ opacity: whyVisible ? 1 : 0, transform: whyVisible ? "translateX(0)" : "translateX(-40px)", transition: "all 0.7s ease" }}>
-                <span className="text-[#1E9C17] text-xs font-semibold uppercase tracking-[0.25em]">The Problem We Solve</span>
-                <h2 className="font-[Montserrat] font-black text-white mt-4 leading-tight" style={{ fontSize: "clamp(2rem, 4vw, 3.5rem)" }}>
-                  Farmers earn less.<br /><span className="text-[#FDB933]">We fix that.</span>
-                </h2>
-                <p className="mt-6 text-[#9CAD9C] text-base leading-relaxed max-w-md">
-                  In Nepal's traditional chain, farmers receive less than 30% of the final price. MeroBari eliminates every unnecessary step.
-                </p>
-                <div className="mt-10 grid grid-cols-2 gap-6">
-                  {[
-                    { label: "Farmer earnings",    before: "30%",  after: "90%",  color: "text-[#1E9C17]" },
-                    { label: "Price transparency", before: "None", after: "100%", color: "text-[#FDB933]" },
-                  ].map((item, i) => (
-                    <div key={i} className="bg-white/5 rounded-2xl p-5 border border-white/10">
-                      <p className="text-xs text-[#9CAD9C] uppercase tracking-widest mb-3">{item.label}</p>
-                      <div className="flex items-end gap-3">
-                        <span className="text-white/30 text-sm line-through">{item.before}</span>
-                        <span className={`font-[Montserrat] font-black text-2xl ${item.color}`}>{item.after}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4" style={{ opacity: whyVisible ? 1 : 0, transform: whyVisible ? "translateX(0)" : "translateX(40px)", transition: "all 0.7s ease 200ms" }}>
-                {[
-                  { target: 500,   suffix: "+", label: "Farmers Onboarded", color: "border-[#1E9C17]/40 bg-[#1E9C17]/5" },
-                  { target: 10000, suffix: "+", label: "Orders Fulfilled",  color: "border-[#FDB933]/40 bg-[#FDB933]/5" },
-                  { target: 15,    suffix: "+", label: "Crop Categories",   color: "border-[#FDB933]/40 bg-[#FDB933]/5" },
-                  { target: 0,     suffix: "%", label: "Middleman Cut",     color: "border-[#1E9C17]/40 bg-[#1E9C17]/5" },
-                ].map((s, i) => (
-                  <div key={i} className={`rounded-2xl border p-6 ${s.color}`}>
-                    <p className="font-[Montserrat] font-black text-white text-4xl leading-none">
-                      <Counter target={s.target} suffix={s.suffix} />
-                    </p>
-                    <p className="text-[#9CAD9C] text-xs mt-3 leading-snug">{s.label}</p>
+            <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
+              {HOW.map((step, i) => (
+                <div
+                  key={i}
+                  className="relative bg-white/5 border border-white/10 rounded-3xl p-8 hover:bg-white/10 hover:border-white/20 transition-all group"
+                  style={{
+                    opacity:    howOn ? 1 : 0,
+                    transform:  howOn ? "translateY(0)" : "translateY(40px)",
+                    transition: `all 0.7s ease ${i * 130}ms`,
+                  }}
+                >
+                  {/* Large step number watermark */}
+                  <div
+                    className="absolute top-5 right-6 cd font-bold text-7xl leading-none select-none pointer-events-none"
+                    style={{ color: step.color, opacity: 0.12 }}
+                  >
+                    {step.n}
                   </div>
+
+                  {/* Step dot */}
+                  <div
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center cd font-bold text-[#0A1F0A] text-lg mb-6 group-hover:scale-110 transition-transform"
+                    style={{ backgroundColor: step.color }}
+                  >
+                    {step.n}
+                  </div>
+
+                  <h3 className="cd font-semibold text-white text-xl mb-3 leading-tight">
+                    {step.head}
+                  </h3>
+                  <p className="text-[#7a9a7a] text-sm leading-relaxed">
+                    {step.body}
+                  </p>
+
+                  {/* Bottom accent line */}
+                  <div
+                    className="absolute bottom-0 left-8 right-8 h-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ backgroundColor: step.color }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Payment methods strip */}
+            <div
+              className="mt-12 border border-white/10 rounded-2xl p-6 flex flex-wrap items-center gap-6"
+              style={{
+                opacity:    howOn ? 1 : 0,
+                transform:  howOn ? "translateY(0)" : "translateY(20px)",
+                transition: "all 0.7s ease 500ms",
+              }}
+            >
+              <p className="text-[#7a9a7a] text-xs font-semibold uppercase tracking-widest">Accepted payments</p>
+              <div className="flex flex-wrap gap-3">
+                {["eSewa", "Khalti", "Bank QR", "Bank Transfer", "Cash on Delivery"].map((m) => (
+                  <span
+                    key={m}
+                    className="bg-white/8 border border-white/15 text-white/80 text-xs font-semibold px-4 py-2 rounded-xl"
+                  >
+                    {m}
+                  </span>
                 ))}
               </div>
             </div>
           </div>
         </section>
 
-        {/* ══ CATEGORIES ════════════════════════════════════════ */}
-        <section ref={catRef} className="py-28 bg-[#F5F7F0]">
-          <div className="max-w-7xl mx-auto px-6 lg:px-12">
-            <div className="text-center mb-16" style={{ opacity: catVisible ? 1 : 0, transform: catVisible ? "translateY(0)" : "translateY(24px)", transition: "all 0.7s ease" }}>
-              <span className="text-[#1E9C17] text-xs font-semibold uppercase tracking-[0.25em]">What We Grow</span>
-              <h2 className="font-[Montserrat] font-black text-[#0D1F0D] mt-3" style={{ fontSize: "clamp(2rem, 4vw, 3rem)" }}>
-                Fresh from the Field
-              </h2>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {categories.map((cat, i) => (
+        {/* ══════════════════════════════════════════════════════
+            STATS BAR
+        ══════════════════════════════════════════════════════ */}
+        <section ref={statsRef} className="bg-[#1E9C17] py-16 px-6 lg:px-16">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-0 md:divide-x md:divide-white/20">
+              {[
+                { to: 500,   s: "+",  l: "Farmers"          },
+                { to: 10000, s: "+",  l: "Orders fulfilled"  },
+                { to: 15,    s: "+",  l: "Crop categories"   },
+                { to: 100,   s: "%",  l: "Transparent pricing"},
+              ].map((s, i) => (
                 <div
                   key={i}
-                  className="group relative rounded-3xl overflow-hidden cursor-pointer"
-                  style={{ aspectRatio: i === 0 || i === 3 ? "3/4" : "3/5", opacity: catVisible ? 1 : 0, transform: catVisible ? "translateY(0)" : "translateY(40px)", transition: `all 0.7s ease ${i * 100}ms` }}
+                  className="text-center md:px-8"
+                  style={{
+                    opacity:    statsOn ? 1 : 0,
+                    transform:  statsOn ? "scale(1)" : "scale(0.9)",
+                    transition: `all 0.6s ease ${i * 100}ms`,
+                  }}
                 >
-                  <img src={cat.img} alt={cat.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                  <div className="absolute top-4 left-4">
-                    <span className="bg-[#FDB933] text-black text-xs font-bold px-3 py-1 rounded-full">{cat.tag}</span>
-                  </div>
-                  <div className="absolute top-4 right-4">
-                    <span className="bg-[#1E9C17] text-white text-xs font-bold px-3 py-1 rounded-full">{cat.price}</span>
-                  </div>
-                  <div className="absolute bottom-5 left-5 right-5">
-                    <h3 className="font-[Montserrat] font-black text-white text-xl">{cat.name}</h3>
-                    <div className="mt-2 h-0.5 w-0 bg-[#1E9C17] group-hover:w-full transition-all duration-500" />
-                  </div>
+                  <p className="cd font-bold text-white text-5xl leading-none">
+                    <Counter to={s.to} suffix={s.s} />
+                  </p>
+                  <p className="text-white/70 text-xs uppercase tracking-widest mt-3 font-medium">{s.l}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ══ HOW IT WORKS ══════════════════════════════════════ */}
-        <section className="py-28 bg-white relative overflow-hidden">
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 font-[Montserrat] font-black text-[18rem] leading-none text-[#F0F0F0] select-none pointer-events-none">
-            D2C
-          </div>
-          <div className="max-w-7xl mx-auto px-6 lg:px-12 relative">
-            {/* FIX: was an IIFE — now a proper named component */}
-            <HowItWorksHeader />
-            <div className="grid md:grid-cols-3 gap-8 relative">
-              {steps.map((step, i) => (
-                <StepCard key={i} step={step} index={i} />
-              ))}
+        {/* ══════════════════════════════════════════════════════
+            FOR FARMERS / FOR CONSUMERS — split
+        ══════════════════════════════════════════════════════ */}
+        <section className="bg-[#F5F0E8] py-28 px-6 lg:px-16">
+          <div className="max-w-6xl mx-auto">
+
+            {/* Section label */}
+            <div className="text-center mb-16">
+              <span className="text-xs font-semibold tracking-[0.3em] uppercase text-[#C4846A]">Built for both sides</span>
+              <h2
+                className="cd font-bold text-[#0A1F0A] mt-3 leading-tight"
+                style={{ fontSize: "clamp(2rem, 4vw, 3.5rem)" }}
+              >
+                One platform. Two doors.
+              </h2>
             </div>
-            {/* FIX: was an IIFE — now a proper named component */}
-            <StepDots />
+
+            <div className="grid md:grid-cols-2 gap-6">
+
+              {/* Farmer door */}
+              <div className="group bg-[#0A1F0A] rounded-3xl p-10 overflow-hidden relative hover:-translate-y-1 transition-transform">
+                <div className="absolute top-0 right-0 w-40 h-40 opacity-20"
+                  style={{ background: "radial-gradient(circle, #1E9C17 0%, transparent 70%)" }} />
+
+                <span className="text-5xl block mb-6">🌾</span>
+                <h3 className="cd font-bold text-white text-3xl mb-4 leading-tight">
+                  For Farmers
+                </h3>
+                <p className="text-[#a0b8a0] leading-relaxed mb-8 text-sm">
+                  List your crops, set regular and bulk prices, manage orders, accept multiple payment methods,
+                  and handle returns — all from one dashboard.
+                </p>
+                <ul className="space-y-2 mb-10">
+                  {[
+                    "Free to register and list",
+                    "Set your own prices",
+                    "Accept bulk orders from traders",
+                    "Location-based visibility",
+                  ].map((f) => (
+                    <li key={f} className="flex items-center gap-3 text-[#c0d0c0] text-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#1E9C17] flex-shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  to="/register"
+                  className="inline-flex items-center gap-2 bg-[#1E9C17] text-white cd font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#158212] transition-colors"
+                >
+                  Register as Farmer
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </Link>
+              </div>
+
+              {/* Consumer door */}
+              <div className="group bg-[#ECEAE0] border-2 border-[#0A1F0A]/10 rounded-3xl p-10 overflow-hidden relative hover:-translate-y-1 transition-transform">
+                <div className="absolute top-0 right-0 w-40 h-40 opacity-20"
+                  style={{ background: "radial-gradient(circle, #E8A020 0%, transparent 70%)" }} />
+
+                <span className="text-5xl block mb-6">🛒</span>
+                <h3 className="cd font-bold text-[#0A1F0A] text-3xl mb-4 leading-tight">
+                  For Consumers
+                </h3>
+                <p className="text-[#4a6a4a] leading-relaxed mb-8 text-sm">
+                  Browse crops from farms near you, see harvest dates and real prices, choose Normal or Bulk
+                  per item, and pay with the method that works for you.
+                </p>
+                <ul className="space-y-2 mb-10">
+                  {[
+                    "Farms sorted by distance from you",
+                    "Normal & bulk pricing per product",
+                    "eSewa, Khalti, COD and more",
+                    "2-day return window on deliveries",
+                  ].map((f) => (
+                    <li key={f} className="flex items-center gap-3 text-[#3a5a3a] text-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#E8A020] flex-shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  to="/register"
+                  className="inline-flex items-center gap-2 bg-[#0A1F0A] text-white cd font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#1a3f1a] transition-colors"
+                >
+                  Start Shopping
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </Link>
+              </div>
+            </div>
           </div>
         </section>
 
-        {/* ══ TESTIMONIALS ══════════════════════════════════════ */}
-        <section ref={testimonialRef} className="py-28 bg-[#0D1F0D] relative overflow-hidden">
-          <div className="absolute inset-0 opacity-5" style={{ backgroundImage: "radial-gradient(circle at 20% 50%, #1E9C17 0%, transparent 50%),radial-gradient(circle at 80% 20%, #FDB933 0%, transparent 40%)" }} />
-          <div className="max-w-7xl mx-auto px-6 lg:px-12 relative">
-            <div className="text-center mb-16" style={{ opacity: testimonialVisible ? 1 : 0, transform: testimonialVisible ? "translateY(0)" : "translateY(24px)", transition: "all 0.7s ease" }}>
-              <span className="text-[#1E9C17] text-xs font-semibold uppercase tracking-[0.25em]">Real Stories</span>
-              <h2 className="font-[Montserrat] font-black text-white mt-3" style={{ fontSize: "clamp(2rem, 4vw, 3rem)" }}>
-                Farmers &amp; Consumers Speak
-              </h2>
+        {/* ══════════════════════════════════════════════════════
+            VOICES
+        ══════════════════════════════════════════════════════ */}
+        <section ref={voiceRef} className="bg-[#F5F0E8] pt-0 pb-28 px-6 lg:px-16">
+          <div className="max-w-6xl mx-auto">
+            <div className="border-t-2 border-[#0A1F0A]/10 pt-16 mb-14">
+              <span className="text-xs font-semibold tracking-[0.3em] uppercase text-[#C4846A]">In their words</span>
             </div>
+
             <div className="grid md:grid-cols-3 gap-6">
-              {testimonials.map((t, i) => (
+              {VOICES.map((v, i) => (
                 <div
                   key={i}
-                  className="bg-white/5 border border-white/10 rounded-3xl p-7 hover:bg-white/10 hover:border-white/20 transition-all duration-300"
-                  style={{ opacity: testimonialVisible ? 1 : 0, transform: testimonialVisible ? "translateY(0)" : "translateY(40px)", transition: `all 0.7s ease ${i * 120}ms` }}
+                  className="bg-[#0A1F0A] rounded-2xl p-8 relative overflow-hidden"
+                  style={{
+                    opacity:    voiceOn ? 1 : 0,
+                    transform:  voiceOn ? "translateY(0)" : "translateY(32px)",
+                    transition: `all 0.7s ease ${i * 130}ms`,
+                  }}
                 >
-                  <div className="text-[#1E9C17] text-5xl font-serif leading-none mb-4">"</div>
-                  <p className="text-white/80 text-sm leading-relaxed mb-6">{t.quote}</p>
+                  {/* Quote mark */}
+                  <p className="text-[#1E9C17] text-6xl font-serif leading-none absolute top-4 right-6 select-none opacity-30">"</p>
+
+                  <p className="text-white/85 text-sm leading-relaxed mb-8 relative">
+                    "{v.quote}"
+                  </p>
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${t.color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-                      {t.init}
+                    <div className="w-9 h-9 rounded-full bg-[#1E9C17] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {v.init}
                     </div>
                     <div>
-                      <p className="text-white font-semibold text-sm">{t.name}</p>
-                      <p className="text-white/40 text-xs">{t.role}</p>
+                      <p className="text-white font-semibold text-sm">{v.name}</p>
+                      <p className="text-[#7a9a7a] text-xs">{v.place}</p>
                     </div>
                   </div>
                 </div>
@@ -530,25 +746,72 @@ const Home = () => {
           </div>
         </section>
 
-        {/* ══ FINAL CTA ═════════════════════════════════════════ */}
-        <section className="bg-[#1E9C17] relative overflow-hidden">
-          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "url('/home/farm.jpg')", backgroundSize: "cover", backgroundPosition: "center" }} />
-          <div className="absolute inset-0 bg-[#1E9C17]/90" />
-          <div className="relative max-w-7xl mx-auto px-6 lg:px-12 py-24 flex flex-col lg:flex-row items-center justify-between gap-10">
-            <div>
-              <h2 className="font-[Montserrat] font-black text-white leading-tight" style={{ fontSize: "clamp(2rem, 4vw, 3.5rem)" }}>
-                Ready to grow<br />with MeroBari?
-              </h2>
-              <p className="mt-4 text-white/70 max-w-md text-base">Join Nepal's most transparent agricultural marketplace today.</p>
+        {/* ══════════════════════════════════════════════════════
+            FINAL CTA
+        ══════════════════════════════════════════════════════ */}
+        <section ref={ctaRef} className="bg-[#0A1F0A] py-32 px-6 lg:px-16 relative overflow-hidden">
+          {/* Large decorative text behind */}
+          <div
+            className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
+            aria-hidden="true"
+          >
+            <span
+              className="cd font-bold text-white/[0.03] whitespace-nowrap"
+              style={{ fontSize: "clamp(6rem, 18vw, 20rem)" }}
+            >
+              MEROBARI
+            </span>
+          </div>
+
+          <div
+            className="relative max-w-4xl mx-auto text-center"
+            style={{
+              opacity:    ctaOn ? 1 : 0,
+              transform:  ctaOn ? "translateY(0)" : "translateY(32px)",
+              transition: "all 0.8s ease",
+            }}
+          >
+            <div className="inline-flex items-center gap-2 mb-8">
+              <span className="w-8 h-px bg-[#E8A020]" />
+              <span className="text-[#E8A020] text-xs font-semibold tracking-[0.3em] uppercase">Join today</span>
+              <span className="w-8 h-px bg-[#E8A020]" />
             </div>
-            <div className="flex flex-wrap gap-4 flex-shrink-0">
-              <Link to="/register" className="bg-white text-[#1E9C17] font-bold px-8 py-4 rounded-full text-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
-                Start as Farmer
+
+            <h2
+              className="cd font-bold text-white leading-[0.95]"
+              style={{ fontSize: "clamp(3rem, 8vw, 7rem)" }}
+            >
+              Grow with us.
+            </h2>
+
+            <p className="mt-6 text-[#a0b8a0] text-lg max-w-xl mx-auto leading-relaxed">
+              Free to join. No listing fees. Built for Nepal's farmers and the people who love fresh food.
+            </p>
+
+            <div className="mt-12 flex flex-wrap gap-5 justify-center">
+              <Link
+                to="/register"
+                className="bg-[#1E9C17] text-white cd font-semibold px-10 py-5 rounded-2xl text-base hover:bg-[#158212] hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#1E9C17]/30 transition-all"
+              >
+                Register Free
               </Link>
-              <Link to="/register" className="bg-[#FDB933] text-black font-bold px-8 py-4 rounded-full text-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
-                Shop as Consumer
+              <Link
+                to="/about"
+                className="border-2 border-white/20 text-white cd font-semibold px-10 py-5 rounded-2xl text-base hover:border-white/50 hover:-translate-y-1 transition-all"
+              >
+                Read Our Story
+              </Link>
+              <Link
+                to="/contact"
+                className="border-2 border-[#E8A020]/40 text-[#E8A020] cd font-semibold px-10 py-5 rounded-2xl text-base hover:border-[#E8A020] hover:-translate-y-1 transition-all"
+              >
+                Contact Us
               </Link>
             </div>
+
+            <p className="mt-14 text-[#4a6a4a] text-xs">
+              Final Year Project · Kathmandu Engineering College · Nepal 🇳🇵
+            </p>
           </div>
         </section>
 

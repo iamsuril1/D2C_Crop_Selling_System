@@ -1,7 +1,7 @@
 /* src/pages/PaymentSelection.jsx
    Two payment modes:
-     Pre Payment  → eSewa | Khalti  (pay before delivery)
-     Post Payment → Cash on Delivery (pay after delivery)
+     Pre Payment  → eSewa only (pay before delivery)
+     Post Payment → Cash on Delivery | FonePay on Delivery (pay during delivery)
 */
 
 import { useEffect, useState } from "react";
@@ -14,13 +14,18 @@ const PAYMENT_MODES = {
   POST: "post_payment",
 };
 
+const POST_METHODS = {
+  COD:     "cash_on_delivery",
+  FONEPAY: "fonepay",
+};
+
 const PaymentSelection = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const order    = location.state?.order;
 
   const [paymentMode,   setPaymentMode]   = useState(PAYMENT_MODES.PRE);
-  const [preMethod,     setPreMethod]     = useState("esewa");  // "esewa" | "khalti"
+  const [postMethod,    setPostMethod]    = useState(POST_METHODS.COD);
   const [submitting,    setSubmitting]    = useState(false);
 
   const [alertModal, setAlertModal] = useState({
@@ -54,7 +59,6 @@ const PaymentSelection = () => {
       const res = await api.post("/api/payments/esewa/initiate", { orderId });
       const d   = res.data;
 
-      // Build a hidden form and submit it to eSewa
       const form = document.createElement("form");
       form.method = "POST";
       form.action = d.paymentUrl;
@@ -89,19 +93,6 @@ const PaymentSelection = () => {
     }
   };
 
-  /* ── Khalti ── */
-  const handleKhalti = async () => {
-    setSubmitting(true);
-    try {
-      const res = await api.post("/api/payments/khalti/initiate", { orderId });
-      // Redirect to Khalti hosted checkout
-      window.location.href = res.data.paymentUrl;
-    } catch (err) {
-      showAlert("Khalti Error", err.response?.data?.message || "Failed to initiate Khalti payment.", "error");
-      setSubmitting(false);
-    }
-  };
-
   /* ── COD ── */
   const handleCOD = async () => {
     setSubmitting(true);
@@ -119,16 +110,49 @@ const PaymentSelection = () => {
     }
   };
 
+  /* ── FonePay on Delivery ── */
+  const handleFonePay = async () => {
+    setSubmitting(true);
+    try {
+      await api.post("/api/payments/fonepay/confirm", { orderId, farmerIds });
+      showAlert(
+        "Order Confirmed",
+        `Order #${orderDisplayId} placed! Pay via FonePay QR scan when your order arrives.`,
+        "success",
+        () => navigate("/my-orders", { replace: true })
+      );
+    } catch (err) {
+      showAlert("FonePay Error", err.response?.data?.message || "Failed to confirm FonePay order.", "error");
+      setSubmitting(false);
+    }
+  };
+
   const handlePay = () => {
     if (paymentMode === PAYMENT_MODES.PRE) {
-      if (preMethod === "esewa")  handleEsewa();
-      else                        handleKhalti();
+      handleEsewa();
     } else {
-      handleCOD();
+      if (postMethod === POST_METHODS.FONEPAY) handleFonePay();
+      else handleCOD();
     }
   };
 
   const total = order.totalAmount || 0;
+
+  /* ── button label ── */
+  const payButtonLabel = () => {
+    if (submitting) return null;
+    if (paymentMode === PAYMENT_MODES.PRE)
+      return `Pay Rs. ${total.toFixed(0)} via eSewa`;
+    if (postMethod === POST_METHODS.FONEPAY)
+      return `Confirm FonePay on Delivery — Rs. ${total.toFixed(0)}`;
+    return `Confirm Cash on Delivery — Rs. ${total.toFixed(0)}`;
+  };
+
+  const payButtonColor = () => {
+    if (paymentMode === PAYMENT_MODES.PRE) return "bg-green-600 hover:bg-green-700";
+    if (postMethod === POST_METHODS.FONEPAY) return "bg-[#8B1A1A] hover:bg-[#6d1414]";
+    return "bg-blue-600 hover:bg-blue-700";
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -215,7 +239,7 @@ const PaymentSelection = () => {
           {/* Tab content */}
           <div className="p-6">
 
-            {/* ── Pre Payment ── */}
+            {/* ── Pre Payment (eSewa only) ── */}
             {paymentMode === PAYMENT_MODES.PRE && (
               <div className="space-y-4">
                 <p className="text-xs text-gray-500">
@@ -223,22 +247,7 @@ const PaymentSelection = () => {
                 </p>
 
                 {/* eSewa */}
-                <label
-                  className={`flex items-center gap-4 border-2 rounded-2xl p-4 cursor-pointer transition-all ${
-                    preMethod === "esewa"
-                      ? "border-green-500 bg-green-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="preMethod"
-                    value="esewa"
-                    checked={preMethod === "esewa"}
-                    onChange={() => setPreMethod("esewa")}
-                    className="sr-only"
-                  />
-                  {/* eSewa logo substitute */}
+                <div className="flex items-center gap-4 border-2 border-green-500 bg-green-50 rounded-2xl p-4">
                   <div className="w-12 h-12 rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
                     <span className="text-white font-black text-sm">eSewa</span>
                   </div>
@@ -246,46 +255,12 @@ const PaymentSelection = () => {
                     <p className="font-bold text-gray-900">eSewa</p>
                     <p className="text-xs text-gray-500 mt-0.5">Nepal's most popular digital wallet</p>
                   </div>
-                  {preMethod === "esewa" && (
-                    <span className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </span>
-                  )}
-                </label>
-
-                {/* Khalti */}
-                <label
-                  className={`flex items-center gap-4 border-2 rounded-2xl p-4 cursor-pointer transition-all ${
-                    preMethod === "khalti"
-                      ? "border-purple-500 bg-purple-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="preMethod"
-                    value="khalti"
-                    checked={preMethod === "khalti"}
-                    onChange={() => setPreMethod("khalti")}
-                    className="sr-only"
-                  />
-                  <div className="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-black text-sm">Khalti</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-900">Khalti</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Fast, secure digital payments</p>
-                  </div>
-                  {preMethod === "khalti" && (
-                    <span className="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </span>
-                  )}
-                </label>
+                  <span className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                </div>
 
                 <div className="bg-green-50 border border-green-100 rounded-xl p-3 text-xs text-green-800">
                   <p className="font-semibold mb-0.5">✓ Benefits of pre-payment</p>
@@ -294,38 +269,115 @@ const PaymentSelection = () => {
               </div>
             )}
 
-            {/* ── Post Payment (COD) ── */}
+            {/* ── Post Payment (COD or FonePay on Delivery) ── */}
             {paymentMode === PAYMENT_MODES.POST && (
               <div className="space-y-4">
                 <p className="text-xs text-gray-500">
-                  Pay in cash when your order arrives at your door. No online transaction needed.
+                  Choose how you'd like to pay when your order arrives at your door.
                 </p>
 
-                <div className="flex items-center gap-4 border-2 border-blue-400 bg-blue-50 rounded-2xl p-4">
+                {/* Cash on Delivery */}
+                <label
+                  className={`flex items-center gap-4 border-2 rounded-2xl p-4 cursor-pointer transition-all ${
+                    postMethod === POST_METHODS.COD
+                      ? "border-blue-400 bg-blue-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="postMethod"
+                    value={POST_METHODS.COD}
+                    checked={postMethod === POST_METHODS.COD}
+                    onChange={() => setPostMethod(POST_METHODS.COD)}
+                    className="sr-only"
+                  />
                   <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
                     <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="font-bold text-gray-900">Cash on Delivery</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Pay Rs. {total.toFixed(0)} in cash when the farmer delivers your order
+                      Hand cash of Rs. {total.toFixed(0)} to the farmer on arrival
                     </p>
                   </div>
-                </div>
+                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                    postMethod === POST_METHODS.COD ? "border-blue-500 bg-blue-500" : "border-gray-300"
+                  }`}>
+                    {postMethod === POST_METHODS.COD && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                </label>
 
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
-                  <p className="font-semibold mb-0.5">ℹ How it works</p>
-                  <p>1. Order placed → Farmer prepares your items</p>
-                  <p>2. Farmer delivers → You hand over cash</p>
-                  <p>3. Farmer marks payment as received</p>
-                </div>
+                {/* FonePay on Delivery */}
+                <label
+                  className={`flex items-center gap-4 border-2 rounded-2xl p-4 cursor-pointer transition-all ${
+                    postMethod === POST_METHODS.FONEPAY
+                      ? "border-[#8B1A1A] bg-red-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="postMethod"
+                    value={POST_METHODS.FONEPAY}
+                    checked={postMethod === POST_METHODS.FONEPAY}
+                    onChange={() => setPostMethod(POST_METHODS.FONEPAY)}
+                    className="sr-only"
+                  />
+                  <div className="w-12 h-12 rounded-xl bg-[#8B1A1A] flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-black text-xs leading-tight text-center">Fone<br/>Pay</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-gray-900">FonePay on Delivery</p>
+                      <span className="text-xs bg-red-100 text-[#8B1A1A] font-semibold px-2 py-0.5 rounded-full">
+                        Digital
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Scan the farmer's FonePay QR code when your order arrives
+                    </p>
+                  </div>
+                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                    postMethod === POST_METHODS.FONEPAY ? "border-[#8B1A1A] bg-[#8B1A1A]" : "border-gray-300"
+                  }`}>
+                    {postMethod === POST_METHODS.FONEPAY && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                </label>
 
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-                  <p className="font-semibold mb-0.5">⚠ Please note</p>
-                  <p>Keep exact change ready. Pre-paid orders may be processed faster.</p>
-                </div>
+                {/* Contextual info based on selection */}
+                {postMethod === POST_METHODS.COD && (
+                  <div className="space-y-3">
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
+                      <p className="font-semibold mb-0.5">ℹ How it works</p>
+                      <p>1. Order placed → Farmer prepares your items</p>
+                      <p>2. Farmer delivers → You hand over cash</p>
+                      <p>3. Farmer marks payment as received</p>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                      <p className="font-semibold mb-0.5">⚠ Please note</p>
+                      <p>Keep exact change ready. Pre-paid orders may be processed faster.</p>
+                    </div>
+                  </div>
+                )}
+
+                {postMethod === POST_METHODS.FONEPAY && (
+                  <div className="space-y-3">
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-xs text-[#8B1A1A]">
+                      <p className="font-semibold mb-0.5">ℹ How FonePay on Delivery works</p>
+                      <p>1. Order placed → Farmer prepares your items</p>
+                      <p>2. Farmer arrives with a FonePay QR code</p>
+                      <p>3. Scan the QR in your FonePay app and pay Rs. {total.toFixed(0)}</p>
+                      <p>4. Show the farmer your payment confirmation</p>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                      <p className="font-semibold mb-0.5">⚠ Before placing this order</p>
+                      <p>Make sure you have the FonePay app installed and your account is topped up with at least Rs. {total.toFixed(0)}.</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -338,11 +390,7 @@ const PaymentSelection = () => {
           className={`w-full font-bold py-4 rounded-2xl text-white text-lg transition shadow-lg ${
             submitting
               ? "bg-gray-400 cursor-not-allowed"
-              : paymentMode === PAYMENT_MODES.PRE
-              ? preMethod === "esewa"
-                ? "bg-green-600 hover:bg-green-700"
-                : "bg-purple-600 hover:bg-purple-700"
-              : "bg-blue-600 hover:bg-blue-700"
+              : payButtonColor()
           }`}
         >
           {submitting ? (
@@ -353,10 +401,8 @@ const PaymentSelection = () => {
               </svg>
               Processing…
             </span>
-          ) : paymentMode === PAYMENT_MODES.PRE ? (
-            `Pay Rs. ${total.toFixed(0)} via ${preMethod === "esewa" ? "eSewa" : "Khalti"}`
           ) : (
-            `Confirm Cash on Delivery — Rs. ${total.toFixed(0)}`
+            payButtonLabel()
           )}
         </button>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState, useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { AuthContext } from "../context/AuthContext";
@@ -144,6 +144,44 @@ const FarmerDashboard = () => {
     }
   };
 
+  /* ── Crop analytics ── */
+  const myId = user?._id?.toString() || user?.id?.toString();
+
+  const cropAnalytics = useMemo(() => {
+    const statsMap = {};
+    for (const order of orders) {
+      if (order.status === "cancelled") continue;
+      const myShipment = order.shipments?.find((s) => {
+        const fid = s.farmer?._id?.toString() || s.farmer?.toString();
+        return fid === myId;
+      });
+      if (!myShipment) continue;
+      for (const item of myShipment.items || []) {
+        const key = item.name || "Unknown";
+        if (!statsMap[key]) statsMap[key] = { qty: 0, revenue: 0, orders: 0, unit: item.unit || "kg" };
+        statsMap[key].qty     += item.quantity || 0;
+        statsMap[key].revenue += (item.price || 0) * (item.quantity || 0);
+        statsMap[key].orders  += 1;
+      }
+    }
+    return Object.entries(statsMap).sort((a, b) => b[1].revenue - a[1].revenue);
+  }, [orders, myId]);
+
+  const totalRevenue = cropAnalytics.reduce((s, [, v]) => s + v.revenue, 0);
+
+  const CHART_COLORS = [
+    "#1E9C17", "#E8A020", "#3B82F6", "#8B5CF6",
+    "#EC4899", "#14B8A6", "#F97316", "#EF4444",
+  ];
+
+  /* ── Bulk discount saving pct ── */
+  const bulkSavingPct = () => {
+    const reg  = Number(editForm.price);
+    const bulk = Number(editForm.bulkPrice);
+    if (!reg || !bulk || bulk >= reg) return null;
+    return Math.round((1 - bulk / reg) * 100);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -154,14 +192,6 @@ const FarmerDashboard = () => {
 
   const activeProducts   = products.filter((p) => p.isActive);
   const inactiveProducts = products.filter((p) => !p.isActive);
-
-  /* ── Bulk discount saving pct ── */
-  const bulkSavingPct = () => {
-    const reg  = Number(editForm.price);
-    const bulk = Number(editForm.bulkPrice);
-    if (!reg || !bulk || bulk >= reg) return null;
-    return Math.round((1 - bulk / reg) * 100);
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 px-8 py-6 space-y-6">
@@ -185,13 +215,19 @@ const FarmerDashboard = () => {
         cancelText="Cancel"
       />
 
-      {/* Top bar */}
+      {/* ── Top bar ── */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
           <p className="text-sm text-gray-500">Welcome back, {user?.firstName || "Farmer"}</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap justify-end">
+          <button
+            onClick={() => navigate("/farmer/earnings")}
+            className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2"
+          >
+            💰 My Earnings
+          </button>
           <button
             onClick={() => navigate("/farmer/payment-settings")}
             className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
@@ -207,7 +243,7 @@ const FarmerDashboard = () => {
         </div>
       </div>
 
-      {/* Summary cards */}
+      {/* ── Summary cards ── */}
       <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm p-4">
           <p className="text-xs uppercase text-gray-500 mb-1">Active Products</p>
@@ -235,7 +271,7 @@ const FarmerDashboard = () => {
         </div>
       </section>
 
-      {/* Products + Orders */}
+      {/* ── Products + Orders ── */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* ── Products ── */}
@@ -578,6 +614,210 @@ const FarmerDashboard = () => {
 
         </div>
       </section>
+
+      {/* ── Crop Sales Analytics ── */}
+      <section className="bg-white rounded-xl shadow-sm p-5">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Crop Sales Analytics</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Based on all non-cancelled orders
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/farmer/earnings")}
+            className="text-xs text-amber-600 hover:text-amber-700 font-semibold border border-amber-200 hover:border-amber-400 px-3 py-1.5 rounded-lg transition"
+          >
+            Full Earnings →
+          </button>
+        </div>
+
+        {cropAnalytics.length === 0 ? (
+          <div className="text-center py-10 text-gray-400">
+            <p className="text-3xl mb-2">📊</p>
+            <p className="text-sm">No sales data yet.</p>
+            <p className="text-xs mt-1">Analytics will appear once you receive orders.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* ── Left: summary stat cards ── */}
+            <div className="space-y-3">
+              <div className="bg-green-50 border border-green-100 rounded-xl p-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Revenue</p>
+                <p className="text-2xl font-bold text-green-700">
+                  Rs. {Math.round(totalRevenue).toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">Across all crops</p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Crop Varieties Sold</p>
+                <p className="text-2xl font-bold text-blue-700">{cropAnalytics.length}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Unique products ordered</p>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Top Earner</p>
+                <p className="text-lg font-bold text-amber-700 truncate">
+                  {cropAnalytics[0]?.[0] || "—"}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Rs. {Math.round(cropAnalytics[0]?.[1]?.revenue || 0).toLocaleString()} earned
+                </p>
+              </div>
+
+              <div className="bg-purple-50 border border-purple-100 rounded-xl p-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Quantity Sold</p>
+                <p className="text-2xl font-bold text-purple-700">
+                  {cropAnalytics.reduce((s, [, v]) => s + v.qty, 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">Units across all crops</p>
+              </div>
+            </div>
+
+            {/* ── Middle: horizontal bar chart ── */}
+            <div className="lg:col-span-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
+                Revenue breakdown by crop
+              </p>
+              <div className="space-y-3">
+                {cropAnalytics.map(([name, stats], i) => {
+                  const pct   = totalRevenue > 0 ? Math.round((stats.revenue / totalRevenue) * 100) : 0;
+                  const color = CHART_COLORS[i % CHART_COLORS.length];
+                  return (
+                    <div key={name}>
+                      <div className="flex items-center justify-between text-sm mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="w-3 h-3 rounded-sm flex-shrink-0"
+                            style={{ backgroundColor: color }}
+                          />
+                          <span className="font-medium text-gray-800 truncate">{name}</span>
+                          <span className="text-xs text-gray-400 flex-shrink-0">
+                            {stats.qty} {stats.unit}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                          <span className="text-xs text-gray-500">
+                            Rs. {Math.round(stats.revenue).toLocaleString()}
+                          </span>
+                          <span className="text-xs font-bold text-gray-700 w-8 text-right">
+                            {pct}%
+                          </span>
+                        </div>
+                      </div>
+                      {/* Bar track */}
+                      <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width:           `${Math.max(pct, 1)}%`,
+                            backgroundColor: color,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* ── Donut-style legend row at bottom ── */}
+              <div className="mt-5 pt-4 border-t border-gray-100">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  Quantity sold per crop
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {cropAnalytics.slice(0, 6).map(([name, stats], i) => {
+                    const color = CHART_COLORS[i % CHART_COLORS.length];
+                    return (
+                      <div
+                        key={name}
+                        className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2"
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: color }}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-gray-800 truncate">{name}</p>
+                          <p className="text-xs text-gray-400">
+                            {stats.qty} {stats.unit}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {cropAnalytics.length > 6 && (
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-gray-300 flex-shrink-0" />
+                      <p className="text-xs text-gray-500">
+                        +{cropAnalytics.length - 6} more
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Order type breakdown (normal vs bulk) ── */}
+              {(() => {
+                let normalCount = 0;
+                let bulkCount   = 0;
+                for (const order of orders) {
+                  if (order.status === "cancelled") continue;
+                  const myShipment = order.shipments?.find((s) => {
+                    const fid = s.farmer?._id?.toString() || s.farmer?.toString();
+                    return fid === myId;
+                  });
+                  if (!myShipment) continue;
+                  for (const item of myShipment.items || []) {
+                    if (item.orderType === "bulk") bulkCount++;
+                    else normalCount++;
+                  }
+                }
+                const total = normalCount + bulkCount;
+                if (total === 0) return null;
+                const normalPct = Math.round((normalCount / total) * 100);
+                const bulkPct   = 100 - normalPct;
+                return (
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                      Order type mix
+                    </p>
+                    <div className="flex items-center gap-3">
+                      {/* Segmented bar */}
+                      <div className="flex-1 h-3 rounded-full overflow-hidden flex">
+                        <div
+                          className="h-full bg-green-500 transition-all duration-700"
+                          style={{ width: `${normalPct}%` }}
+                        />
+                        <div
+                          className="h-full bg-amber-400 transition-all duration-700"
+                          style={{ width: `${bulkPct}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-4 flex-shrink-0 text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                          <span className="text-gray-600">Normal {normalPct}%</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                          <span className="text-gray-600">Bulk {bulkPct}%</span>
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      {normalCount} normal item rows · {bulkCount} bulk item rows
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+      </section>
+
     </div>
   );
 };

@@ -1,8 +1,8 @@
 /* src/pages/PaymentSuccess.jsx
-   Handles redirect from both eSewa and Khalti after successful payment.
-
+   Handles redirect from eSewa after successful payment.
    eSewa  → GET /payment/esewa/success?data=<base64>
-   Khalti → GET /payment/khalti/success?pidx=...&purchase_order_id=...&status=Completed
+   
+   Khalti has been removed. FonePay is post-payment (handled via confirm, no redirect).
 */
 
 import { useEffect, useState } from "react";
@@ -24,16 +24,6 @@ const PaymentSuccess = () => {
           const res = await api.post("/api/payments/esewa/verify", { data: esewaData });
           setStatus("success");
           setMessage(`eSewa payment verified for order #${res.data.order?.id?.slice(-6) || ""}`);
-          return;
-        }
-
-        /* ── Khalti callback ── */
-        const pidx    = params.get("pidx");
-        const orderId = params.get("purchase_order_id");
-        if (pidx && orderId) {
-          const res = await api.post("/api/payments/khalti/verify", { pidx, orderId });
-          setStatus("success");
-          setMessage(`Khalti payment verified for order #${res.data.order?.id?.slice(-6) || ""}`);
           return;
         }
 
