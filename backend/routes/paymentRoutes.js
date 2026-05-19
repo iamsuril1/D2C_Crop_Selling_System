@@ -10,10 +10,10 @@ import {
   uploadPaymentQR,
   initiateEsewa,
   verifyEsewa,
-  initiateKhalti,
-  verifyKhalti,
   confirmCOD,
   markCODReceived,
+  confirmFonePay,
+  markFonePayReceived,
   verifyPayment,
   servePaymentFile,
 } from "../controllers/paymentController.js";
@@ -29,13 +29,13 @@ router.post("/upload-qr",  protect, authorize("farmer"), upload.single("qrCode")
 router.post("/esewa/initiate", protect, authorize("consumer"), initiateEsewa);
 router.post("/esewa/verify",   protect, authorize("consumer"), verifyEsewa);
 
-/* ── Khalti (pre-payment) ── */
-router.post("/khalti/initiate", protect, authorize("consumer"), initiateKhalti);
-router.post("/khalti/verify",   protect, authorize("consumer"), verifyKhalti);
+/* ── Cash on Delivery (post-payment, pay cash on delivery) ── */
+router.post("/cod/confirm",    protect, authorize("consumer"), confirmCOD);
+router.put ("/cod/received",   protect, authorize("farmer"),   markCODReceived);
 
-/* ── Cash on Delivery (post-payment) ── */
-router.post("/cod/confirm",   protect, authorize("consumer"), confirmCOD);
-router.put ("/cod/received",  protect, authorize("farmer"),   markCODReceived);
+/* ── FonePay on Delivery (post-payment, pay via FonePay QR scan on delivery) ── */
+router.post("/fonepay/confirm",   protect, authorize("consumer"), confirmFonePay);
+router.put ("/fonepay/received",  protect, authorize("farmer"),   markFonePayReceived);
 
 /* ── Farmer verifies manual payment proof ── */
 router.put("/verify", protect, authorize("farmer"), verifyPayment);

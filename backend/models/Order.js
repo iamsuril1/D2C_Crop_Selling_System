@@ -21,7 +21,8 @@ const shipmentSchema = new mongoose.Schema(
     subtotal:    { type: Number, required: true, default: 0 },
     paymentMethod: {
       type:    String,
-      enum:    ["esewa", "khalti", "cash_on_delivery", "pending"],
+      // "khalti" removed, "fonepay" added
+      enum:    ["esewa", "fonepay", "cash_on_delivery", "pending"],
       default: "pending",
     },
     /* paymentStatus = consumer → platform */
@@ -48,8 +49,8 @@ const shipmentSchema = new mongoose.Schema(
       default: false,
     },
     farmerPaymentRecord: {
-      method:    { type: String },   // "esewa" | "bank_qr" | "bank_transfer" | "cash"
-      reference: { type: String },   // UTR / transaction ID / note
+      method:    { type: String },
+      reference: { type: String },
       paidAt:    { type: Date   },
       paidBy:    { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     },
@@ -79,7 +80,6 @@ const orderSchema = new mongoose.Schema(
     },
 
     esewaTransactionUuid: { type: String, default: null },
-    khaltiPidx:           { type: String, default: null },
 
     shipments:      { type: [shipmentSchema], default: [] },
     itemsSubtotal:  { type: Number, required: true, default: 0 },
