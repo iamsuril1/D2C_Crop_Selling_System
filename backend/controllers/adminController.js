@@ -1,3 +1,7 @@
+/* backend/controllers/adminController.js
+   FIX: $unwind preserveNullAndEmpty → preserveNullAndEmptyArrays (correct MongoDB option)
+*/
+
 import User    from '../models/User.js';
 import Product from '../models/Product.js';
 import Order   from '../models/Order.js';
@@ -17,15 +21,14 @@ export const getAllUsers = async (req, res) => {
 export const createUser = async (req, res) => {
   try {
     const { firstName, lastName, email, password, role } = req.body;
-    if (!['farmer', 'consumer'].includes(role)) {
+    if (!['farmer', 'consumer'].includes(role))
       return res.status(400).json({ message: 'Invalid role. Only farmer or consumer allowed.' });
-    }
+
     const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ message: 'Email already exists' });
 
     const hashed = await bcrypt.hash(password, 10);
     const user   = await User.create({ firstName, lastName, email, password: hashed, role });
-
     res.status(201).json({ id: user.id, firstName, lastName, email, role });
   } catch (err) {
     console.error('Admin createUser ERROR:', err);
@@ -37,9 +40,8 @@ export const deleteUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
-    if (user.role === 'admin') {
+    if (user.role === 'admin')
       return res.status(403).json({ message: 'Admin accounts cannot be deleted via this endpoint' });
-    }
 
     await User.findByIdAndDelete(req.params.id);
     res.json({ message: 'User deleted' });
@@ -87,10 +89,9 @@ export const deleteProductAdmin = async (req, res) => {
 
 /* ─────────────────────────────────────────────────────────────
    GET ALL ORDERS
-   FIX: the original code used nested Promise.all loops to populate
-   shipment farmers — an N+1 pattern that fires one DB query per
-   shipment. Replaced with a MongoDB aggregation pipeline that
-   populates consumer + all shipment farmers in two round-trips.
+   FIX: preserveNullAndEmpty → preserveNullAndEmptyArrays
+   This is the correct MongoDB $unwind option name. The old name
+   does not exist and throws error code 28811.
 ───────────────────────────────────────────────────────────── */
 export const getAllOrders = async (req, res) => {
   try {
@@ -98,55 +99,62 @@ export const getAllOrders = async (req, res) => {
       // 1. Join consumer
       {
         $lookup: {
-          from:         "users",
-          localField:   "consumer",
-          foreignField: "_id",
-          as:           "consumer",
+          from:         'users',
+          localField:   'consumer',
+          foreignField: '_id',
+          as:           'consumer',
           pipeline: [
             { $project: { firstName: 1, lastName: 1, email: 1 } },
           ],
         },
       },
-      { $unwind: { path: "$consumer", preserveNullAndEmpty: true } },
+      {
+        $unwind: {
+          path: '$consumer',
+          preserveNullAndEmptyArrays: true,   // ← FIX: was preserveNullAndEmpty
+        },
+      },
 
-      // 2. Join shipment farmers — collect all unique farmer IDs first
+      // 2. Collect farmer IDs from shipments
       {
         $addFields: {
           farmerIds: {
-            $map: { input: "$shipments", as: "s", in: "$$s.farmer" },
+            $map: { input: '$shipments', as: 's', in: '$$s.farmer' },
           },
         },
       },
+
+      // 3. Lookup all shipment farmers in one round-trip
       {
         $lookup: {
-          from:         "users",
-          localField:   "farmerIds",
-          foreignField: "_id",
-          as:           "farmerDocs",
+          from:         'users',
+          localField:   'farmerIds',
+          foreignField: '_id',
+          as:           'farmerDocs',
           pipeline: [
             { $project: { firstName: 1, lastName: 1, email: 1 } },
           ],
         },
       },
 
-      // 3. Replace shipment.farmer ObjectId with the populated doc
+      // 4. Replace shipment.farmer ObjectId with populated doc
       {
         $addFields: {
           shipments: {
             $map: {
-              input: "$shipments",
-              as:    "shipment",
+              input: '$shipments',
+              as:    'shipment',
               in: {
                 $mergeObjects: [
-                  "$$shipment",
+                  '$$shipment',
                   {
                     farmer: {
                       $arrayElemAt: [
                         {
                           $filter: {
-                            input: "$farmerDocs",
-                            as:    "fd",
-                            cond:  { $eq: ["$$fd._id", "$$shipment.farmer"] },
+                            input: '$farmerDocs',
+                            as:    'fd',
+                            cond:  { $eq: ['$$fd._id', '$$shipment.farmer'] },
                           },
                         },
                         0,
@@ -160,8 +168,8 @@ export const getAllOrders = async (req, res) => {
         },
       },
 
-      // 4. Clean up temporary fields
-      { $unset: ["farmerIds", "farmerDocs"] },
+      // 5. Clean up temp fields
+      { $unset: ['farmerIds', 'farmerDocs'] },
 
       { $sort: { createdAt: -1 } },
     ]);
@@ -177,12 +185,10 @@ export const cancelOrderAdmin = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
-    if (order.status === 'delivered') {
+    if (order.status === 'delivered')
       return res.status(400).json({ message: 'Delivered orders cannot be cancelled' });
-    }
-    if (order.status === 'cancelled') {
+    if (order.status === 'cancelled')
       return res.status(400).json({ message: 'Order is already cancelled' });
-    }
 
     // Restore stock
     try {

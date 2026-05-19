@@ -1,17 +1,3 @@
-/* backend/controllers/paymentController.js
-   Fixes applied:
-   1. ES704 — initiateEsewa: platformCharge moved to product_service_charge
-      so amount + service_charge = total_amount exactly.
-   2. verifyEsewa — added console.error logging at every 400 branch so you
-      can see exactly which check fails in your server terminal.
-   3. verifyEsewa — orderId extraction: uses slice(0,24) instead of split("-")[0]
-      because MongoDB ObjectIds are always exactly 24 hex chars with no dashes.
-   4. verifyEsewa — status check is now case-insensitive (sandbox may return
-      "COMPLETE" or "complete" depending on API version).
-   5. verifyEsewa — signature verification logs the exact message string being
-      signed so you can compare it against eSewa's signed_field_names payload.
-*/
-
 import crypto   from "crypto";
 import axios    from "axios";
 import Order    from "../models/Order.js";
@@ -20,68 +6,39 @@ import fs       from "fs";
 import path     from "path";
 import { sendNotification } from "../utils/notificationHelpers.js";
 
-/* ─────────────────────────────────────────────────────────────
-   ENV CONSTANTS
-───────────────────────────────────────────────────────────── */
 const ESEWA_MERCHANT_CODE = process.env.ESEWA_MERCHANT_CODE || "EPAYTEST";
 const ESEWA_SECRET_KEY    = process.env.ESEWA_SECRET_KEY    || "8gBm/:&EnhH.1/q";
 const ESEWA_BASE_URL      = process.env.ESEWA_BASE_URL      || "https://rc-epay.esewa.com.np";
+
 const KHALTI_SECRET_KEY   = process.env.KHALTI_SECRET_KEY   || "test_secret_key_dc74e0fd57cb46cd93832aee0a390234";
-const KHALTI_BASE_URL     = process.env.KHALTI_BASE_URL     || "https://a.khalti.com";
+const KHALTI_BASE_URL     = process.env.KHALTI_BASE_URL     || "https://dev.khalti.com";
+
 const FRONTEND_URL        = process.env.FRONTEND_URL        || "http://localhost:5173";
 
 const PRIVATE_DIR = path.join(process.cwd(), "uploads", "private");
 if (!fs.existsSync(PRIVATE_DIR)) fs.mkdirSync(PRIVATE_DIR, { recursive: true });
 
-/* ─────────────────────────────────────────────────────────────
-   ESEWA SIGNATURE HELPERS
-───────────────────────────────────────────────────────────── */
-
-/**
- * Generate HMAC-SHA256 signature for eSewa v2.
- * Message format: "total_amount=X,transaction_uuid=Y,product_code=Z"
- */
 const generateEsewaSignature = (totalAmount, transactionUuid, productCode) => {
   const message = `total_amount=${totalAmount},transaction_uuid=${transactionUuid},product_code=${productCode}`;
-  return crypto
-    .createHmac("sha256", ESEWA_SECRET_KEY)
-    .update(message)
-    .digest("base64");
+  return crypto.createHmac("sha256", ESEWA_SECRET_KEY).update(message).digest("base64");
 };
 
-/**
- * Verify eSewa response signature.
- * Rebuilds the signed message using signed_field_names from the decoded response,
- * then compares HMAC with the received signature.
- */
 const verifyEsewaSignature = (responseData) => {
   const { signed_field_names, signature } = responseData;
-
   if (!signed_field_names || !signature) {
-    console.error("[eSewa verify] Missing signed_field_names or signature in decoded payload");
+    console.error("[eSewa verify] Missing signed_field_names or signature");
     return false;
   }
-
   const fields  = signed_field_names.split(",");
   const message = fields.map((f) => `${f}=${responseData[f] ?? ""}`).join(",");
-
-  console.log("[eSewa verify] Reconstructed signed message :", message);
-  console.log("[eSewa verify] ESEWA_SECRET_KEY (first 4)   :", ESEWA_SECRET_KEY.slice(0, 4) + "…");
-
-  const expected = crypto
-    .createHmac("sha256", ESEWA_SECRET_KEY)
-    .update(message)
-    .digest("base64");
-
-  console.log("[eSewa verify] Expected signature :", expected);
-  console.log("[eSewa verify] Received signature :", signature);
-  console.log("[eSewa verify] Match              :", expected === signature);
-
+  console.log("[eSewa verify] Signed message:", message);
+  const expected = crypto.createHmac("sha256", ESEWA_SECRET_KEY).update(message).digest("base64");
+  console.log("[eSewa verify] Expected:", expected, "| Received:", signature, "| Match:", expected === signature);
   return expected === signature;
 };
 
 /* ─────────────────────────────────────────────────────────────
-   GET FARMER PAYMENT METHODS
+   FARMER PAYMENT METHODS
 ───────────────────────────────────────────────────────────── */
 export const getFarmerPaymentMethods = async (req, res) => {
   try {
@@ -90,7 +47,6 @@ export const getFarmerPaymentMethods = async (req, res) => {
     );
     if (!farmer || farmer.role !== "farmer")
       return res.status(404).json({ message: "Farmer not found" });
-
     res.json({
       farmerId:               farmer._id,
       farmerName:             `${farmer.firstName} ${farmer.lastName}`,
@@ -108,11 +64,9 @@ export const updateMyPaymentMethods = async (req, res) => {
     const farmer = await User.findById(req.user._id);
     if (!farmer || farmer.role !== "farmer")
       return res.status(403).json({ message: "Only farmers can set payment methods" });
-
     if (paymentMethods)         farmer.paymentMethods         = paymentMethods;
     if (preferredPaymentMethod) farmer.preferredPaymentMethod = preferredPaymentMethod;
     await farmer.save();
-
     res.json({ message: "Payment methods updated", paymentMethods: farmer.paymentMethods });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -130,15 +84,8 @@ export const uploadPaymentQR = async (req, res) => {
 
 /* ─────────────────────────────────────────────────────────────
    INITIATE ESEWA — POST /api/payments/esewa/initiate
-
-   FIX ES704:
-     amount                  = itemsSubtotal + deliveryTotal
-     tax_amount              = 0
-     product_service_charge  = platformCharge (Rs. 25)  ← was 0
-     product_delivery_charge = 0
-     total_amount            = order.totalAmount
-     ──────────────────────────────────────────────────────────
-     amount + 0 + platformCharge + 0 = total_amount  ✓
+   FIX ES704: platformCharge goes into product_service_charge
+   so: amount + 0 + platformCharge + 0 = total_amount exactly
 ───────────────────────────────────────────────────────────── */
 export const initiateEsewa = async (req, res) => {
   try {
@@ -153,13 +100,9 @@ export const initiateEsewa = async (req, res) => {
     const platformCharge   = order.platformCharge ?? 25;
     const totalAmount      = order.totalAmount;
 
-    console.log("[eSewa initiate] itemsAndDelivery  :", itemsAndDelivery);
-    console.log("[eSewa initiate] platformCharge    :", platformCharge);
-    console.log("[eSewa initiate] total_amount      :", totalAmount);
-    console.log("[eSewa initiate] sum check (should equal total_amount):", itemsAndDelivery + platformCharge);
+    console.log("[eSewa initiate] items+delivery:", itemsAndDelivery, "+ platform:", platformCharge, "= total:", totalAmount);
 
     const signature = generateEsewaSignature(totalAmount, transactionUuid, ESEWA_MERCHANT_CODE);
-
     order.esewaTransactionUuid = transactionUuid;
     await order.save();
 
@@ -185,83 +128,47 @@ export const initiateEsewa = async (req, res) => {
 
 /* ─────────────────────────────────────────────────────────────
    VERIFY ESEWA — POST /api/payments/esewa/verify
-
-   eSewa redirects to /payment/esewa/success?data=<base64>
-   PaymentSuccess.jsx POSTs { data } to this endpoint.
-
-   Every 400 branch now has a console.error so you can see in
-   your terminal exactly which guard is failing.
 ───────────────────────────────────────────────────────────── */
 export const verifyEsewa = async (req, res) => {
   try {
     const { data: encodedData } = req.body;
+    console.log("[eSewa verify] req.body keys:", Object.keys(req.body));
 
-    console.log("[eSewa verify] req.body keys   :", Object.keys(req.body));
-    console.log("[eSewa verify] encodedData      :", encodedData ? encodedData.slice(0, 40) + "…" : "MISSING");
-
-    // ── Guard 1: data param must be present ─────────────────────────────────
     if (!encodedData) {
-      console.error("[eSewa verify] 400 → data param missing from request body");
+      console.error("[eSewa verify] 400: data param missing");
       return res.status(400).json({ message: "Missing payment data" });
     }
 
-    // ── Decode base64 → JSON ─────────────────────────────────────────────────
     let decoded;
     try {
-      const jsonStr = Buffer.from(encodedData, "base64").toString("utf8");
-      console.log("[eSewa verify] Decoded JSON :", jsonStr);
-      decoded = JSON.parse(jsonStr);
-    } catch (parseErr) {
-      console.error("[eSewa verify] 400 → base64 decode / JSON.parse failed:", parseErr.message);
+      decoded = JSON.parse(Buffer.from(encodedData, "base64").toString("utf8"));
+      console.log("[eSewa verify] decoded:", JSON.stringify(decoded));
+    } catch (e) {
+      console.error("[eSewa verify] 400: base64 decode failed:", e.message);
       return res.status(400).json({ message: "Invalid payment data encoding" });
     }
 
-    console.log("[eSewa verify] decoded keys         :", Object.keys(decoded));
-    console.log("[eSewa verify] decoded.status       :", decoded.status);
-    console.log("[eSewa verify] transaction_uuid     :", decoded.transaction_uuid);
-    console.log("[eSewa verify] transaction_code     :", decoded.transaction_code);
-    console.log("[eSewa verify] signed_field_names   :", decoded.signed_field_names);
-
-    // ── Guard 2: signature must be valid ─────────────────────────────────────
-    const isValid = verifyEsewaSignature(decoded);
-    if (!isValid) {
-      console.error("[eSewa verify] 400 → Signature mismatch — verify ESEWA_SECRET_KEY in .env");
+    if (!verifyEsewaSignature(decoded)) {
+      console.error("[eSewa verify] 400: signature mismatch");
       return res.status(400).json({ message: "Invalid payment signature" });
     }
 
-    // ── Guard 3: payment must be COMPLETE ────────────────────────────────────
-    // Case-insensitive so "COMPLETE" and "complete" both work
-    const status = (decoded.status || "").toUpperCase().trim();
-    if (status !== "COMPLETE") {
-      console.error(`[eSewa verify] 400 → status="${decoded.status}" is not COMPLETE`);
-      return res.status(400).json({
-        message: `Payment not complete. Status: ${decoded.status}`,
-      });
+    if ((decoded.status || "").toUpperCase().trim() !== "COMPLETE") {
+      console.error("[eSewa verify] 400: status not COMPLETE:", decoded.status);
+      return res.status(400).json({ message: `Payment not complete. Status: ${decoded.status}` });
     }
 
-    // ── Extract orderId ───────────────────────────────────────────────────────
-    // transaction_uuid = "${orderId}-${Date.now()}"
-    // MongoDB ObjectIds are exactly 24 hex chars, no dashes, so slice(0,24) is safe.
     const txUuid  = decoded.transaction_uuid || "";
     const orderId = txUuid.slice(0, 24);
+    console.log("[eSewa verify] orderId:", orderId);
 
-    console.log("[eSewa verify] Extracted orderId :", orderId);
-
-    if (!orderId || orderId.length !== 24) {
-      console.error("[eSewa verify] 400 → Could not extract valid orderId from transaction_uuid:", txUuid);
-      return res.status(400).json({ message: "Could not determine order from transaction" });
+    if (orderId.length !== 24) {
+      return res.status(400).json({ message: "Could not extract orderId from transaction" });
     }
 
-    // ── Guard 4: order must exist ─────────────────────────────────────────────
     const order = await Order.findById(orderId);
-    if (!order) {
-      console.error(`[eSewa verify] 404 → Order not found for id="${orderId}"`);
-      return res.status(404).json({ message: "Order not found" });
-    }
+    if (!order) return res.status(404).json({ message: "Order not found" });
 
-    console.log("[eSewa verify] Order found, updating shipments…");
-
-    // ── Mark shipments — consumer paid, admin holds funds ─────────────────────
     order.shipments = order.shipments.map((s) => ({
       ...s.toObject(),
       paymentMethod: "esewa",
@@ -273,40 +180,34 @@ export const verifyEsewa = async (req, res) => {
     order.paymentStatus = "paid";
     await order.save();
 
-    console.log("[eSewa verify] Order saved. Sending notifications…");
-
     await sendNotification(
-      order.consumer,
-      "payment_paid",
+      order.consumer, "payment_paid",
       `Payment received for order #${order._id.toString().slice(-6)}`,
       "Your eSewa payment was successful. Funds will be released to the farmer after admin review.",
       { orderId: order._id }
     );
-
     for (const shipment of order.shipments) {
       await sendNotification(
-        shipment.farmer,
-        "payment_submitted",
+        shipment.farmer, "payment_submitted",
         `Payment held for order #${order._id.toString().slice(-6)}`,
-        "Consumer paid via eSewa. Funds are held by admin and will be released to you shortly.",
+        "Consumer paid via eSewa. Admin will release to you shortly.",
         { orderId: order._id }
       );
     }
 
-    console.log("[eSewa verify] Done ✓");
-
-    res.json({
-      message: "eSewa payment verified. Funds held pending admin release.",
-      order,
-    });
+    res.json({ message: "eSewa payment verified.", order });
   } catch (err) {
-    console.error("[eSewa verify] Unexpected error:", err);
+    console.error("[eSewa verify] error:", err);
     res.status(500).json({ message: err.message });
   }
 };
 
 /* ─────────────────────────────────────────────────────────────
    INITIATE KHALTI — POST /api/payments/khalti/initiate
+
+   FIX: sandbox URL is https://dev.khalti.com/api/v2/
+        (NOT https://a.khalti.com which is old/wrong)
+   FIX: Authorization header must be "Key <secret>" exactly
 ───────────────────────────────────────────────────────────── */
 export const initiateKhalti = async (req, res) => {
   try {
@@ -321,26 +222,33 @@ export const initiateKhalti = async (req, res) => {
     const payload = {
       return_url:          `${FRONTEND_URL}/payment/khalti/success`,
       website_url:         FRONTEND_URL,
-      amount:              order.totalAmount * 100,
-      purchase_order_id:   orderId,
+      amount:              Math.round(order.totalAmount * 100), // paisa, must be integer
+      purchase_order_id:   orderId.toString(),
       purchase_order_name: `MeroBari Order #${order._id.toString().slice(-6)}`,
       customer_info: {
         name:  `${order.consumer.firstName} ${order.consumer.lastName}`,
         email: order.consumer.email,
-        phone: order.consumer.phone || "9800000000",
+        phone: order.consumer.phone || "9800000001",
       },
     };
+
+    console.log("[Khalti initiate] payload:", JSON.stringify(payload));
+    console.log("[Khalti initiate] URL:", `${KHALTI_BASE_URL}/api/v2/epayment/initiate/`);
+    console.log("[Khalti initiate] Authorization: Key", KHALTI_SECRET_KEY.slice(0, 10) + "…");
 
     const response = await axios.post(
       `${KHALTI_BASE_URL}/api/v2/epayment/initiate/`,
       payload,
       {
         headers: {
+          /* FIX: must be "Key <secret>" — Khalti rejects any other format */
           Authorization:  `Key ${KHALTI_SECRET_KEY}`,
           "Content-Type": "application/json",
         },
       }
     );
+
+    console.log("[Khalti initiate] response:", JSON.stringify(response.data));
 
     order.khaltiPidx = response.data.pidx;
     await order.save();
@@ -353,17 +261,29 @@ export const initiateKhalti = async (req, res) => {
   } catch (err) {
     console.error("[Khalti initiate] error:", err.response?.data || err.message);
     res.status(500).json({
-      message: err.response?.data?.detail || "Failed to initiate Khalti payment",
+      message: err.response?.data?.detail
+        || JSON.stringify(err.response?.data)
+        || "Failed to initiate Khalti payment",
     });
   }
 };
 
 /* ─────────────────────────────────────────────────────────────
    VERIFY KHALTI — POST /api/payments/khalti/verify
+
+   Called by PaymentSuccess.jsx after Khalti redirects to
+   /payment/khalti/success?pidx=…&purchase_order_id=…&status=Completed
+
+   FIX: pidx mismatch is fault-tolerant — if khaltiPidx was not
+        saved (race) we still verify via lookup and trust Khalti
+   FIX: status === "Completed" (Khalti's exact casing per docs)
+   FIX: correct sandbox URL dev.khalti.com
 ───────────────────────────────────────────────────────────── */
 export const verifyKhalti = async (req, res) => {
   try {
     const { pidx, orderId } = req.body;
+    console.log("[Khalti verify] pidx:", pidx, "orderId:", orderId);
+
     if (!pidx || !orderId)
       return res.status(400).json({ message: "pidx and orderId are required" });
 
@@ -371,8 +291,16 @@ export const verifyKhalti = async (req, res) => {
     if (!order) return res.status(404).json({ message: "Order not found" });
     if (order.consumer.toString() !== req.user._id.toString())
       return res.status(403).json({ message: "Unauthorized" });
-    if (order.khaltiPidx !== pidx)
+
+    /* FIX: fault-tolerant pidx mismatch — only reject if we saved a pidx
+       AND it doesn't match. If khaltiPidx was never saved (race condition
+       between save() and redirect), trust Khalti's own lookup response. */
+    if (order.khaltiPidx && order.khaltiPidx !== pidx) {
+      console.error("[Khalti verify] pidx mismatch. Saved:", order.khaltiPidx, "Received:", pidx);
       return res.status(400).json({ message: "pidx mismatch" });
+    }
+
+    console.log("[Khalti verify] calling lookup:", `${KHALTI_BASE_URL}/api/v2/epayment/lookup/`);
 
     const response = await axios.post(
       `${KHALTI_BASE_URL}/api/v2/epayment/lookup/`,
@@ -385,12 +313,24 @@ export const verifyKhalti = async (req, res) => {
       }
     );
 
-    const { status, transaction_id } = response.data;
+    console.log("[Khalti verify] lookup response:", JSON.stringify(response.data));
 
-    if (status !== "Completed")
+    const { status, transaction_id, total_amount } = response.data;
+
+    /* FIX: Khalti returns "Completed" (capital C) per official docs */
+    if (status !== "Completed") {
+      console.error("[Khalti verify] status not Completed:", status);
       return res.status(400).json({
-        message: `Khalti payment not completed. Status: ${status}`,
+        message: `Payment not completed. Status: ${status}`,
       });
+    }
+
+    /* Optional: verify amount matches order (prevent amount tampering) */
+    const expectedPaisa = Math.round(order.totalAmount * 100);
+    if (total_amount && total_amount !== expectedPaisa) {
+      console.error("[Khalti verify] amount mismatch. Expected:", expectedPaisa, "Got:", total_amount);
+      return res.status(400).json({ message: "Payment amount mismatch" });
+    }
 
     order.shipments = order.shipments.map((s) => ({
       ...s.toObject(),
@@ -401,31 +341,32 @@ export const verifyKhalti = async (req, res) => {
     }));
     order.paymentType   = "pre_payment";
     order.paymentStatus = "paid";
+    /* Ensure pidx is stored even if it wasn't saved during initiate */
+    order.khaltiPidx    = pidx;
     await order.save();
 
     await sendNotification(
-      order.consumer,
-      "payment_paid",
+      order.consumer, "payment_paid",
       `Payment received for order #${order._id.toString().slice(-6)}`,
       "Your Khalti payment was successful. Funds will be released to the farmer after admin review.",
       { orderId: order._id }
     );
-
     for (const shipment of order.shipments) {
       await sendNotification(
-        shipment.farmer,
-        "payment_submitted",
+        shipment.farmer, "payment_submitted",
         `Payment held for order #${order._id.toString().slice(-6)}`,
-        "Consumer paid via Khalti. Funds are held by admin and will be released to you shortly.",
+        "Consumer paid via Khalti. Admin will release to you shortly.",
         { orderId: order._id }
       );
     }
 
-    res.json({ message: "Khalti payment verified. Funds held pending admin release.", order });
+    res.json({ message: "Khalti payment verified.", order });
   } catch (err) {
     console.error("[Khalti verify] error:", err.response?.data || err.message);
     res.status(500).json({
-      message: err.response?.data?.detail || "Failed to verify Khalti payment",
+      message: err.response?.data?.detail
+        || JSON.stringify(err.response?.data)
+        || "Failed to verify Khalti payment",
     });
   }
 };
@@ -448,11 +389,7 @@ export const confirmCOD = async (req, res) => {
 
     order.shipments = order.shipments.map((s) => {
       if (targetFarmers.includes(s.farmer.toString())) {
-        return {
-          ...s.toObject(),
-          paymentMethod: "cash_on_delivery",
-          paymentStatus: "pending_admin_release",
-        };
+        return { ...s.toObject(), paymentMethod: "cash_on_delivery", paymentStatus: "pending_admin_release" };
       }
       return s;
     });
@@ -462,14 +399,12 @@ export const confirmCOD = async (req, res) => {
 
     for (const farmerId of targetFarmers) {
       await sendNotification(
-        farmerId,
-        "payment_submitted",
+        farmerId, "payment_submitted",
         `COD order #${order._id.toString().slice(-6)}`,
         "Consumer will pay cash on delivery. Admin will release your payment after confirmation.",
         { orderId: order._id }
       );
     }
-
     res.json({ message: "Cash on delivery confirmed", order });
   } catch (err) {
     console.error("[COD confirm] error:", err);
@@ -478,7 +413,7 @@ export const confirmCOD = async (req, res) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
-   FARMER MARKS COD AS RECEIVED — PUT /api/payments/cod/received
+   FARMER MARKS COD RECEIVED — PUT /api/payments/cod/received
 ───────────────────────────────────────────────────────────── */
 export const markCODReceived = async (req, res) => {
   try {
@@ -486,24 +421,21 @@ export const markCODReceived = async (req, res) => {
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    const shipmentIndex = order.shipments.findIndex(
+    const idx = order.shipments.findIndex(
       (s) => s.farmer.toString() === req.user._id.toString()
     );
-    if (shipmentIndex === -1)
-      return res.status(403).json({ message: "Unauthorized" });
+    if (idx === -1) return res.status(403).json({ message: "Unauthorized" });
 
-    order.shipments[shipmentIndex].paymentStatus = "paid";
-    order.shipments[shipmentIndex].paymentDate   = new Date();
+    order.shipments[idx].paymentStatus = "paid";
+    order.shipments[idx].paymentDate   = new Date();
     await order.save();
 
     await sendNotification(
-      order.consumer,
-      "payment_paid",
+      order.consumer, "payment_paid",
       `Cash received for order #${order._id.toString().slice(-6)}`,
       "The farmer has confirmed cash payment.",
       { orderId: order._id }
     );
-
     res.json({ message: "COD marked as received", order });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -523,18 +455,10 @@ export const servePaymentFile = async (req, res) => {
     const order = await Order.findOne({
       $or: [
         { consumer: req.user._id, "shipments.paymentProof": { $regex: filename } },
-        {
-          shipments: {
-            $elemMatch: {
-              farmer:       req.user._id,
-              paymentProof: { $regex: filename },
-            },
-          },
-        },
+        { shipments: { $elemMatch: { farmer: req.user._id, paymentProof: { $regex: filename } } } },
       ],
     });
     if (!order) return res.status(403).json({ message: "Forbidden" });
-
     res.sendFile(filePath);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -559,13 +483,11 @@ export const verifyPayment = async (req, res) => {
     await order.save();
 
     await sendNotification(
-      order.consumer,
-      `payment_${status}`,
+      order.consumer, `payment_${status}`,
       `Payment ${status}`,
       `Your payment for order #${order._id.toString().slice(-6)} has been ${status}`,
       { orderId: order._id }
     );
-
     res.json({ message: `Payment ${status}`, order });
   } catch (err) {
     res.status(500).json({ message: err.message });
