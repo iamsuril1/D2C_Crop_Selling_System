@@ -1,18 +1,13 @@
-
 import mongoose from "mongoose";
 import bcrypt   from "bcryptjs";
 import dotenv   from "dotenv";
 import User     from "./models/User.js";
-
 dotenv.config();
-
 const MONGO_URI = process.env.MONGO_URI;
-
 if (!MONGO_URI) {
   console.error("MONGO_URI is not set in your .env file.");
   process.exit(1);
 }
-
 const seedUsers = [
   {
     firstName: "Admin",
@@ -34,7 +29,6 @@ const seedUsers = [
       coordinates: [85.3240, 27.7172], 
     },
     addressText: "Kathmandu, Bagmati Province, Nepal",
-
     paymentMethods: [
       { type: "cash_on_delivery", enabled: true },
       { type: "esewa",            enabled: false },
@@ -85,15 +79,13 @@ const seed = async () => {
         `   ✓  ${user.role.padEnd(8)}  ${user.email.padEnd(30)}  password: ${data.password}`
       );
     }
-
   } catch (err) {
     console.error("Seeding failed:", err.message);
     process.exit(1);
   } finally {
     await mongoose.disconnect();
-    console.log("🔌  Disconnected from MongoDB.");
+    console.log(" Disconnected from MongoDB.");
     process.exit(0);
   }
 };
-
 seed();

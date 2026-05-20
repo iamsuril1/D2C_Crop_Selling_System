@@ -1,3 +1,12 @@
+/* backend/controllers/paymentController.js
+   SIMPLIFIED:
+   - When consumer pays (eSewa / COD / FonePay), shipment.paymentStatus → "paid"
+     (previously was "pending_admin_release" — that middle state is removed)
+   - Order.paymentStatus → "paid"
+   - Farmer payout queue picks up all orders where paymentStatus = "paid"
+     and shipments.farmerPaid = false  (no release step needed)
+*/
+
 import crypto   from "crypto";
 import Order    from "../models/Order.js";
 import User     from "../models/User.js";
@@ -8,7 +17,6 @@ import { sendNotification } from "../utils/notificationHelpers.js";
 const ESEWA_MERCHANT_CODE = process.env.ESEWA_MERCHANT_CODE || "EPAYTEST";
 const ESEWA_SECRET_KEY    = process.env.ESEWA_SECRET_KEY    || "8gBm/:&EnhH.1/q";
 const ESEWA_BASE_URL      = process.env.ESEWA_BASE_URL      || "https://rc-epay.esewa.com.np";
-
 const FRONTEND_URL        = process.env.FRONTEND_URL        || "http://localhost:5173";
 
 const PRIVATE_DIR = path.join(process.cwd(), "uploads", "private");
@@ -21,21 +29,14 @@ const generateEsewaSignature = (totalAmount, transactionUuid, productCode) => {
 
 const verifyEsewaSignature = (responseData) => {
   const { signed_field_names, signature } = responseData;
-  if (!signed_field_names || !signature) {
-    console.error("[eSewa verify] Missing signed_field_names or signature");
-    return false;
-  }
+  if (!signed_field_names || !signature) return false;
   const fields  = signed_field_names.split(",");
   const message = fields.map((f) => `${f}=${responseData[f] ?? ""}`).join(",");
-  console.log("[eSewa verify] Signed message:", message);
   const expected = crypto.createHmac("sha256", ESEWA_SECRET_KEY).update(message).digest("base64");
-  console.log("[eSewa verify] Expected:", expected, "| Received:", signature, "| Match:", expected === signature);
   return expected === signature;
 };
 
-/* ─────────────────────────────────────────────────────────────
-   FARMER PAYMENT METHODS
-───────────────────────────────────────────────────────────── */
+/* ── Farmer Payment Methods ── */
 export const getFarmerPaymentMethods = async (req, res) => {
   try {
     const farmer = await User.findById(req.params.farmerId).select(
@@ -79,7 +80,7 @@ export const uploadPaymentQR = async (req, res) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
-   INITIATE ESEWA — POST /api/payments/esewa/initiate
+   INITIATE ESEWA
 ───────────────────────────────────────────────────────────── */
 export const initiateEsewa = async (req, res) => {
   try {
@@ -88,30 +89,30 @@ export const initiateEsewa = async (req, res) => {
     if (!order) return res.status(404).json({ message: "Order not found" });
     if (order.consumer.toString() !== req.user._id.toString())
       return res.status(403).json({ message: "Unauthorized" });
+    if (order.status === "cancelled")
+      return res.status(400).json({ message: "This order has been cancelled" });
 
     const transactionUuid  = `${orderId}-${Date.now()}`;
     const itemsAndDelivery = (order.itemsSubtotal || 0) + (order.deliveryTotal || 0);
     const platformCharge   = order.platformCharge ?? 25;
     const totalAmount      = order.totalAmount;
 
-    console.log("[eSewa initiate] items+delivery:", itemsAndDelivery, "+ platform:", platformCharge, "= total:", totalAmount);
-
     const signature = generateEsewaSignature(totalAmount, transactionUuid, ESEWA_MERCHANT_CODE);
     order.esewaTransactionUuid = transactionUuid;
     await order.save();
 
     res.json({
-      paymentUrl:               `${ESEWA_BASE_URL}/api/epay/main/v2/form`,
-      amount:                   itemsAndDelivery,
-      tax_amount:               0,
-      total_amount:             totalAmount,
-      transaction_uuid:         transactionUuid,
-      product_code:             ESEWA_MERCHANT_CODE,
-      product_service_charge:   platformCharge,
-      product_delivery_charge:  0,
-      success_url:              `${FRONTEND_URL}/payment/esewa/success`,
-      failure_url:              `${FRONTEND_URL}/payment/esewa/failure`,
-      signed_field_names:       "total_amount,transaction_uuid,product_code",
+      paymentUrl:              `${ESEWA_BASE_URL}/api/epay/main/v2/form`,
+      amount:                  itemsAndDelivery,
+      tax_amount:              0,
+      total_amount:            totalAmount,
+      transaction_uuid:        transactionUuid,
+      product_code:            ESEWA_MERCHANT_CODE,
+      product_service_charge:  platformCharge,
+      product_delivery_charge: 0,
+      success_url:             `${FRONTEND_URL}/payment/esewa/success`,
+      failure_url:             `${FRONTEND_URL}/payment/esewa/failure`,
+      signed_field_names:      "total_amount,transaction_uuid,product_code",
       signature,
     });
   } catch (err) {
@@ -121,52 +122,41 @@ export const initiateEsewa = async (req, res) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
-   VERIFY ESEWA — POST /api/payments/esewa/verify
+   VERIFY ESEWA
+   Shipment paymentStatus → "paid" directly (no pending_admin_release)
 ───────────────────────────────────────────────────────────── */
 export const verifyEsewa = async (req, res) => {
   try {
     const { data: encodedData } = req.body;
-    console.log("[eSewa verify] req.body keys:", Object.keys(req.body));
-
-    if (!encodedData) {
-      console.error("[eSewa verify] 400: data param missing");
+    if (!encodedData)
       return res.status(400).json({ message: "Missing payment data" });
-    }
 
     let decoded;
     try {
       decoded = JSON.parse(Buffer.from(encodedData, "base64").toString("utf8"));
-      console.log("[eSewa verify] decoded:", JSON.stringify(decoded));
     } catch (e) {
-      console.error("[eSewa verify] 400: base64 decode failed:", e.message);
       return res.status(400).json({ message: "Invalid payment data encoding" });
     }
 
-    if (!verifyEsewaSignature(decoded)) {
-      console.error("[eSewa verify] 400: signature mismatch");
+    if (!verifyEsewaSignature(decoded))
       return res.status(400).json({ message: "Invalid payment signature" });
-    }
 
-    if ((decoded.status || "").toUpperCase().trim() !== "COMPLETE") {
-      console.error("[eSewa verify] 400: status not COMPLETE:", decoded.status);
+    if ((decoded.status || "").toUpperCase().trim() !== "COMPLETE")
       return res.status(400).json({ message: `Payment not complete. Status: ${decoded.status}` });
-    }
 
     const txUuid  = decoded.transaction_uuid || "";
     const orderId = txUuid.slice(0, 24);
-    console.log("[eSewa verify] orderId:", orderId);
-
-    if (orderId.length !== 24) {
+    if (orderId.length !== 24)
       return res.status(400).json({ message: "Could not extract orderId from transaction" });
-    }
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
+    // Mark all shipments as paid — goes straight to farmer payout queue
     order.shipments = order.shipments.map((s) => ({
       ...s.toObject(),
       paymentMethod: "esewa",
-      paymentStatus: "pending_admin_release",
+      paymentStatus: "paid",          // ← was "pending_admin_release"
       paymentDate:   new Date(),
       transactionId: decoded.transaction_code,
     }));
@@ -175,16 +165,18 @@ export const verifyEsewa = async (req, res) => {
     await order.save();
 
     await sendNotification(
-      order.consumer, "payment_paid",
+      order.consumer,
+      "payment_paid",
       `Payment received for order #${order._id.toString().slice(-6)}`,
-      "Your eSewa payment was successful. Funds will be released to the farmer after admin review.",
+      "Your eSewa payment was successful. The farmer will prepare your order.",
       { orderId: order._id }
     );
     for (const shipment of order.shipments) {
       await sendNotification(
-        shipment.farmer, "payment_submitted",
-        `Payment held for order #${order._id.toString().slice(-6)}`,
-        "Consumer paid via eSewa. Admin will release to you shortly.",
+        shipment.farmer,
+        "payment_submitted",
+        `Payment received for order #${order._id.toString().slice(-6)}`,
+        "Consumer paid via eSewa. You'll receive your payout from admin.",
         { orderId: order._id }
       );
     }
@@ -197,7 +189,8 @@ export const verifyEsewa = async (req, res) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
-   CASH ON DELIVERY — POST /api/payments/cod/confirm
+   CASH ON DELIVERY
+   Shipment paymentStatus → "paid" directly
 ───────────────────────────────────────────────────────────── */
 export const confirmCOD = async (req, res) => {
   try {
@@ -206,6 +199,8 @@ export const confirmCOD = async (req, res) => {
     if (!order) return res.status(404).json({ message: "Order not found" });
     if (order.consumer.toString() !== req.user._id.toString())
       return res.status(403).json({ message: "Unauthorized" });
+    if (order.status === "cancelled")
+      return res.status(400).json({ message: "This order has been cancelled" });
 
     const targetFarmers =
       Array.isArray(farmerIds) && farmerIds.length > 0
@@ -214,7 +209,11 @@ export const confirmCOD = async (req, res) => {
 
     order.shipments = order.shipments.map((s) => {
       if (targetFarmers.includes(s.farmer.toString())) {
-        return { ...s.toObject(), paymentMethod: "cash_on_delivery", paymentStatus: "pending_admin_release" };
+        return {
+          ...s.toObject(),
+          paymentMethod: "cash_on_delivery",
+          paymentStatus: "paid",           // ← was "pending_admin_release"
+        };
       }
       return s;
     });
@@ -224,9 +223,10 @@ export const confirmCOD = async (req, res) => {
 
     for (const farmerId of targetFarmers) {
       await sendNotification(
-        farmerId, "payment_submitted",
+        farmerId,
+        "payment_submitted",
         `COD order #${order._id.toString().slice(-6)}`,
-        "Consumer will pay cash on delivery. Admin will release your payment after confirmation.",
+        "Consumer selected Cash on Delivery. Prepare the order for delivery.",
         { orderId: order._id }
       );
     }
@@ -238,9 +238,7 @@ export const confirmCOD = async (req, res) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
-   FONEPAY ON DELIVERY — POST /api/payments/fonepay/confirm
-   FonePay is a post-payment method: consumer pays via FonePay
-   QR scan during delivery (like COD but digital).
+   FONEPAY ON DELIVERY
 ───────────────────────────────────────────────────────────── */
 export const confirmFonePay = async (req, res) => {
   try {
@@ -249,6 +247,8 @@ export const confirmFonePay = async (req, res) => {
     if (!order) return res.status(404).json({ message: "Order not found" });
     if (order.consumer.toString() !== req.user._id.toString())
       return res.status(403).json({ message: "Unauthorized" });
+    if (order.status === "cancelled")
+      return res.status(400).json({ message: "This order has been cancelled" });
 
     const targetFarmers =
       Array.isArray(farmerIds) && farmerIds.length > 0
@@ -260,7 +260,7 @@ export const confirmFonePay = async (req, res) => {
         return {
           ...s.toObject(),
           paymentMethod: "fonepay",
-          paymentStatus: "pending_admin_release",
+          paymentStatus: "paid",           // ← was "pending_admin_release"
         };
       }
       return s;
@@ -271,9 +271,10 @@ export const confirmFonePay = async (req, res) => {
 
     for (const farmerId of targetFarmers) {
       await sendNotification(
-        farmerId, "payment_submitted",
+        farmerId,
+        "payment_submitted",
         `FonePay order #${order._id.toString().slice(-6)}`,
-        "Consumer will pay via FonePay QR scan on delivery. Admin will release your payment after confirmation.",
+        "Consumer selected FonePay on Delivery. Prepare the order.",
         { orderId: order._id }
       );
     }
@@ -284,28 +285,23 @@ export const confirmFonePay = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   FARMER MARKS FONEPAY RECEIVED — PUT /api/payments/fonepay/received
-───────────────────────────────────────────────────────────── */
+/* ── Mark FonePay received (farmer) ── */
 export const markFonePayReceived = async (req, res) => {
   try {
     const { orderId, transactionId } = req.body;
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: "Order not found" });
-
     const idx = order.shipments.findIndex(
       (s) => s.farmer.toString() === req.user._id.toString()
     );
     if (idx === -1) return res.status(403).json({ message: "Unauthorized" });
-
-    order.shipments[idx].paymentStatus = "paid";
-    order.shipments[idx].paymentDate   = new Date();
+    order.shipments[idx].paymentDate = new Date();
     if (transactionId) order.shipments[idx].transactionId = transactionId;
     await order.save();
-
     await sendNotification(
-      order.consumer, "payment_paid",
-      `FonePay payment received for order #${order._id.toString().slice(-6)}`,
+      order.consumer,
+      "payment_paid",
+      `FonePay payment confirmed for order #${order._id.toString().slice(-6)}`,
       "The farmer has confirmed your FonePay payment.",
       { orderId: order._id }
     );
@@ -315,26 +311,21 @@ export const markFonePayReceived = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   FARMER MARKS COD RECEIVED — PUT /api/payments/cod/received
-───────────────────────────────────────────────────────────── */
+/* ── Mark COD received (farmer) ── */
 export const markCODReceived = async (req, res) => {
   try {
     const { orderId } = req.body;
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: "Order not found" });
-
     const idx = order.shipments.findIndex(
       (s) => s.farmer.toString() === req.user._id.toString()
     );
     if (idx === -1) return res.status(403).json({ message: "Unauthorized" });
-
-    order.shipments[idx].paymentStatus = "paid";
-    order.shipments[idx].paymentDate   = new Date();
+    order.shipments[idx].paymentDate = new Date();
     await order.save();
-
     await sendNotification(
-      order.consumer, "payment_paid",
+      order.consumer,
+      "payment_paid",
       `Cash received for order #${order._id.toString().slice(-6)}`,
       "The farmer has confirmed cash payment.",
       { orderId: order._id }
@@ -345,16 +336,13 @@ export const markCODReceived = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   SERVE PRIVATE FILE — GET /api/payments/files/:filename
-───────────────────────────────────────────────────────────── */
+/* ── Serve private files ── */
 export const servePaymentFile = async (req, res) => {
   try {
     const filename = path.basename(req.params.filename);
     const filePath = path.join(PRIVATE_DIR, filename);
     if (!fs.existsSync(filePath))
       return res.status(404).json({ message: "File not found" });
-
     const order = await Order.findOne({
       $or: [
         { consumer: req.user._id, "shipments.paymentProof": { $regex: filename } },
@@ -368,25 +356,21 @@ export const servePaymentFile = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   FARMER VERIFIES MANUAL PAYMENT — PUT /api/payments/verify
-───────────────────────────────────────────────────────────── */
+/* ── Farmer verifies manual payment ── */
 export const verifyPayment = async (req, res) => {
   try {
     const { orderId, status } = req.body;
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: "Order not found" });
-
     const idx = order.shipments.findIndex(
       (s) => s.farmer.toString() === req.user._id.toString()
     );
     if (idx === -1) return res.status(403).json({ message: "Unauthorized" });
-
     order.shipments[idx].paymentStatus = status;
     await order.save();
-
     await sendNotification(
-      order.consumer, `payment_${status}`,
+      order.consumer,
+      `payment_${status}`,
       `Payment ${status}`,
       `Your payment for order #${order._id.toString().slice(-6)} has been ${status}`,
       { orderId: order._id }

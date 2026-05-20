@@ -1,90 +1,112 @@
 /* backend/controllers/farmerPayoutController.js
-   Per-farmer accumulated payout system.
-
-   Flow:
-     1. Admin releases an order payout (existing payoutController) →
-        shipment.paymentStatus = "paid", adminPayout.released = true
-     2. GET /api/farmer-payouts  → lists each farmer with their total
-        accumulated balance (sum of all released-but-not-yet-farmer-paid
-        shipment subtotals) plus their payment details from User.paymentMethods
-     3. PUT /api/farmer-payouts/:farmerId/pay  → admin marks farmer as paid,
-        records method + reference number, sets all relevant shipments to
-        farmerPaid = true so they don't appear in the pending balance again
+   SIMPLIFIED FLOW:
+   - Removed adminPayout.released requirement entirely
+   - As soon as consumer pays (paymentStatus: "paid"), order appears in farmer payout queue
+   - Admin directly pays farmers — no separate "release" step
+   - Return deductions still applied
+   - 15-day cooldown still enforced
 */
 
-import Order from "../models/Order.js";
-import User  from "../models/User.js";
+import Order  from "../models/Order.js";
+import User   from "../models/User.js";
+import Return from "../models/Return.js";
 import { sendNotification } from "../utils/notificationHelpers.js";
+
+const PAYOUT_COOLDOWN_DAYS = 15;
 
 /* ─────────────────────────────────────────────────────────────
    HELPER — pull enabled payment methods for a farmer
 ───────────────────────────────────────────────────────────── */
 const extractPaymentDetails = (farmer) => {
   const methods = farmer.paymentMethods || [];
-
-  const esewa = methods.find((m) => m.type === "esewa" && m.enabled);
-  const bankQr = methods.find((m) => m.type === "bank_qr" && m.enabled);
-  const bankTransfer = methods.find((m) => m.type === "bank_transfer" && m.enabled);
-  const cod = methods.find((m) => m.type === "cash_on_delivery" && m.enabled);
+  const esewa        = methods.find((m) => m.type === "esewa"         && m.enabled);
+  const bankQr       = methods.find((m) => m.type === "bank_qr"       && m.enabled);
+  const bankTransfer = methods.find((m) => m.type === "bank_transfer"  && m.enabled);
 
   return {
-    preferred: farmer.preferredPaymentMethod || "cash_on_delivery",
-    esewa: esewa ? { esewaId: esewa.esewaId } : null,
-    bankQr: bankQr
-      ? { bankName: bankQr.bankName, qrCodeImage: bankQr.qrCodeImage }
-      : null,
-    bankTransfer: bankTransfer
-      ? {
-          bankName:      bankTransfer.bankName,
-          accountNumber: bankTransfer.accountNumber,
-          accountName:   bankTransfer.accountName,
-          bankBranch:    bankTransfer.bankBranch || "",
-        }
-      : null,
-    cod: cod ? true : null,
+    preferred:    farmer.preferredPaymentMethod || "cash",
+    esewa:        esewa        ? { esewaId: esewa.esewaId }                                              : null,
+    bankQr:       bankQr       ? { bankName: bankQr.bankName, qrCodeImage: bankQr.qrCodeImage }          : null,
+    bankTransfer: bankTransfer ? {
+      bankName:      bankTransfer.bankName,
+      accountNumber: bankTransfer.accountNumber,
+      accountName:   bankTransfer.accountName,
+      bankBranch:    bankTransfer.bankBranch || "",
+    } : null,
+  };
+};
+
+/* ─────────────────────────────────────────────────────────────
+   HELPER — check 15-day cooldown for a farmer
+───────────────────────────────────────────────────────────── */
+const checkPayoutCooldown = async (farmerId) => {
+  const recentOrder = await Order.findOne({
+    "shipments.farmer":     farmerId,
+    "shipments.farmerPaid": true,
+  })
+    .select("shipments")
+    .sort({ "shipments.farmerPaymentRecord.paidAt": -1 });
+
+  if (!recentOrder) return { allowed: true, lastPaidAt: null, daysLeft: 0 };
+
+  let lastPaidAt = null;
+  for (const s of recentOrder.shipments) {
+    if (
+      s.farmer?.toString() === farmerId?.toString() &&
+      s.farmerPaid &&
+      s.farmerPaymentRecord?.paidAt
+    ) {
+      const paidAt = new Date(s.farmerPaymentRecord.paidAt);
+      if (!lastPaidAt || paidAt > lastPaidAt) lastPaidAt = paidAt;
+    }
+  }
+
+  if (!lastPaidAt) return { allowed: true, lastPaidAt: null, daysLeft: 0 };
+
+  const daysSince = (Date.now() - lastPaidAt.getTime()) / 86_400_000;
+  const daysLeft  = Math.ceil(PAYOUT_COOLDOWN_DAYS - daysSince);
+
+  return {
+    allowed:    daysSince >= PAYOUT_COOLDOWN_DAYS,
+    lastPaidAt,
+    daysLeft:   Math.max(0, daysLeft),
   };
 };
 
 /* ─────────────────────────────────────────────────────────────
    GET /api/farmer-payouts
-   Returns one entry per farmer who has a pending balance:
-   {
-     farmerId, farmerName, farmerEmail,
-     pendingAmount,          ← sum of shipment.subtotals not yet farmer-paid
-     pendingOrderCount,      ← number of distinct orders
-     pendingShipments: [...] ← detail for the accordion
-     paymentDetails,         ← bank/eSewa/QR info from farmer profile
-   }
+   Now: any order where consumer paid AND farmer not yet paid
+   No longer requires adminPayout.released = true
 ───────────────────────────────────────────────────────────── */
 export const getFarmerPayouts = async (req, res) => {
   try {
-    /* Find all orders where:
-       - admin has released the payout (adminPayout.released = true)
-       - at least one shipment is NOT yet farmer-paid (farmerPaid != true)
-       - order is not cancelled
-    */
     const orders = await Order.find({
-      "adminPayout.released": true,
-      status: { $nin: ["cancelled"] },
-      "shipments.farmerPaid": { $ne: true },
+      paymentStatus:          "paid",          // consumer has paid
+      status:                 { $nin: ["cancelled"] },
+      "shipments.farmerPaid": { $ne: true },   // farmer not yet paid
     })
       .populate("consumer", "firstName lastName")
-      .populate("shipments.farmer", "firstName lastName email paymentMethods preferredPaymentMethod");
+      .populate(
+        "shipments.farmer",
+        "firstName lastName email paymentMethods preferredPaymentMethod"
+      );
 
-    /* Accumulate per farmer */
     const farmerMap = new Map();
 
     for (const order of orders) {
       for (const shipment of order.shipments) {
-        /* Skip already farmer-paid shipments */
-        if (shipment.farmerPaid) continue;
-        /* Skip shipments that haven't been admin-released yet */
-        if (shipment.paymentStatus !== "paid") continue;
+        if (shipment.farmerPaid)              continue;
+        if (shipment.paymentStatus === "pending") continue; // shipment-level not yet confirmed
 
         const farmer = shipment.farmer;
         if (!farmer) continue;
 
         const fid = (farmer._id || farmer).toString();
+
+        const deduction        = shipment.returnDeduction || 0;
+        const effectiveSubtotal = Math.max(0, (shipment.subtotal || 0) - deduction);
+
+        if (effectiveSubtotal === 0) continue;
 
         if (!farmerMap.has(fid)) {
           farmerMap.set(fid, {
@@ -100,34 +122,46 @@ export const getFarmerPayouts = async (req, res) => {
         }
 
         const entry = farmerMap.get(fid);
-        entry.pendingAmount += shipment.subtotal || 0;
+        entry.pendingAmount += effectiveSubtotal;
         entry.orderIds.add(order._id.toString());
         entry.pendingShipments.push({
-          orderId:         order._id,
-          orderDisplayId:  order._id.toString().slice(-6),
-          consumerName:    order.consumer
+          orderId:          order._id,
+          orderDisplayId:   order._id.toString().slice(-6),
+          consumerName:     order.consumer
             ? `${order.consumer.firstName} ${order.consumer.lastName}`
             : "Consumer",
-          orderType:       order.orderType,
-          createdAt:       order.createdAt,
-          shipmentSubtotal: shipment.subtotal,
-          items:           shipment.items,
-          paymentMethod:   shipment.paymentMethod,
+          orderType:        order.orderType,
+          createdAt:        order.createdAt,
+          shipmentSubtotal: effectiveSubtotal,
+          originalSubtotal: shipment.subtotal,
+          returnDeduction:  deduction,
+          items:            shipment.items,
+          paymentMethod:    shipment.paymentMethod,
         });
       }
     }
 
-    /* Convert map to array, add pendingOrderCount */
-    const result = [...farmerMap.values()].map((entry) => ({
-      ...entry,
-      pendingAmount:     Math.round(entry.pendingAmount),
-      pendingOrderCount: entry.orderIds.size,
-      orderIds:          undefined, // don't send the Set
-    }));
+    const result = await Promise.all(
+      [...farmerMap.values()].map(async (entry) => {
+        const cooldown = await checkPayoutCooldown(entry.farmerId);
+        return {
+          ...entry,
+          pendingAmount:     Math.round(entry.pendingAmount),
+          pendingOrderCount: entry.orderIds.size,
+          orderIds:          undefined,
+          cooldown: {
+            allowed:     cooldown.allowed,
+            lastPaidAt:  cooldown.lastPaidAt,
+            daysLeft:    cooldown.daysLeft,
+            nextPayoutAt: cooldown.lastPaidAt
+              ? new Date(cooldown.lastPaidAt.getTime() + PAYOUT_COOLDOWN_DAYS * 86_400_000)
+              : null,
+          },
+        };
+      })
+    );
 
-    /* Sort by highest pending amount first */
     result.sort((a, b) => b.pendingAmount - a.pendingAmount);
-
     res.json(result);
   } catch (err) {
     console.error("[getFarmerPayouts] error:", err);
@@ -137,16 +171,14 @@ export const getFarmerPayouts = async (req, res) => {
 
 /* ─────────────────────────────────────────────────────────────
    GET /api/farmer-payouts/history
-   All farmers who have been fully paid, for the history tab.
 ───────────────────────────────────────────────────────────── */
 export const getFarmerPayoutHistory = async (req, res) => {
   try {
     const orders = await Order.find({
-      "adminPayout.released": true,
       "shipments.farmerPaid": true,
     })
       .populate("shipments.farmer", "firstName lastName email")
-      .sort({ "adminPayout.releasedAt": -1 })
+      .sort({ createdAt: -1 })
       .limit(200);
 
     const farmerMap = new Map();
@@ -154,7 +186,6 @@ export const getFarmerPayoutHistory = async (req, res) => {
     for (const order of orders) {
       for (const shipment of order.shipments) {
         if (!shipment.farmerPaid) continue;
-
         const farmer = shipment.farmer;
         if (!farmer) continue;
         const fid = (farmer._id || farmer).toString();
@@ -173,8 +204,7 @@ export const getFarmerPayoutHistory = async (req, res) => {
         entry.totalPaid += shipment.subtotal || 0;
 
         if (shipment.farmerPaymentRecord) {
-          /* Group by payment batch (farmerPaymentRecord.paidAt rounded to minute) */
-          const record = shipment.farmerPaymentRecord;
+          const record   = shipment.farmerPaymentRecord;
           const batchKey = record.paidAt
             ? new Date(record.paidAt).toISOString().slice(0, 16)
             : "unknown";
@@ -199,7 +229,6 @@ export const getFarmerPayoutHistory = async (req, res) => {
       ...e,
       totalPaid: Math.round(e.totalPaid),
     }));
-
     result.sort((a, b) => b.totalPaid - a.totalPaid);
     res.json(result);
   } catch (err) {
@@ -210,16 +239,12 @@ export const getFarmerPayoutHistory = async (req, res) => {
 
 /* ─────────────────────────────────────────────────────────────
    PUT /api/farmer-payouts/:farmerId/pay
-   Body: { method, reference }
-     method    — "esewa" | "bank_qr" | "bank_transfer" | "cash"
-     reference — transaction ID / UTR / screenshot note (optional)
-
-   Marks ALL pending released shipments for this farmer as
-   farmerPaid = true and records the payment details.
+   Enforces 15-day cooldown.
+   No longer checks adminPayout.released.
 ───────────────────────────────────────────────────────────── */
 export const markFarmerPaid = async (req, res) => {
   try {
-    const { farmerId } = req.params;
+    const { farmerId }               = req.params;
     const { method, reference = "" } = req.body;
 
     if (!method) {
@@ -233,13 +258,25 @@ export const markFarmerPaid = async (req, res) => {
       });
     }
 
-    /* Find all orders with unpaid released shipments for this farmer */
+    // 15-day cooldown check
+    const cooldown = await checkPayoutCooldown(farmerId);
+    if (!cooldown.allowed) {
+      return res.status(429).json({
+        message: `Payout cooldown active. Next payout allowed in ${cooldown.daysLeft} day(s).`,
+        daysLeft:    cooldown.daysLeft,
+        lastPaidAt:  cooldown.lastPaidAt,
+        nextPayoutAt: new Date(
+          cooldown.lastPaidAt.getTime() + PAYOUT_COOLDOWN_DAYS * 86_400_000
+        ),
+      });
+    }
+
+    // Find all orders where this farmer has an unpaid shipment and consumer has paid
     const orders = await Order.find({
-      "adminPayout.released":  true,
-      "shipments.farmer":      farmerId,
-      "shipments.farmerPaid":  { $ne: true },
-      "shipments.paymentStatus": "paid",
-      status: { $nin: ["cancelled"] },
+      paymentStatus:          "paid",
+      "shipments.farmer":     farmerId,
+      "shipments.farmerPaid": { $ne: true },
+      status:                 { $nin: ["cancelled"] },
     });
 
     if (orders.length === 0) {
@@ -249,8 +286,8 @@ export const markFarmerPaid = async (req, res) => {
     const paymentRecord = {
       method,
       reference,
-      paidAt:    new Date(),
-      paidBy:    req.user._id,
+      paidAt: new Date(),
+      paidBy: req.user._id,
     };
 
     let totalPaid = 0;
@@ -261,33 +298,35 @@ export const markFarmerPaid = async (req, res) => {
       for (const shipment of order.shipments) {
         const shipFarmerId = (shipment.farmer?._id || shipment.farmer).toString();
         if (shipFarmerId !== farmerId) continue;
-        if (shipment.farmerPaid) continue;
-        if (shipment.paymentStatus !== "paid") continue;
+        if (shipment.farmerPaid)       continue;
+        if (shipment.paymentStatus === "pending") continue;
 
-        shipment.farmerPaid            = true;
-        shipment.farmerPaymentRecord   = paymentRecord;
-        totalPaid                     += shipment.subtotal || 0;
-        orderModified                  = true;
+        const deduction       = shipment.returnDeduction || 0;
+        const effectiveAmount = Math.max(0, (shipment.subtotal || 0) - deduction);
+
+        shipment.farmerPaid          = true;
+        shipment.farmerPaymentRecord = paymentRecord;
+        totalPaid                   += effectiveAmount;
+        orderModified                = true;
       }
 
       if (orderModified) await order.save();
     }
 
-    /* Notify the farmer */
     await sendNotification(
       farmerId,
       "payment_paid",
-      "Admin has paid your accumulated balance",
-      `Rs. ${Math.round(totalPaid)} has been sent to you via ${method.replace("_", " ")}${
+      "Payment received from admin",
+      `Rs. ${Math.round(totalPaid)} has been sent to you via ${method.replace(/_/g, " ")}${
         reference ? ` (Ref: ${reference})` : ""
       }.`,
       { method, reference, amount: Math.round(totalPaid) }
     );
 
     res.json({
-      message:   "Farmer paid successfully",
+      message:       "Farmer paid successfully",
       farmerId,
-      totalPaid: Math.round(totalPaid),
+      totalPaid:     Math.round(totalPaid),
       method,
       reference,
       ordersUpdated: orders.length,
@@ -305,13 +344,11 @@ export const getFarmerPayoutStats = async (req, res) => {
   try {
     const [pendingOrders, paidShipmentOrders] = await Promise.all([
       Order.find({
-        "adminPayout.released":    true,
-        "shipments.farmerPaid":    { $ne: true },
-        "shipments.paymentStatus": "paid",
-        status:                    { $nin: ["cancelled"] },
+        paymentStatus:          "paid",
+        "shipments.farmerPaid": { $ne: true },
+        status:                 { $nin: ["cancelled"] },
       }),
       Order.find({
-        "adminPayout.released": true,
         "shipments.farmerPaid": true,
       }),
     ]);
@@ -322,9 +359,12 @@ export const getFarmerPayoutStats = async (req, res) => {
 
     for (const order of pendingOrders) {
       for (const s of order.shipments) {
-        if (!s.farmerPaid && s.paymentStatus === "paid") {
-          pendingAmount += s.subtotal || 0;
-          pendingFarmers.add((s.farmer?._id || s.farmer).toString());
+        if (!s.farmerPaid && s.paymentStatus !== "pending") {
+          const effective = Math.max(0, (s.subtotal || 0) - (s.returnDeduction || 0));
+          if (effective > 0) {
+            pendingAmount += effective;
+            pendingFarmers.add((s.farmer?._id || s.farmer).toString());
+          }
         }
       }
     }

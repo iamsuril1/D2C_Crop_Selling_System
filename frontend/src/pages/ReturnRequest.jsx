@@ -1,3 +1,7 @@
+// src/pages/ReturnRequest.jsx
+// Added: refund payment method selection (eSewa / Bank Transfer / Cash)
+// Consumer specifies how they want their refund before submitting.
+
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/axios";
@@ -25,12 +29,19 @@ const ReturnRequest = () => {
     orderDisplayId = "",
   } = state;
 
-  const [reason,       setReason]       = useState("");
-  const [reasonDetail, setReasonDetail] = useState("");
-  const [photo,        setPhoto]        = useState(null);
-  const [photoPreview, setPhotoPreview] = useState(null);
-  const [submitting,   setSubmitting]   = useState(false);
-  const [errors,       setErrors]       = useState({});
+  const [reason,        setReason]        = useState("");
+  const [reasonDetail,  setReasonDetail]  = useState("");
+  const [photo,         setPhoto]         = useState(null);
+  const [photoPreview,  setPhotoPreview]  = useState(null);
+  const [submitting,    setSubmitting]    = useState(false);
+  const [errors,        setErrors]        = useState({});
+
+  // Refund payment state
+  const [refundMethod,    setRefundMethod]    = useState("");
+  const [esewaId,         setEsewaId]         = useState("");
+  const [bankName,        setBankName]         = useState("");
+  const [accountNumber,   setAccountNumber]   = useState("");
+  const [accountName,     setAccountName]     = useState("");
 
   const [alertModal, setAlertModal] = useState({
     isOpen: false, type: "", title: "", message: "", onConfirm: null,
@@ -45,9 +56,6 @@ const ReturnRequest = () => {
     if (cb) cb();
   };
 
-  // Guard inline — no useEffect, no redirect race.
-  // If state is missing (direct URL visit, stale history) show a plain error
-  // with a button back to My Orders rather than silently redirecting.
   const isValidId = (id) => /^[a-f\d]{24}$/i.test(String(id));
   if (!isValidId(farmerId) || !isValidId(orderId)) {
     return (
@@ -83,9 +91,23 @@ const ReturnRequest = () => {
     setErrors((p) => { const e = { ...p }; delete e.photo; return e; });
   };
 
+  const validateRefund = () => {
+    if (!refundMethod) return "Please select a refund method";
+    if (refundMethod === "esewa" && !esewaId.trim()) return "eSewa ID is required";
+    if (refundMethod === "bank_transfer") {
+      if (!bankName.trim())      return "Bank name is required";
+      if (!accountNumber.trim()) return "Account number is required";
+      if (!accountName.trim())   return "Account holder name is required";
+    }
+    return null;
+  };
+
   const handleSubmit = async (ev) => {
     ev.preventDefault();
     if (!reason) { setErrors({ reason: "Please select a reason" }); return; }
+
+    const refundError = validateRefund();
+    if (refundError) { setErrors((p) => ({ ...p, refund: refundError })); return; }
 
     setSubmitting(true);
     try {
@@ -94,13 +116,22 @@ const ReturnRequest = () => {
       formData.append("farmerId",     farmerId);
       formData.append("reason",       reason);
       formData.append("reasonDetail", reasonDetail);
+      formData.append("refundMethod", refundMethod);
+
+      if (refundMethod === "esewa")         formData.append("esewaId",       esewaId.trim());
+      if (refundMethod === "bank_transfer") {
+        formData.append("bankName",      bankName.trim());
+        formData.append("accountNumber", accountNumber.trim());
+        formData.append("accountName",   accountName.trim());
+      }
+
       if (photo) formData.append("evidencePhoto", photo);
 
       await api.post("/api/returns", formData);
 
       showAlert(
         "Return submitted",
-        "Your request has been sent to the farmer. You'll be notified once they review it.",
+        "Your request has been sent to the farmer. Once they approve it, admin will process your refund using the payment details you provided.",
         "success",
         () => navigate("/my-orders", { replace: true })
       );
@@ -150,6 +181,7 @@ const ReturnRequest = () => {
           </div>
 
           <div className="px-6 py-6 space-y-6">
+
             {/* Items summary */}
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -165,19 +197,22 @@ const ReturnRequest = () => {
                         {item.name}
                         <span className="text-gray-400 font-normal ml-1">×{item.quantity}</span>
                       </span>
-                      <span className="text-gray-700">Rs. {((item.price ?? 0) * (item.quantity ?? 0)).toFixed(0)}</span>
+                      <span className="text-gray-700">
+                        Rs. {((item.price ?? 0) * (item.quantity ?? 0)).toFixed(0)}
+                      </span>
                     </div>
                   ))}
                 </div>
               )}
-              <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between text-sm font-semibold text-gray-800">
-                <span>Shipment total</span>
-                <span>Rs. {totalAmount.toFixed(0)}</span>
+              <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between text-sm font-bold text-gray-900">
+                <span>Refund amount (if approved)</span>
+                <span className="text-green-700">Rs. {totalAmount.toFixed(0)}</span>
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Reason picker */}
+            <form onSubmit={handleSubmit} className="space-y-6">
+
+              {/* ── Reason picker ── */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Reason for return <span className="text-red-500">*</span>
@@ -206,7 +241,7 @@ const ReturnRequest = () => {
                 )}
               </div>
 
-              {/* Detail */}
+              {/* ── Detail ── */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Additional details{" "}
@@ -221,7 +256,7 @@ const ReturnRequest = () => {
                 />
               </div>
 
-              {/* Evidence photo */}
+              {/* ── Evidence photo ── */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Evidence photo{" "}
@@ -245,7 +280,8 @@ const ReturnRequest = () => {
                 ) : (
                   <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-orange-400 transition">
                     <svg className="w-8 h-8 text-gray-300 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     <span className="text-sm text-gray-400">Click to upload photo</span>
                     <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
@@ -256,13 +292,135 @@ const ReturnRequest = () => {
                 )}
               </div>
 
+              {/* ── Refund payment method ── */}
+              <div className="border-t border-gray-100 pt-6">
+                <div className="mb-3">
+                  <h3 className="text-sm font-bold text-gray-900">
+                    How would you like your refund? <span className="text-red-500">*</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    If your return is approved, admin will send Rs.{totalAmount.toFixed(0)} using the details below.
+                  </p>
+                </div>
+
+                {/* Method selector */}
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {[
+                    { value: "esewa",         label: "eSewa",          icon: "💚", desc: "Digital wallet" },
+                    { value: "bank_transfer", label: "Bank Transfer",  icon: "🏦", desc: "Direct to account" },
+                    { value: "cash",          label: "Cash",           icon: "💵", desc: "Physical handover" },
+                  ].map((m) => (
+                    <button
+                      key={m.value}
+                      type="button"
+                      onClick={() => {
+                        setRefundMethod(m.value);
+                        setErrors((p) => { const e = { ...p }; delete e.refund; return e; });
+                      }}
+                      className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 text-xs font-semibold transition ${
+                        refundMethod === m.value
+                          ? "border-green-500 bg-green-50 text-green-800"
+                          : "border-gray-200 text-gray-600 hover:border-gray-300"
+                      }`}
+                    >
+                      <span className="text-xl mb-1">{m.icon}</span>
+                      <span>{m.label}</span>
+                      <span className="font-normal text-gray-400 mt-0.5">{m.desc}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* eSewa detail */}
+                {refundMethod === "esewa" && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">eSewa Details</p>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        eSewa ID (mobile number) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        value={esewaId}
+                        onChange={(e) => setEsewaId(e.target.value)}
+                        placeholder="98XXXXXXXX"
+                        maxLength={10}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Bank transfer detail */}
+                {refundMethod === "bank_transfer" && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Bank Account Details</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Bank Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={bankName}
+                          onChange={(e) => setBankName(e.target.value)}
+                          placeholder="e.g. Nabil Bank"
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Account Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value)}
+                          placeholder="XXXXXXXXXXXX"
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Account Holder Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={accountName}
+                          onChange={(e) => setAccountName(e.target.value)}
+                          placeholder="Full name as on the bank account"
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cash detail */}
+                {refundMethod === "cash" && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Cash Refund</p>
+                    <p className="text-sm text-amber-800">
+                      Admin will arrange for cash of Rs.{totalAmount.toFixed(0)} to be returned to you directly.
+                      Our team will contact you to arrange a handover.
+                    </p>
+                  </div>
+                )}
+
+                {errors.refund && (
+                  <p className="text-red-500 text-xs mt-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    ⚠ {errors.refund}
+                  </p>
+                )}
+              </div>
+
+              {/* Info box */}
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
                 <p className="font-medium mb-1">What happens next</p>
-                <ul className="space-y-0.5 list-disc list-inside text-blue-700">
+                <ul className="space-y-0.5 list-disc list-inside text-blue-700 text-xs">
                   <li>Your request is sent to the farmer for review</li>
-                  <li>The farmer has up to 2 days to approve or reject</li>
-                  <li>You'll receive a notification with their decision</li>
-                  <li>If approved, stock is restored on their end</li>
+                  <li>Farmer has up to 2 days to approve or reject</li>
+                  <li>If approved, admin processes your refund to the details above</li>
+                  <li>The refund amount is deducted from the farmer's payout</li>
                 </ul>
               </div>
 
@@ -277,7 +435,7 @@ const ReturnRequest = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting || !reason}
+                  disabled={submitting || !reason || !refundMethod}
                   className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-semibold py-3 rounded-xl transition disabled:cursor-not-allowed"
                 >
                   {submitting ? "Submitting..." : "Submit return request"}

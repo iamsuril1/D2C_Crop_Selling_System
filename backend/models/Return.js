@@ -1,7 +1,12 @@
+// backend/models/Return.js
+// ADDED: farmerDeductionAmount — items-only deduction from farmer
+//        refundRecord.amount   — actual amount paid to consumer (may differ from refundAmount)
+
 import mongoose from "mongoose";
+
 const returnItemSchema = new mongoose.Schema(
   {
-    product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+    product:  { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
     name:     { type: String, required: true },
     quantity: { type: Number, required: true },
     price:    { type: Number, required: true },
@@ -11,11 +16,11 @@ const returnItemSchema = new mongoose.Schema(
 
 const returnSchema = new mongoose.Schema(
   {
-
     order:    { type: mongoose.Schema.Types.ObjectId, ref: "Order",   required: true },
     consumer: { type: mongoose.Schema.Types.ObjectId, ref: "User",    required: true },
     farmer:   { type: mongoose.Schema.Types.ObjectId, ref: "User",    required: true },
-    items: { type: [returnItemSchema], required: true },
+    items:    { type: [returnItemSchema], required: true },
+
     reason: {
       type: String,
       enum: [
@@ -28,21 +33,60 @@ const returnSchema = new mongoose.Schema(
       ],
       required: true,
     },
-    reasonDetail: { type: String, default: "" },   
-    evidencePhoto: { type: String, default: "" },   
+    reasonDetail:  { type: String, default: "" },
+    evidencePhoto: { type: String, default: "" },
+
     status: {
-      type: String,
-      enum: ["pending", "approved", "rejected"],
+      type:    String,
+      enum:    ["pending", "approved", "rejected"],
       default: "pending",
     },
-
     farmerNote: { type: String, default: "" },
+    decidedAt:  { type: Date },
 
-    decidedAt: { type: Date },
+    // ── Refund payment info (collected from consumer at request time) ──
+    refundMethod: {
+      type: String,
+      enum: ["esewa", "bank_transfer", "cash", null],
+      default: null,
+    },
+    // For dashboard display: consumer's eSewa ID or "Cash"
+    refundEsewaId: { type: String, default: "" },
+
+    refundPaymentDetail: {
+      esewaId:       { type: String, default: "" },
+      bankName:      { type: String, default: "" },
+      accountNumber: { type: String, default: "" },
+      accountName:   { type: String, default: "" },
+    },
+
+    // ── Refund amounts ──
+    // refundAmount          = full consumer refund (items + delivery + platform portion)
+    // farmerDeductionAmount = only items cost deducted from farmer
+    refundAmount:          { type: Number, default: 0 },
+    farmerDeductionAmount: { type: Number, default: 0 },
+
+    // ── Refund processing (filled by admin) ──
+    refundStatus: {
+      type:    String,
+      enum:    ["pending", "processed", "skipped"],
+      default: "pending",
+    },
+    refundRecord: {
+      processedAt: { type: Date },
+      processedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      method:      { type: String },
+      reference:   { type: String, default: "" },
+      amount:      { type: Number, default: 0 },
+      note:        { type: String, default: "" },
+    },
+
+    // ── Farmer deduction ──
+    farmerDeducted:   { type: Boolean, default: false },
+    farmerDeductedAt: { type: Date },
   },
   { timestamps: true }
 );
-
 
 returnSchema.index({ order: 1, farmer: 1 }, { unique: true });
 

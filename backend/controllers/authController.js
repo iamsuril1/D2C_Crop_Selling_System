@@ -1,6 +1,6 @@
-import User from "../models/User.js";
+import User   from "../models/User.js";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import jwt    from "jsonwebtoken";
 
 export const register = async (req, res) => {
   try {
@@ -20,7 +20,7 @@ export const register = async (req, res) => {
     const phoneExists = await User.findOne({ phone: phone.trim() });
     if (phoneExists) return res.status(409).json({ message: "Phone number already registered" });
 
-    const hashed  = await bcrypt.hash(password, 10);
+    const hashed   = await bcrypt.hash(password, 10);
     const safeRole = role === "farmer" ? "farmer" : "consumer";
 
     const user = await User.create({
@@ -28,8 +28,8 @@ export const register = async (req, res) => {
       lastName,
       email,
       password: hashed,
-      role: safeRole,
-      phone: phone.trim(),
+      role:     safeRole,
+      phone:    phone.trim(),
     });
 
     res.status(201).json({ message: "Registered", userId: user._id });
@@ -49,9 +49,10 @@ export const login = async (req, res) => {
     let user = null;
 
     if (email && email.trim()) {
-      user = await User.findOne({ email: email.trim().toLowerCase() });
+      // FIX: must select +password because password is now select:false in schema
+      user = await User.findOne({ email: email.trim().toLowerCase() }).select("+password");
     } else if (phone && phone.trim()) {
-      user = await User.findOne({ phone: phone.trim() });
+      user = await User.findOne({ phone: phone.trim() }).select("+password");
     } else {
       return res.status(400).json({ message: "Email or phone number is required" });
     }
@@ -92,7 +93,8 @@ export const getMe = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select("+password");
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     user.firstName = req.body.firstName || user.firstName;
     user.lastName  = req.body.lastName  || user.lastName;
@@ -114,12 +116,10 @@ export const updateProfile = async (req, res) => {
       user.password = await bcrypt.hash(req.body.password, 10);
     }
 
-    if (req.file) {
-      user.profileImage = `/uploads/${req.file.filename}`;
-    }
-
     await user.save();
-    res.json({ message: "Profile updated", user });
+
+    const userObj = user.toJSON();
+    res.json({ message: "Profile updated", user: userObj });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -158,11 +158,6 @@ export const updateMyLocation = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   DELETE ACCOUNT
-   FIX: require current password before deleting — prevents account
-   deletion by anyone who merely has a stolen/leaked JWT token.
-───────────────────────────────────────────────────────────── */
 export const deleteMe = async (req, res) => {
   try {
     const { password } = req.body;
@@ -171,7 +166,6 @@ export const deleteMe = async (req, res) => {
       return res.status(400).json({ message: "Current password is required to delete your account" });
     }
 
-    // Fetch the full user record (req.user has password stripped by authMiddleware)
     const user = await User.findById(req.user._id).select("+password");
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -192,9 +186,10 @@ export const clearMyLocation = async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    user.location    = null;
-    user.addressText = "";
-    await user.save();
+    await User.findByIdAndUpdate(req.user._id, {
+      $unset: { location: "" },
+      $set:   { addressText: "" },
+    });
 
     res.json({ message: "Location cleared" });
   } catch (err) {

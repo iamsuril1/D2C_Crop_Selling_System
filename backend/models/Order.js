@@ -1,13 +1,18 @@
-/* backend/models/Order.js */
-
 import mongoose from "mongoose";
 
 const shipmentItemSchema = new mongoose.Schema(
   {
-    product:  { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
-    name:     String,
-    quantity: Number,
-    price:    Number,
+    product:   { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+    name:      String,
+    quantity:  Number,
+    price:     Number,     
+    basePrice: Number,    
+    bulkPrice: Number,      
+    orderType: {            
+      type:    String,
+      enum:    ["normal", "bulk"],
+      default: "normal",
+    },
   },
   { _id: false }
 );
@@ -21,11 +26,9 @@ const shipmentSchema = new mongoose.Schema(
     subtotal:    { type: Number, required: true, default: 0 },
     paymentMethod: {
       type:    String,
-      // "khalti" removed, "fonepay" added
       enum:    ["esewa", "fonepay", "cash_on_delivery", "pending"],
       default: "pending",
     },
-    /* paymentStatus = consumer → platform */
     paymentStatus: {
       type:    String,
       enum:    ["pending", "paid", "failed", "refunded", "pending_admin_release"],
@@ -42,8 +45,6 @@ const shipmentSchema = new mongoose.Schema(
       bankBranch:    String,
       qrCodeImage:   String,
     },
-
-    /* ── platform → farmer settlement ── */
     farmerPaid: {
       type:    Boolean,
       default: false,
