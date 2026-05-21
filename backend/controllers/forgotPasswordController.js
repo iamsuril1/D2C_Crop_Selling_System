@@ -55,7 +55,6 @@ export const resetPassword = async (req, res) => {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
-    // Re-confirm OTP is still valid and verified
     const otp = await Otp.findOne({ email });
     if (!otp || !otp.verified) return res.status(400).json({ message: "Please verify OTP first" });
     if (otp.code !== code) return res.status(400).json({ message: "Invalid OTP" });

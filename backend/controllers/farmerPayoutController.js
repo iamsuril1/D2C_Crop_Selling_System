@@ -12,7 +12,7 @@ import User   from "../models/User.js";
 import Return from "../models/Return.js";
 import { sendNotification } from "../utils/notificationHelpers.js";
 
-const PAYOUT_COOLDOWN_DAYS = 15;
+const PAYOUT_COOLDOWN_DAYS = 3;
 
 /* ─────────────────────────────────────────────────────────────
    HELPER — pull enabled payment methods for a farmer
@@ -237,11 +237,6 @@ export const getFarmerPayoutHistory = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   PUT /api/farmer-payouts/:farmerId/pay
-   Enforces 15-day cooldown.
-   No longer checks adminPayout.released.
-───────────────────────────────────────────────────────────── */
 export const markFarmerPaid = async (req, res) => {
   try {
     const { farmerId }               = req.params;

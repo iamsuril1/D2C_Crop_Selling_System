@@ -25,12 +25,10 @@ const ConsumerOrderTracking = () => {
   const [filter,          setFilter]          = useState("all");
   const [cancellingOrder, setCancellingOrder] = useState(null);
   const [expandedOrder,   setExpandedOrder]   = useState(null);
+  const [retryingPayment, setRetryingPayment] = useState(null);
 
-  // Map of "orderId_farmerId" → return status string
   const [existingReturns, setExistingReturns] = useState({});
-  // Guard: never show the return button until we know if a return already exists.
-  // This prevents the button from flashing briefly after navigating back from ReturnRequest.
-  const [returnsLoaded, setReturnsLoaded] = useState(false);
+  const [returnsLoaded,   setReturnsLoaded]   = useState(false);
 
   const [alertModal, setAlertModal] = useState({
     isOpen: false, title: "", message: "", type: "info",
@@ -57,7 +55,6 @@ const ConsumerOrderTracking = () => {
   };
 
   const loadMyReturns = async () => {
-    // Reset guard so button stays hidden while new data is in-flight
     setReturnsLoaded(false);
     try {
       const res = await api.get("/api/returns/my");
@@ -69,18 +66,61 @@ const ConsumerOrderTracking = () => {
       });
       setExistingReturns(map);
     } catch {
-      // non-critical — still mark loaded so UI isn't stuck
+      // non-critical
     } finally {
       setReturnsLoaded(true);
     }
   };
 
-  // location.key changes on every navigation even to the same path,
-  // so coming back from ReturnRequest always re-fetches returns.
   useEffect(() => {
     loadOrders();
     loadMyReturns();
   }, [location.pathname, location.key]);
+
+  const canRetryPayment = (order) => {
+    return order.status !== "cancelled" && order.paymentStatus === "pending";
+  };
+
+  const handleRetryPayment = async (order, method) => {
+    const orderId = (order._id || order.id)?.toString();
+
+    if (method === "esewa") {
+      navigate("/payment", { state: { order } });
+      return;
+    }
+
+    try {
+      setRetryingPayment(orderId);
+      const farmerIds = order.shipments?.map((s) => toFarmerIdStr(s.farmer)).filter(Boolean);
+
+      if (method === "cod") {
+        await api.post("/api/payments/cod/confirm", { orderId, farmerIds });
+        showAlert(
+          "Order Confirmed",
+          `Order #${orderId.slice(-6)} confirmed! Pay cash when your order arrives.`,
+          "success"
+        );
+      } else if (method === "fonepay") {
+        await api.post("/api/payments/fonepay/confirm", { orderId, farmerIds });
+        showAlert(
+          "Order Confirmed",
+          `Order #${orderId.slice(-6)} confirmed! Pay via FonePay QR scan on delivery.`,
+          "success"
+        );
+      }
+
+      await loadOrders();
+      notifCtx?.refetch?.();
+    } catch (err) {
+      showAlert(
+        "Payment Failed",
+        err.response?.data?.message || "Failed to confirm payment. Please try again.",
+        "error"
+      );
+    } finally {
+      setRetryingPayment(null);
+    }
+  };
 
   const requestCancel = (orderId, e) => {
     e.stopPropagation();
@@ -165,7 +205,6 @@ const ConsumerOrderTracking = () => {
 
   const canRequestReturn = (order, shipment) => {
     if (order.status !== "delivered") return false;
-    // Never show the button before we've confirmed no return already exists
     if (!returnsLoaded) return false;
     const deliveredTimestamp = order.deliveredAt || order.updatedAt;
     const daysSince = (Date.now() - new Date(deliveredTimestamp).getTime()) / 86_400_000;
@@ -281,6 +320,7 @@ const ConsumerOrderTracking = () => {
                 const cancellable    = canConsumerCancel(order.status);
                 const hasReturn      = order.status === "delivered" &&
                   order.shipments?.some((s) => getReturnStatus(order, s));
+                const needsPayment   = canRetryPayment(order);
 
                 return (
                   <div key={orderId} className="relative">
@@ -289,6 +329,8 @@ const ConsumerOrderTracking = () => {
                       className={`w-full aspect-square flex flex-col justify-between rounded-2xl p-4 text-left transition-all duration-200 border-2 ${
                         isSelected
                           ? "border-green-500 shadow-lg bg-white"
+                          : needsPayment
+                          ? "border-amber-300 bg-amber-50 hover:border-amber-400 hover:shadow-md"
                           : "border-gray-100 bg-white hover:border-green-300 hover:shadow-md"
                       }`}
                     >
@@ -298,7 +340,12 @@ const ConsumerOrderTracking = () => {
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${si.color}`}>
                             {si.label}
                           </span>
-                          {hasReturn && (
+                          {needsPayment && (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 animate-pulse">
+                              Pay Now
+                            </span>
+                          )}
+                          {hasReturn && !needsPayment && (
                             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">
                               Return
                             </span>
@@ -345,17 +392,24 @@ const ConsumerOrderTracking = () => {
               const si          = getStatusInfo(order.status);
               const stepIndex   = statusSteps.indexOf(order.status);
               const cancellable = canConsumerCancel(order.status);
+              const needsPayment = canRetryPayment(order);
+              const orderIdStr  = orderId?.toString();
 
               return (
                 <div className="bg-white rounded-2xl border-2 border-green-500 shadow-xl overflow-hidden mt-2">
                   {/* Header */}
                   <div className="bg-gradient-to-r from-green-50 to-blue-50 px-6 py-5 border-b flex flex-wrap items-center justify-between gap-4">
                     <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className="text-xl font-bold text-gray-900">Order #{orderId?.toString().slice(-6)}</h3>
+                      <div className="flex items-center gap-3 mb-1 flex-wrap">
+                        <h3 className="text-xl font-bold text-gray-900">Order #{orderIdStr?.slice(-6)}</h3>
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${si.color}`}>
                           {order.status?.toUpperCase()}
                         </span>
+                        {needsPayment && (
+                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 animate-pulse">
+                            PAYMENT PENDING
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-gray-500">
                         {new Date(order.createdAt).toLocaleDateString()} at {new Date(order.createdAt).toLocaleTimeString()}
@@ -374,6 +428,22 @@ const ConsumerOrderTracking = () => {
                       </button>
                     </div>
                   </div>
+
+                  {/* Payment pending banner */}
+                  {needsPayment && (
+                    <div className="bg-amber-50 border-b-2 border-amber-200 px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl flex-shrink-0">⏳</span>
+                        <div>
+                          <p className="font-bold text-amber-900">Payment not completed</p>
+                          <p className="text-sm text-amber-700 mt-0.5">
+                            Your order is saved but needs payment to proceed. Choose a method below.
+                            Orders without payment are automatically cancelled after 1 hour.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Progress bar */}
                   {order.status !== "cancelled" && (
@@ -449,36 +519,44 @@ const ConsumerOrderTracking = () => {
                               <div key={i} className="flex justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
                                 <span className="font-medium text-gray-900">
                                   {item.name} <span className="text-gray-400 font-normal">×{item.quantity}</span>
+                                  {item.orderType === "bulk" && (
+                                    <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 font-semibold px-1.5 py-0.5 rounded-full">Bulk</span>
+                                  )}
                                 </span>
                                 <span className="font-semibold">Rs. {(item.price * item.quantity).toFixed(0)}</span>
                               </div>
                             ))}
                           </div>
 
-                          <div className="flex items-center justify-between text-xs bg-blue-50 rounded-lg px-3 py-2 mb-2">
-                            <span className="text-blue-700 font-medium capitalize">{shipment.paymentMethod || "Pending"}</span>
-                            <span className={`px-2 py-0.5 rounded-full font-semibold ${getPaymentStatusColor(shipment.paymentStatus)}`}>
-                              {shipment.paymentStatus?.toUpperCase() || "PENDING"}
-                            </span>
-                          </div>
+                          {/* Payment status — only show if payment done */}
+                          {!needsPayment && (
+                            <div className="flex items-center justify-between text-xs bg-blue-50 rounded-lg px-3 py-2 mb-2">
+                              <span className="text-blue-700 font-medium capitalize">
+                                {shipment.paymentMethod === "cash_on_delivery"
+                                  ? "Cash on Delivery"
+                                  : shipment.paymentMethod === "fonepay"
+                                  ? "FonePay on Delivery"
+                                  : shipment.paymentMethod || "Pending"}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full font-semibold ${getPaymentStatusColor(shipment.paymentStatus)}`}>
+                                {shipment.paymentStatus?.toUpperCase() || "PENDING"}
+                              </span>
+                            </div>
+                          )}
 
                           <div className="flex justify-between text-sm pt-2 border-t border-gray-100 mb-3">
                             <span className="text-gray-500">Shipment total</span>
                             <span className="font-bold">Rs. {((shipment.subtotal || 0) + (shipment.deliveryFee || 0)).toFixed(0)}</span>
                           </div>
 
-                          {/* ── Return action area ── */}
+                          {/* Return action area */}
                           {order.status === "delivered" && (
                             <>
-                              {/* While return data is still loading, show a neutral
-                                  placeholder so the button never flashes then disappears */}
                               {!returnsLoaded && windowOpen && (
                                 <div className="w-full py-2 rounded-xl text-sm text-center text-gray-400 border-2 border-gray-100 animate-pulse">
                                   Checking return status…
                                 </div>
                               )}
-
-                              {/* Case 1: loaded + window open + no existing return → show button */}
                               {returnsLoaded && canReturn && (
                                 <button
                                   onClick={() => handleRequestReturn(order, shipment)}
@@ -487,8 +565,6 @@ const ConsumerOrderTracking = () => {
                                   Request return
                                 </button>
                               )}
-
-                              {/* Case 2: return already exists → show status badge, NO button */}
                               {returnsLoaded && !canReturn && returnStatus && (
                                 <div className={`w-full text-center py-2 rounded-xl text-sm font-semibold border-2 border-transparent ${getReturnBadge(returnStatus)}`}>
                                   {returnStatus === "pending"  && "⏳ Return request pending"}
@@ -496,8 +572,6 @@ const ConsumerOrderTracking = () => {
                                   {returnStatus === "rejected" && "✗ Return rejected"}
                                 </div>
                               )}
-
-                              {/* Case 3: loaded + no return + window closed */}
                               {returnsLoaded && !canReturn && !returnStatus && (
                                 <p className="text-xs text-center text-gray-400 py-1">
                                   Return window closed (2 days after delivery)
@@ -509,27 +583,118 @@ const ConsumerOrderTracking = () => {
                       );
                     })}
 
-                    {/* Summary */}
+                    {/* Order summary */}
                     <div className="bg-gray-50 rounded-xl p-4 space-y-1.5">
                       <div className="flex justify-between text-sm text-gray-600"><span>Items subtotal</span><span>Rs. {order.itemsSubtotal?.toFixed(0)}</span></div>
                       <div className="flex justify-between text-sm text-gray-600"><span>Delivery</span><span>Rs. {order.deliveryTotal?.toFixed(0)}</span></div>
+                      <div className="flex justify-between text-sm text-gray-600"><span>Platform charge</span><span>Rs. {order.platformCharge?.toFixed(0) || "25"}</span></div>
                       <div className="flex justify-between font-bold text-gray-900 pt-1.5 border-t border-gray-200 text-sm"><span>Total</span><span>Rs. {order.totalAmount?.toFixed(0)}</span></div>
                     </div>
 
+                    {/* ── PAYMENT OPTIONS (shown when payment is pending) ── */}
+                    {needsPayment && (
+                      <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5">
+                        <div className="flex items-center gap-3 mb-4">
+                          <span className="text-2xl">💳</span>
+                          <div>
+                            <p className="font-bold text-amber-900 text-base">Complete your payment</p>
+                            <p className="text-sm text-amber-700 mt-0.5">
+                              Choose how you'd like to pay for this order.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                          {/* eSewa */}
+                          <button
+                            onClick={() => handleRetryPayment(order, "esewa")}
+                            disabled={retryingPayment === orderIdStr}
+                            className="flex flex-col items-center gap-2 border-2 border-green-400 bg-white hover:bg-green-50 rounded-xl p-4 transition disabled:opacity-50 group"
+                          >
+                            <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center group-hover:bg-green-700 transition">
+                              <span className="text-white font-black text-xs">eSewa</span>
+                            </div>
+                            <div className="text-center">
+                              <p className="font-bold text-green-800 text-sm">Pay via eSewa</p>
+                              <p className="text-xs text-gray-500 mt-0.5">Secure online payment</p>
+                            </div>
+                          </button>
+
+                          {/* Cash on Delivery */}
+                          <button
+                            onClick={() => handleRetryPayment(order, "cod")}
+                            disabled={retryingPayment === orderIdStr}
+                            className="flex flex-col items-center gap-2 border-2 border-blue-400 bg-white hover:bg-blue-50 rounded-xl p-4 transition disabled:opacity-50 group"
+                          >
+                            <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center group-hover:bg-blue-700 transition">
+                              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                              </svg>
+                            </div>
+                            <div className="text-center">
+                              <p className="font-bold text-blue-800 text-sm">Cash on Delivery</p>
+                              <p className="text-xs text-gray-500 mt-0.5">Pay when it arrives</p>
+                            </div>
+                          </button>
+
+                          {/* FonePay */}
+                          <button
+                            onClick={() => handleRetryPayment(order, "fonepay")}
+                            disabled={retryingPayment === orderIdStr}
+                            className="flex flex-col items-center gap-2 border-2 border-red-300 bg-white hover:bg-red-50 rounded-xl p-4 transition disabled:opacity-50 group"
+                          >
+                            <div className="w-12 h-12 bg-[#8B1A1A] rounded-xl flex items-center justify-center group-hover:bg-[#6d1414] transition">
+                              <span className="text-white font-black text-[10px] text-center leading-tight">Fone<br/>Pay</span>
+                            </div>
+                            <div className="text-center">
+                              <p className="font-bold text-red-900 text-sm">FonePay Delivery</p>
+                              <p className="text-xs text-gray-500 mt-0.5">Scan QR on delivery</p>
+                            </div>
+                          </button>
+                        </div>
+
+                        {/* Loading state */}
+                        {retryingPayment === orderIdStr && (
+                          <div className="flex items-center justify-center gap-2 py-2 text-amber-700 text-sm">
+                            <div className="w-4 h-4 border-2 border-amber-300 border-t-amber-700 rounded-full animate-spin" />
+                            Processing your payment selection...
+                          </div>
+                        )}
+
+                        {/* Info note */}
+                        <div className="bg-white border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
+                          <span className="font-semibold">Note: </span>
+                          Orders without payment are automatically cancelled after 1 hour.
+                          Cash on Delivery and FonePay confirm your order immediately.
+                        </div>
+                      </div>
+                    )}
+
                     {/* Order-level actions */}
                     <div className="flex gap-2">
-                      {cancellable && (
+                      {cancellable && !needsPayment && (
                         <button
-                          onClick={(e) => requestCancel(orderId, e)}
-                          disabled={cancellingOrder === orderId}
+                          onClick={(e) => requestCancel(orderIdStr, e)}
+                          disabled={cancellingOrder === orderIdStr}
                           className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition"
                         >
-                          {cancellingOrder === orderId ? "Cancelling..." : "Cancel order"}
+                          {cancellingOrder === orderIdStr ? "Cancelling..." : "Cancel order"}
                         </button>
                       )}
-                      <button className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition">
-                        Contact farmer
-                      </button>
+                      {cancellable && needsPayment && (
+                        <button
+                          onClick={(e) => requestCancel(orderIdStr, e)}
+                          disabled={cancellingOrder === orderIdStr}
+                          className="flex-1 border border-red-300 text-red-600 hover:bg-red-50 font-semibold px-4 py-2.5 rounded-lg text-sm transition"
+                        >
+                          {cancellingOrder === orderIdStr ? "Cancelling..." : "Cancel order instead"}
+                        </button>
+                      )}
+                      {!needsPayment && (
+                        <button className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2.5 rounded-lg text-sm transition">
+                          Contact farmer
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
