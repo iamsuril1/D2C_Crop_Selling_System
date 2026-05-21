@@ -41,16 +41,14 @@ const userSchema = new mongoose.Schema(
       type:  String,
       trim:  true,
     },
-    // FIX: select: false means password is NEVER returned unless explicitly
-    // requested with .select("+password") — prevents accidental exposure
+    
     password: {
       type:     String,
-      required: true,
       select:   false,
     },
     role: {
       type:    String,
-      enum:    ["consumer", "farmer", "admin"],
+      enum:    ["consumer", "farmer", "admin", "pending_google"],
       default: "consumer",
     },
     profileImage: { type: String, default: "" },
@@ -64,6 +62,11 @@ const userSchema = new mongoose.Schema(
       type:    String,
       enum:    ["esewa", "bank_qr", "bank_transfer", "cash_on_delivery"],
       default: "cash_on_delivery",
+    },
+    googleId: {
+    type:   String,
+    sparse: true,
+    index:  true, 
     },
   },
   { timestamps: true }

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useContext } from "react";
 
 import { AuthContext } from "./context/AuthContext.jsx";
+import AuthCallback from "./pages/AuthCallback";
 
 import Navbar   from "./components/Navbar";
 import Footer   from "./components/Footer";
@@ -28,11 +29,11 @@ import FarmerOrders          from "./pages/FarmerOrders";
 import ConsumerOrderTracking from "./pages/ConsumerOrdertracking";
 
 import FarmerPaymentSettings from "./pages/FarmerPaymentSettings";
-import FarmerEarnings from "./pages/FarmerEarnings";
+import FarmerEarnings        from "./pages/FarmerEarnings";
 
-import PaymentSelection      from "./pages/PaymentSelection";
-import PaymentSuccess        from "./pages/PaymentSuccess";
-import PaymentFailure        from "./pages/PaymentFailure";
+import PaymentSelection from "./pages/PaymentSelection";
+import PaymentSuccess   from "./pages/PaymentSuccess";
+import PaymentFailure   from "./pages/PaymentFailure";
 
 import ForgotPassword from "./pages/ForgotPassword";
 
@@ -57,7 +58,7 @@ const HeroPage = ({ children }) => (
 );
 
 function App() {
-  const { user, loading } = useContext(AuthContext);
+  const { user, loading, getRoleRoute } = useContext(AuthContext);
 
   if (loading) {
     return (
@@ -69,10 +70,7 @@ function App() {
 
   const roleRedirect = () => {
     if (!user) return <HeroPage><Home /></HeroPage>;
-    if (user.role === "farmer")   return <Navigate to="/farmer"   replace />;
-    if (user.role === "consumer") return <Navigate to="/consumer" replace />;
-    if (user.role === "admin")    return <Navigate to="/admin"    replace />;
-    return <HeroPage><Home /></HeroPage>;
+    return <Navigate to={getRoleRoute(user.role)} replace />;
   };
 
   return (
@@ -85,9 +83,10 @@ function App() {
           <Route path="/" element={roleRedirect()} />
 
           {/* ── Auth ── */}
-          <Route path="/login"           element={!user ? <HeroPage><Login /></HeroPage>    : <Navigate to="/" replace />} />
-          <Route path="/register"        element={!user ? <HeroPage><Register /></HeroPage> : <Navigate to="/" replace />} />
+          <Route path="/login"           element={!user ? <HeroPage><Login /></HeroPage>    : <Navigate to={getRoleRoute(user.role)} replace />} />
+          <Route path="/register"        element={!user ? <HeroPage><Register /></HeroPage> : <Navigate to={getRoleRoute(user.role)} replace />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/auth/callback"   element={<AuthCallback />} />
 
           {/* ── Product detail (public) ── */}
           <Route path="/product/:id" element={<ProductDetails />} />
@@ -97,11 +96,10 @@ function App() {
           <Route path="/cart"      element={<ProtectedRoute user={user} roles={["consumer"]}><Orders /></ProtectedRoute>} />
           <Route path="/my-orders" element={<ProtectedRoute user={user} roles={["consumer"]}><ConsumerOrderTracking /></ProtectedRoute>} />
 
-          {/* Payment — Khalti routes removed, only eSewa redirect needed */}
           <Route path="/payment"               element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentSelection /></ProtectedRoute>} />
           <Route path="/payment/esewa/success" element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentSuccess /></ProtectedRoute>} />
           <Route path="/payment/esewa/failure" element={<ProtectedRoute user={user} roles={["consumer"]}><PaymentFailure /></ProtectedRoute>} />
-          
+
           <Route path="/return-request" element={<ProtectedRoute user={user} roles={["consumer"]}><ReturnRequest /></ProtectedRoute>} />
 
           {/* ── Farmer ── */}
@@ -110,16 +108,12 @@ function App() {
           <Route path="/farmer/orders"           element={<ProtectedRoute user={user} roles={["farmer"]}><FarmerOrders /></ProtectedRoute>} />
           <Route path="/farmer/payment-settings" element={<ProtectedRoute user={user} roles={["farmer"]}><FarmerPaymentSettings /></ProtectedRoute>} />
           <Route path="/farmer/returns"          element={<ProtectedRoute user={user} roles={["farmer"]}><FarmerReturns /></ProtectedRoute>} />
-          <Route path="/farmer/earnings" element={<ProtectedRoute user={user} roles={["farmer"]}><FarmerEarnings /></ProtectedRoute>} />
+          <Route path="/farmer/earnings"         element={<ProtectedRoute user={user} roles={["farmer"]}><FarmerEarnings /></ProtectedRoute>} />
 
           {/* ── Admin ── */}
-          <Route path="/admin" element={<ProtectedRoute user={user} roles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/admin/payouts" element={<ProtectedRoute user={user} roles={["admin"]}><AdminPayouts /></ProtectedRoute>} />
-          <Route path="/admin/farmer-payouts" element={
-            <ProtectedRoute user={user} roles={["admin"]}>
-              <AdminFarmerPayouts />
-            </ProtectedRoute>
-          } />
+          <Route path="/admin"                element={<ProtectedRoute user={user} roles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/payouts"        element={<ProtectedRoute user={user} roles={["admin"]}><AdminPayouts /></ProtectedRoute>} />
+          <Route path="/admin/farmer-payouts" element={<ProtectedRoute user={user} roles={["admin"]}><AdminFarmerPayouts /></ProtectedRoute>} />
 
           {/* ── Shared (all logged-in roles) ── */}
           <Route path="/profile"       element={<ProtectedRoute user={user} roles={["consumer","farmer","admin"]}><Profile /></ProtectedRoute>} />

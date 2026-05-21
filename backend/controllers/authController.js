@@ -2,6 +2,21 @@ import User   from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt    from "jsonwebtoken";
 
+const signToken = (id, role) =>
+  jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: "7d" });
+
+const safeUser = (user) => ({
+  _id:          user._id,
+  firstName:    user.firstName,
+  lastName:     user.lastName,
+  email:        user.email,
+  phone:        user.phone,
+  role:         user.role,
+  profileImage: user.profileImage,
+  location:     user.location,
+  addressText:  user.addressText,
+});
+
 export const register = async (req, res) => {
   try {
     const { firstName, lastName, email, password, role, phone } = req.body;
@@ -49,7 +64,6 @@ export const login = async (req, res) => {
     let user = null;
 
     if (email && email.trim()) {
-      // FIX: must select +password because password is now select:false in schema
       user = await User.findOne({ email: email.trim().toLowerCase() }).select("+password");
     } else if (phone && phone.trim()) {
       user = await User.findOne({ phone: phone.trim() }).select("+password");
@@ -59,28 +73,19 @@ export const login = async (req, res) => {
 
     if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
+    // Google-only accounts have no password
+    if (!user.password) {
+      return res.status(401).json({
+        message: "This account uses Google sign-in. Please use 'Continue with Google'.",
+      });
+    }
+
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ message: "Invalid credentials" });
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
     res.json({
-      token,
-      user: {
-        _id:          user._id,
-        firstName:    user.firstName,
-        lastName:     user.lastName,
-        email:        user.email,
-        phone:        user.phone,
-        role:         user.role,
-        profileImage: user.profileImage,
-        location:     user.location,
-        addressText:  user.addressText,
-      },
+      token: signToken(user._id, user.role),
+      user:  safeUser(user),
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -117,9 +122,7 @@ export const updateProfile = async (req, res) => {
     }
 
     await user.save();
-
-    const userObj = user.toJSON();
-    res.json({ message: "Profile updated", user: userObj });
+    res.json({ message: "Profile updated", user: safeUser(user) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -161,17 +164,16 @@ export const updateMyLocation = async (req, res) => {
 export const deleteMe = async (req, res) => {
   try {
     const { password } = req.body;
-
-    if (!password) {
-      return res.status(400).json({ message: "Current password is required to delete your account" });
-    }
-
     const user = await User.findById(req.user._id).select("+password");
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      return res.status(401).json({ message: "Incorrect password" });
+    // Google-only accounts can delete without password
+    if (user.password) {
+      if (!password) {
+        return res.status(400).json({ message: "Current password is required to delete your account" });
+      }
+      const match = await bcrypt.compare(password, user.password);
+      if (!match) return res.status(401).json({ message: "Incorrect password" });
     }
 
     await User.findByIdAndDelete(req.user._id);
@@ -192,6 +194,47 @@ export const clearMyLocation = async (req, res) => {
     });
 
     res.json({ message: "Location cleared" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* ─────────────────────────────────────────────────────────────
+   GOOGLE OAUTH
+───────────────────────────────────────────────────────────── */
+export const googleCallback = (req, res) => {
+  const { user, isNew } = req.user; // set by passport strategy
+
+  const token       = signToken(user._id, user.role);
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+  res.redirect(
+    `${frontendUrl}/auth/callback?token=${token}&newUser=${isNew}`
+  );
+};
+
+export const setGoogleRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+
+    if (!["consumer", "farmer"].includes(role)) {
+      return res.status(400).json({ message: "Role must be consumer or farmer" });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (user.role !== "pending_google") {
+      return res.status(400).json({ message: "Role already set" });
+    }
+
+    user.role = role;
+    await user.save();
+
+    // Issue a fresh token with the real role
+    const token = signToken(user._id, user.role);
+
+    res.json({ token, user: safeUser(user) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

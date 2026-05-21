@@ -1,15 +1,17 @@
 import { createContext, useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
+
 export const AuthContext = createContext(null);
 export default AuthContext;
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     const boot = async () => {
       try {
         const token = localStorage.getItem("token");
-
         if (!token) {
           setUser(null);
           return;
@@ -23,26 +25,34 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       }
     };
-
     boot();
   }, []);
+
   const login = (token, userData) => {
     localStorage.setItem("token", token);
     setUser(userData);
   };
+
   const logout = () => {
     localStorage.removeItem("token");
     setUser(null);
   };
+
+  const getRoleRoute = (role) => {
+    if (role === "farmer")   return "/farmer";
+    if (role === "consumer") return "/consumer";
+    if (role === "admin")    return "/admin";
+    return "/";
+  };
+
   const value = useMemo(
-    () => ({
-      user,
-      setUser,
-      loading,
-      login,
-      logout,
-    }),
+    () => ({ user, setUser, loading, login, logout, getRoleRoute }),
     [user, loading]
   );
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };

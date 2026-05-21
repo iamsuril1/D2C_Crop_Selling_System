@@ -1,9 +1,9 @@
-/* backend/app.js */
-import express from "express";
-import cors    from "cors";
-import path    from "path";
-import fs      from "fs";
-
+import express    from "express";
+import cors       from "cors";
+import path       from "path";
+import fs         from "fs";
+import passport   from "passport";
+import "./config/passport.js";
 import authRoutes           from "./routes/authRoutes.js";
 import productRoutes        from "./routes/productRoutes.js";
 import orderRoutes          from "./routes/orderRoutes.js";
@@ -16,9 +16,8 @@ import forgotPasswordRoutes from "./routes/forgotPasswordRoutes.js";
 import returnRoutes         from "./routes/ReturnRoutes.js";
 import contactRoutes        from "./routes/contactRoutes.js";
 import payoutRoutes         from "./routes/payoutRoutes.js";
-import farmerPayoutRoutes   from "./routes/farmerPayoutRoutes.js";   
-
-import { errorHandler } from "./middleware/errorMiddleware.js";
+import farmerPayoutRoutes   from "./routes/farmerPayoutRoutes.js";
+import { errorHandler }     from "./middleware/errorMiddleware.js";
 
 const app = express();
 
@@ -35,6 +34,9 @@ app.use(express.urlencoded({ extended: true }));
 
 const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
 app.use(cors({ origin: allowedOrigin, credentials: true }));
+
+// Passport (no session needed — we use JWT)
+app.use(passport.initialize());
 
 app.use(
   "/uploads",
@@ -60,7 +62,7 @@ app.use("/api/forgot-password", forgotPasswordRoutes);
 app.use("/api/returns",         returnRoutes);
 app.use("/api/contact",         contactRoutes);
 app.use("/api/payouts",         payoutRoutes);
-app.use("/api/farmer-payouts",  farmerPayoutRoutes);   // ← NEW
+app.use("/api/farmer-payouts",  farmerPayoutRoutes);
 
 app.use(errorHandler);
 

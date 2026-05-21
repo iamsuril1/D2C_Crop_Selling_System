@@ -1,11 +1,3 @@
-/* src/pages/ConsumerDashboard.jsx
-   Enhanced with:
-   - Live search bar (name, category, farmer)
-   - Filter panel (category, sort, price range, in-stock, organic, bulk available)
-   - Filter toggles with active-count badge
-   - All filters work together
-*/
-
 import { useEffect, useMemo, useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
@@ -694,4 +686,4 @@ const ConsumerDashboard = () => {
   );
 };
 
-export default ConsumerDashboard;
+export default ConsumerDashboard; 

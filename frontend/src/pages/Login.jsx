@@ -1,35 +1,61 @@
 import { useState, useContext } from "react";
-import { useNavigate } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext";
-import api from "../api/axios";
-import AlertModal from "../components/AlertModal";
+import { useNavigate }          from "react-router-dom";
+import { AuthContext }          from "../context/AuthContext";
+import api                      from "../api/axios";
+import AlertModal               from "../components/AlertModal";
+
+/* ── Google sign-in button ── */
+const GoogleButton = () => {
+  const handleGoogle = () => {
+    window.location.href =
+      (import.meta.env.VITE_API_URL || "http://localhost:5000") +
+      "/api/auth/google";
+  };
+
+  return (
+    <>
+      <div className="flex items-center gap-3 my-2">
+        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-xs text-gray-400 font-medium">or</span>
+        <div className="flex-1 h-px bg-gray-200" />
+      </div>
+
+      <button
+        type="button"
+        onClick={handleGoogle}
+        className="w-full flex items-center justify-center gap-3 border-2 border-gray-200 hover:border-gray-300 bg-white text-gray-700 font-semibold py-3 rounded-2xl transition hover:bg-gray-50 active:scale-[0.98]"
+      >
+        <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <path fill="#4285F4" d="M46.145 24.503c0-1.59-.142-3.12-.406-4.594H24v8.697h12.43c-.536 2.888-2.162 5.334-4.606 6.977v5.805h7.453c4.36-4.014 6.868-9.926 6.868-16.885z"/>
+          <path fill="#34A853" d="M24 47c6.24 0 11.476-2.07 15.277-5.612l-7.453-5.805c-2.069 1.386-4.716 2.205-7.824 2.205-6.015 0-11.107-4.063-12.929-9.527H3.376v5.995C7.163 41.88 15.003 47 24 47z"/>
+          <path fill="#FBBC05" d="M11.071 28.261A14.917 14.917 0 0 1 10.25 24c0-1.479.254-2.915.821-4.261v-5.995H3.376A23.94 23.94 0 0 0 0 24c0 3.869.927 7.532 2.572 10.744l8.499-6.483z"/>
+          <path fill="#EA4335" d="M24 9.213c3.39 0 6.432 1.166 8.823 3.455l6.613-6.613C35.464 2.283 30.228 0 24 0 15.003 0 7.163 5.12 3.376 13.744l8.495 6.483c1.822-5.464 6.914-11.014 12.129-11.014z"/>
+        </svg>
+        Continue with Google
+      </button>
+    </>
+  );
+};
 
 const Login = () => {
-  const navigate = useNavigate();
-  const { setUser } = useContext(AuthContext);
+  const navigate          = useNavigate();
+  const { login, getRoleRoute } = useContext(AuthContext);
 
-  const [loginMethod, setLoginMethod] = useState("email"); // "email" | "phone"
-  const [formData, setFormData] = useState({
-    email: "",
-    phone: "",
-    password: "",
-  });
-  const [loading, setLoading] = useState(false);
+  const [loginMethod, setLoginMethod] = useState("email");
+  const [formData,    setFormData]    = useState({ email: "", phone: "", password: "" });
+  const [loading,     setLoading]     = useState(false);
 
   const [alertModal, setAlertModal] = useState({
     isOpen: false, type: "", title: "", message: "",
   });
 
-  const showAlert = (title, message, type = "error") => {
+  const showAlert  = (title, message, type = "error") =>
     setAlertModal({ isOpen: true, title, message, type });
-  };
-  const closeAlert = () => {
-    setAlertModal((prev) => ({ ...prev, isOpen: false }));
-  };
+  const closeAlert = () =>
+    setAlertModal((p) => ({ ...p, isOpen: false }));
 
-  const handleChange = (e) => {
+  const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
 
   const switchMethod = (method) => {
     setLoginMethod(method);
@@ -41,21 +67,12 @@ const Login = () => {
     if (loading) return;
 
     const password = formData.password.trim();
-    if (!password) {
-      showAlert("Validation Error", "Password is required.", "warning");
-      return;
-    }
+    if (!password) { showAlert("Validation Error", "Password is required.", "warning"); return; }
 
     if (loginMethod === "email") {
-      if (!formData.email.trim()) {
-        showAlert("Validation Error", "Email is required.", "warning");
-        return;
-      }
+      if (!formData.email.trim()) { showAlert("Validation Error", "Email is required.", "warning"); return; }
     } else {
-      if (!formData.phone.trim()) {
-        showAlert("Validation Error", "Mobile number is required.", "warning");
-        return;
-      }
+      if (!formData.phone.trim()) { showAlert("Validation Error", "Mobile number is required.", "warning"); return; }
       if (!/^[0-9]{10}$/.test(formData.phone.trim())) {
         showAlert("Validation Error", "Enter a valid 10-digit mobile number.", "warning");
         return;
@@ -73,26 +90,20 @@ const Login = () => {
 
       const res = await api.post("/api/auth/login", payload);
 
-      if (!res?.data?.token || !res?.data?.user) {
-        throw new Error("Invalid server response");
-      }
+      if (!res?.data?.token || !res?.data?.user) throw new Error("Invalid server response");
 
-      localStorage.setItem("token", res.data.token);
-      setUser(res.data.user);
-      navigate("/");
+      const { token, user } = res.data;
+      login(token, user);
+
+      // Navigate directly by role — avoids timing bug with roleRedirect()
+      navigate(getRoleRoute(user.role), { replace: true });
+
     } catch (err) {
       let message = "Login failed. Please try again.";
-
-      if (!navigator.onLine) {
-        message = "No internet connection.";
-      } else if (err.response) {
-        message = err.response.data?.message || `Server error (${err.response.status})`;
-      } else if (err.request) {
-        message = "Server is not responding. Please try later.";
-      } else if (err.message) {
-        message = err.message;
-      }
-
+      if (!navigator.onLine)  message = "No internet connection.";
+      else if (err.response)  message = err.response.data?.message || `Server error (${err.response.status})`;
+      else if (err.request)   message = "Server is not responding. Please try later.";
+      else if (err.message)   message = err.message;
       showAlert("Login Failed", message, "error");
     } finally {
       setLoading(false);
@@ -111,7 +122,7 @@ const Login = () => {
         confirmText="OK"
       />
 
-      {/* Left Form */}
+      {/* ── Left: Form ── */}
       <div className="flex items-center justify-center px-6 py-16 bg-gradient-to-b from-[#E6F4EA] to-[#FDF8E3]">
         <form
           onSubmit={handleSubmit}
@@ -125,6 +136,8 @@ const Login = () => {
               Login to buy fresh crops directly from farmers.
             </p>
           </div>
+
+          <GoogleButton />
 
           {/* Login method toggle */}
           <div className="flex rounded-xl overflow-hidden border-2 border-green-200">
@@ -193,7 +206,7 @@ const Login = () => {
             <label className="floating-label text-green-700">Password</label>
           </div>
 
-          {/* Forgot password — only shown for email login */}
+          {/* Forgot password */}
           {loginMethod === "email" && (
             <div className="text-right -mt-2">
               <span
@@ -225,7 +238,7 @@ const Login = () => {
         </form>
       </div>
 
-      {/* Right Image */}
+      {/* ── Right: Image ── */}
       <div className="hidden md:block relative">
         <img
           src="Login.jpg"

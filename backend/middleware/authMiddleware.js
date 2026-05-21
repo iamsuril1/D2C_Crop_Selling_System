@@ -12,19 +12,22 @@ export const protect = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
+    const user    = await User.findById(decoded.id);
     if (!user) return res.status(401).json({ message: "User not found" });
+
+    if (
+      user.role === "pending_google" &&
+      !req.path.endsWith("/set-role")
+    ) {
+      return res.status(403).json({
+        message: "Please complete registration by selecting your role.",
+        code:    "ROLE_REQUIRED",
+      });
+    }
 
     req.user = user;
     next();
   } catch (e) {
-    return res.status(401).json({ message: "Token invalid" });
+    return res.status(401).json({ message: "Token invalid or expired" });
   }
-};
-
-export const errorHandler = (err, req, res, next) => {
-  console.error(err);
-  res.status(err.statusCode || 500).json({
-    message: err.message || "Server error",
-  });
 };

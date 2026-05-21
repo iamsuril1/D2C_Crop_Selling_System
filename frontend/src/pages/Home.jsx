@@ -1,21 +1,12 @@
-/* src/pages/Home.jsx — completely new design
-   Direction: Editorial brutalism meets organic warmth
-   Palette: Cream (#F5F0E8), deep forest (#0A1F0A), living green (#1E9C17),
-            harvest gold (#E8A020), raw clay (#C4846A)
-   Type: Clash Display (display) + DM Sans (body) via Google Fonts
-   Unforgettable element: The massive rotating crop wheel + the
-   "price comparison" split screen that reveals on scroll
-*/
-
 import { Link } from "react-router-dom";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /* ────────────────────────────────────────────────────────────
    HOOK: Intersection Observer (fires once)
 ──────────────────────────────────────────────────────────── */
 const useReveal = (threshold = 0.12) => {
-  const ref            = useRef(null);
-  const [on, setOn]    = useState(false);
+  const ref         = useRef(null);
+  const [on, setOn] = useState(false);
   useEffect(() => {
     const el  = ref.current;
     if (!el)  return;
@@ -30,98 +21,327 @@ const useReveal = (threshold = 0.12) => {
 };
 
 /* ────────────────────────────────────────────────────────────
-   HOOK: Animated counter
+   VEGETABLES (SVG icons instead of emojis)
 ──────────────────────────────────────────────────────────── */
-const Counter = ({ to, suffix = "" }) => {
-  const [val, setVal]   = useState(0);
-  const [ref, on]       = useReveal(0.3);
+const VEGGIES = [
+  { name: "Tomato",    color: "#E74C3C" },
+  { name: "Spinach",   color: "#27AE60" },
+  { name: "Potato",    color: "#D4A853" },
+  { name: "Carrot",    color: "#E67E22" },
+  { name: "Garlic",    color: "#F0E6D3" },
+  { name: "Onion",     color: "#9B59B6" },
+  { name: "Corn",      color: "#F1C40F" },
+  { name: "Broccoli",  color: "#1E9C17" },
+  { name: "Eggplant",  color: "#6C3483" },
+  { name: "Coriander", color: "#2ECC71" },
+  { name: "Capsicum",  color: "#E74C3C" },
+  { name: "Cucumber",  color: "#28B463" },
+];
+
+/* ────────────────────────────────────────────────────────────
+   ROTATING VEGGIE WHEEL
+──────────────────────────────────────────────────────────── */
+const VeggieWheel = () => {
+  const [angle, setAngle] = useState(0);
+  const raf               = useRef(null);
+
   useEffect(() => {
-    if (!on) return;
-    let cur = 0;
-    const step = Math.max(1, Math.ceil(to / 72));
-    const id   = setInterval(() => {
-      cur += step;
-      if (cur >= to) { setVal(to); clearInterval(id); }
-      else setVal(cur);
-    }, 14);
-    return () => clearInterval(id);
-  }, [on, to]);
-  return <span ref={ref}>{val.toLocaleString()}{suffix}</span>;
+    const tick = () => {
+      setAngle((a) => (a + 0.15) % 360);
+      raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, []);
+
+  const cx     = 160;
+  const cy     = 160;
+  const radius = 115;
+
+  return (
+    <svg viewBox="0 0 320 320" className="w-full h-full" aria-hidden="true">
+      {/* Decorative rings */}
+      <circle cx={cx} cy={cy} r={150} fill="none" stroke="#1E9C17" strokeWidth="1"   opacity="0.15" strokeDasharray="5 5" />
+      <circle cx={cx} cy={cy} r={130} fill="none" stroke="#E8A020" strokeWidth="0.5" opacity="0.12" />
+      <circle cx={cx} cy={cy} r={60}  fill="none" stroke="#1E9C17" strokeWidth="0.5" opacity="0.2"  strokeDasharray="3 3" />
+
+      {/* Rotating colored dots with labels */}
+      {VEGGIES.map((v, i) => {
+        const a = (i * (360 / VEGGIES.length) + angle) * (Math.PI / 180);
+        const x = cx + radius * Math.cos(a);
+        const y = cy + radius * Math.sin(a);
+        const scale = 0.75 + 0.35 * ((Math.sin(a) + 1) / 2);
+        const r     = Math.round(9 * scale);
+        return (
+          <g key={i}>
+            <circle cx={x} cy={y} r={r} fill={v.color} opacity={0.85} />
+            <circle cx={x} cy={y} r={r} fill="none" stroke="white" strokeWidth="0.8" opacity={0.4} />
+          </g>
+        );
+      })}
+
+      {/* Spoke lines from center to each dot */}
+      {VEGGIES.map((v, i) => {
+        const a  = (i * (360 / VEGGIES.length) + angle) * (Math.PI / 180);
+        const x  = cx + radius * Math.cos(a);
+        const y  = cy + radius * Math.sin(a);
+        const x0 = cx + 60 * Math.cos(a);
+        const y0 = cy + 60 * Math.sin(a);
+        return (
+          <line
+            key={`spoke-${i}`}
+            x1={x0} y1={y0}
+            x2={x}  y2={y}
+            stroke={v.color}
+            strokeWidth="0.6"
+            opacity="0.25"
+          />
+        );
+      })}
+
+      {/* Center badge */}
+      <circle cx={cx} cy={cy} r={58} fill="#0A1F0A" />
+      <circle cx={cx} cy={cy} r={54} fill="#0A1F0A" stroke="#1E9C17" strokeWidth="1.5" />
+      <text x={cx} y={cy - 10} textAnchor="middle" fill="#1E9C17"
+        fontFamily="Montserrat, sans-serif" fontWeight="900" fontSize="13" letterSpacing="1">
+        MERO
+      </text>
+      <text x={cx} y={cy + 8} textAnchor="middle" fill="white"
+        fontFamily="Montserrat, sans-serif" fontWeight="900" fontSize="13" letterSpacing="1">
+        BARI
+      </text>
+      <text x={cx} y={cy + 23} textAnchor="middle" fill="#E8A020"
+        fontFamily="sans-serif" fontSize="8" letterSpacing="3">
+        NEPAL
+      </text>
+    </svg>
+  );
 };
 
 /* ────────────────────────────────────────────────────────────
-   DATA
+   AIRPLANE FLIGHT PATH
 ──────────────────────────────────────────────────────────── */
-const CROPS = [
-  { name: "Tomato",    kg: "Rs.28",  emoji: "🍅" },
-  { name: "Spinach",   kg: "Rs.15",  emoji: "🥬" },
-  { name: "Potato",    kg: "Rs.22",  emoji: "🥔" },
-  { name: "Carrot",    kg: "Rs.35",  emoji: "🥕" },
-  { name: "Garlic",    kg: "Rs.120", emoji: "🧄" },
-  { name: "Ginger",    kg: "Rs.80",  emoji: "🫚" },
-  { name: "Onion",     kg: "Rs.30",  emoji: "🧅" },
-  { name: "Coriander", kg: "Rs.20",  emoji: "🌿" },
-  { name: "Cabbage",   kg: "Rs.18",  emoji: "🥦" },
-  { name: "Radish",    kg: "Rs.16",  emoji: "🌾" },
-];
+const PlaneIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+    <path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/>
+  </svg>
+);
 
-const HOW = [
-  {
-    n:     "01",
-    head:  "Farmers list their crops",
-    body:  "Set your price, upload a photo, choose regular and bulk rates. Live in under 3 minutes.",
-    color: "#1E9C17",
-  },
-  {
-    n:     "02",
-    head:  "Consumers browse nearby",
-    body:  "Location-based discovery surfaces farms closest to you first. Fresher produce, lower delivery fees.",
-    color: "#E8A020",
-  },
-  {
-    n:     "03",
-    head:  "Direct payment & delivery",
-    body:  "eSewa, Khalti, Bank QR or Cash on Delivery. Farmer ships directly to your door.",
-    color: "#C4846A",
-  },
-];
+const BoxIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+    <path d="M21 8l-9-6-9 6v8l9 6 9-6V8zm-9 11.5L4 14v-5.5l8 5.33 8-5.33V14l-8 5.5zM12 3.8L19.5 8.5 12 13.2 4.5 8.5 12 3.8z"/>
+  </svg>
+);
 
-const VOICES = [
-  {
-    quote: "I set my own price for the first time in 12 years of farming.",
-    name:  "Ramesh B.", place: "Bhaktapur",    init: "RB",
-  },
-  {
-    quote: "My restaurant saves Rs. 7,000 a month on vegetables alone.",
-    name:  "Bikash T.", place: "Kathmandu",    init: "BT",
-  },
-  {
-    quote: "I know exactly which farm my food comes from and when it was harvested.",
-    name:  "Sita M.",   place: "Lalitpur",     init: "SM",
-  },
-];
+const FlightPath = () => {
+  return (
+    <div className="relative w-full overflow-hidden py-20 px-6 lg:px-16 bg-[#F5F0E8]">
+      <div className="max-w-5xl mx-auto">
+
+        {/* Section label */}
+        <div className="text-center mb-16">
+          <span className="text-xs font-semibold tracking-[0.3em] uppercase text-[#1E9C17]">
+            How it works
+          </span>
+          <h2
+            className="cd font-bold text-[#0A1F0A] mt-3 leading-tight"
+            style={{ fontSize: "clamp(2rem, 4vw, 3rem)" }}
+          >
+            Farm to your door, directly.
+          </h2>
+          <p className="mt-4 text-[#5a7a5a] text-sm max-w-md mx-auto leading-relaxed">
+            No middlemen. No inflated prices. Just a direct line between the farmer who grows your food and the table you eat it at.
+          </p>
+        </div>
+
+        {/* SVG Flight path */}
+        <div className="relative">
+          <svg
+            viewBox="0 0 900 180"
+            className="w-full"
+            style={{ overflow: "visible" }}
+            aria-hidden="true"
+          >
+            <defs>
+              <marker id="arrowGreen" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">
+                <path d="M0,0 L7,3.5 L0,7 Z" fill="#1E9C17" />
+              </marker>
+              <marker id="arrowGold" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">
+                <path d="M0,0 L7,3.5 L0,7 Z" fill="#E8A020" />
+              </marker>
+            </defs>
+
+            {/* Path 1: Farmer → Platform */}
+            <path
+              d="M 130,90 Q 280,25 430,90"
+              fill="none"
+              stroke="#1E9C17"
+              strokeWidth="2"
+              strokeDasharray="8 5"
+              opacity="0.4"
+              markerEnd="url(#arrowGreen)"
+            />
+
+            {/* Path 2: Platform → Consumer */}
+            <path
+              d="M 470,90 Q 620,25 760,90"
+              fill="none"
+              stroke="#E8A020"
+              strokeWidth="2"
+              strokeDasharray="8 5"
+              opacity="0.4"
+              markerEnd="url(#arrowGold)"
+            />
+
+            {/* Animated plane on path 1 */}
+            <g fill="#1E9C17">
+              <animateMotion
+                dur="3.2s"
+                repeatCount="indefinite"
+                path="M 130,90 Q 280,25 430,90"
+                rotate="auto"
+              />
+              <polygon points="0,-6 14,0 0,6 4,0" />
+            </g>
+
+            {/* Animated box on path 2 */}
+            <g fill="#E8A020">
+              <animateMotion
+                dur="3.2s"
+                repeatCount="indefinite"
+                begin="1.6s"
+                path="M 470,90 Q 620,25 760,90"
+                rotate="auto"
+              />
+              <rect x="-6" y="-6" width="12" height="12" rx="2" />
+            </g>
+          </svg>
+
+          {/* Three nodes */}
+          <div className="absolute inset-0 flex items-center justify-between px-[5%] pointer-events-none">
+
+            {/* Farmer node */}
+            <div className="flex flex-col items-center gap-3 text-center w-28">
+              <div className="w-16 h-16 rounded-2xl bg-[#0A1F0A] flex items-center justify-center shadow-xl">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#1E9C17" strokeWidth="1.5" className="w-8 h-8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3a9 9 0 0 0-9 9c0 3.87 2.45 7.17 5.9 8.43L12 21l3.1-0.57A9 9 0 0 0 21 12a9 9 0 0 0-9-9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12c0-2.21 1.79-4 4-4s4 1.79 4 4" />
+                  <line x1="12" y1="8" x2="12" y2="3" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div>
+                <p className="cd font-bold text-[#0A1F0A] text-sm">Farmer</p>
+                <p className="text-[#1E9C17] text-xs font-medium">Lists crops</p>
+              </div>
+            </div>
+
+            {/* Platform node */}
+            <div className="flex flex-col items-center gap-3 text-center w-28">
+              <div className="w-16 h-16 rounded-full bg-[#1E9C17] flex items-center justify-center shadow-xl ring-4 ring-[#1E9C17]/20">
+                <span className="cd font-black text-white text-[10px] leading-tight text-center tracking-wide">
+                  MERO<br />BARI
+                </span>
+              </div>
+              <div>
+                <p className="cd font-bold text-[#0A1F0A] text-sm">Platform</p>
+                <p className="text-[#1E9C17] text-xs font-medium">Connects both</p>
+              </div>
+            </div>
+
+            {/* Consumer node */}
+            <div className="flex flex-col items-center gap-3 text-center w-28">
+              <div className="w-16 h-16 rounded-2xl bg-[#E8A020] flex items-center justify-center shadow-xl">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#0A1F0A" strokeWidth="1.5" className="w-8 h-8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                  <line x1="3" y1="6" x2="21" y2="6" strokeLinecap="round" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 10a4 4 0 0 1-8 0" />
+                </svg>
+              </div>
+              <div>
+                <p className="cd font-bold text-[#0A1F0A] text-sm">Consumer</p>
+                <p className="text-[#E8A020] text-xs font-medium">Buys fresh</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Step cards */}
+        <div className="grid md:grid-cols-3 gap-6 mt-20">
+          {[
+            {
+              num:   "01",
+              title: "Register & List",
+              body:  "Farmers sign up free and list crops with harvest details and pricing. Live in minutes.",
+              color: "#1E9C17",
+            },
+            {
+              num:   "02",
+              title: "Browse & Order",
+              body:  "Consumers discover nearby farms, see harvest dates, and place normal or bulk orders.",
+              color: "#E8A020",
+            },
+            {
+              num:   "03",
+              title: "Pay & Receive",
+              body:  "Pay via eSewa, FonePay, or Cash on Delivery. Produce delivered directly to you.",
+              color: "#C4846A",
+            },
+          ].map((s, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-2xl p-7 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all relative overflow-hidden"
+            >
+              {/* Large watermark number */}
+              <span
+                className="absolute top-4 right-5 cd font-black text-6xl leading-none select-none pointer-events-none"
+                style={{ color: s.color, opacity: 0.08 }}
+              >
+                {s.num}
+              </span>
+
+              {/* Accent dot */}
+              <div
+                className="w-3 h-3 rounded-full mb-5"
+                style={{ backgroundColor: s.color }}
+              />
+
+              <h3 className="cd font-bold text-[#0A1F0A] text-lg mb-2">{s.title}</h3>
+              <p className="text-[#5a7a5a] text-sm leading-relaxed">{s.body}</p>
+
+              {/* Bottom accent */}
+              <div
+                className="absolute bottom-0 left-0 h-1 w-full rounded-b-2xl opacity-20"
+                style={{ backgroundColor: s.color }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /* ────────────────────────────────────────────────────────────
-   TICKER (horizontal scroll marquee)
+   TICKER (vegetable names + color dots, no emojis)
 ──────────────────────────────────────────────────────────── */
 const Ticker = () => {
-  const items = [...CROPS, ...CROPS];
+  const items = [...VEGGIES, ...VEGGIES];
   return (
-    <div className="overflow-hidden py-5 border-y-2 border-[#0A1F0A]/12 bg-[#F5F0E8]">
+    <div className="overflow-hidden py-4 border-y-2 border-[#0A1F0A]/10 bg-[#F5F0E8]">
       <div
         className="flex gap-0 w-max"
-        style={{ animation: "tickerSlide 32s linear infinite" }}
+        style={{ animation: "tickerSlide 30s linear infinite" }}
       >
-        {items.map((c, i) => (
+        {items.map((v, i) => (
           <div
             key={i}
-            className="flex items-center gap-5 px-10 border-r-2 border-[#0A1F0A]/10 shrink-0"
+            className="flex items-center gap-3 px-8 border-r border-[#0A1F0A]/8 shrink-0"
           >
-            <span className="text-3xl leading-none">{c.emoji}</span>
-            <div>
-              <p className="font-bold text-[#0A1F0A] text-lg leading-tight">{c.name}</p>
-              <p className="text-[#1E9C17] text-xs font-semibold tracking-wide">{c.kg} / kg</p>
-            </div>
+            <span
+              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: v.color }}
+            />
+            <p className="font-semibold text-[#0A1F0A] text-sm tracking-wide">{v.name}</p>
           </div>
         ))}
       </div>
@@ -130,80 +350,14 @@ const Ticker = () => {
 };
 
 /* ────────────────────────────────────────────────────────────
-   ROTATING WHEEL OF CROPS (SVG)
-──────────────────────────────────────────────────────────── */
-const CropWheel = () => {
-  const [angle, setAngle] = useState(0);
-  const raf               = useRef(null);
-  useEffect(() => {
-    const tick = () => {
-      setAngle((a) => (a + 0.18) % 360);
-      raf.current = requestAnimationFrame(tick);
-    };
-    raf.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf.current);
-  }, []);
-
-  const radius = 110;
-  const cx     = 160;
-  const cy     = 160;
-
-  return (
-    <svg viewBox="0 0 320 320" className="w-full h-full" aria-hidden="true">
-      {/* Outer decorative ring */}
-      <circle cx={cx} cy={cy} r={148} fill="none" stroke="#1E9C17" strokeWidth="1" opacity="0.25" strokeDasharray="6 4" />
-      <circle cx={cx} cy={cy} r={132} fill="none" stroke="#E8A020" strokeWidth="0.5" opacity="0.2" />
-
-      {/* Rotating crop emojis */}
-      {CROPS.map((crop, i) => {
-        const a    = (i * (360 / CROPS.length) + angle) * (Math.PI / 180);
-        const x    = cx + radius * Math.cos(a);
-        const y    = cy + radius * Math.sin(a);
-        const size = 18 + 6 * Math.abs(Math.sin(a));
-        return (
-          <text
-            key={i}
-            x={x}
-            y={y}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontSize={size}
-            style={{ userSelect: "none" }}
-          >
-            {crop.emoji}
-          </text>
-        );
-      })}
-
-      {/* Center badge */}
-      <circle cx={cx} cy={cy} r={56} fill="#0A1F0A" />
-      <circle cx={cx} cy={cy} r={52} fill="#0A1F0A" stroke="#1E9C17" strokeWidth="1.5" />
-      <text x={cx} y={cy - 10} textAnchor="middle" fill="#1E9C17"
-        fontFamily="Montserrat, sans-serif" fontWeight="900" fontSize="13">
-        MERO
-      </text>
-      <text x={cx} y={cy + 8} textAnchor="middle" fill="white"
-        fontFamily="Montserrat, sans-serif" fontWeight="900" fontSize="13">
-        BARI
-      </text>
-      <text x={cx} y={cy + 24} textAnchor="middle" fill="#E8A020"
-        fontFamily="sans-serif" fontSize="9" letterSpacing="2">
-        D2C
-      </text>
-    </svg>
-  );
-};
-
-/* ────────────────────────────────────────────────────────────
    MAIN COMPONENT
 ──────────────────────────────────────────────────────────── */
 const Home = () => {
-  const [ready, setReady] = useState(false);
-
-  const [howRef,    howOn]    = useReveal(0.1);
-  const [statsRef,  statsOn]  = useReveal(0.2);
-  const [voiceRef,  voiceOn]  = useReveal(0.1);
-  const [ctaRef,    ctaOn]    = useReveal(0.15);
+  const [ready,    setReady]    = useState(false);
+  const [howRef,   howOn]       = useReveal(0.1);
+  const [doorsRef, doorsOn]     = useReveal(0.1);
+  const [voiceRef, voiceOn]     = useReveal(0.1);
+  const [ctaRef,   ctaOn]       = useReveal(0.15);
 
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 40);
@@ -212,29 +366,24 @@ const Home = () => {
 
   return (
     <>
-      {/* ── Global styles ── */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
 
         @keyframes tickerSlide {
           from { transform: translateX(0); }
           to   { transform: translateX(-50%); }
         }
         @keyframes heroIn {
-          from { opacity: 0; transform: translateY(40px); }
-          to   { opacity: 1; transform: translateY(0);    }
-        }
-        @keyframes fadeSlideUp {
-          from { opacity: 0; transform: translateY(28px); }
+          from { opacity: 0; transform: translateY(36px); }
           to   { opacity: 1; transform: translateY(0);    }
         }
         @keyframes scaleIn {
-          from { opacity: 0; transform: scale(0.92); }
+          from { opacity: 0; transform: scale(0.88); }
           to   { opacity: 1; transform: scale(1);    }
         }
-        @keyframes lineGrow {
-          from { transform: scaleX(0); }
-          to   { transform: scaleX(1); }
+        @keyframes floatY {
+          0%, 100% { transform: translateY(0px);   }
+          50%       { transform: translateY(-14px); }
         }
 
         .hero-word {
@@ -248,6 +397,7 @@ const Home = () => {
         .w4 { animation-delay: 0.46s; }
         .w5 { animation-delay: 0.58s; }
         .w6 { animation-delay: 0.70s; }
+        .w7 { animation-delay: 0.82s; }
 
         .cd { font-family: 'Clash Display', 'Montserrat', sans-serif; }
         .dm { font-family: 'DM Sans', 'Poppins', sans-serif; }
@@ -262,7 +412,7 @@ const Home = () => {
 
           {/* Background texture */}
           <div
-            className="absolute inset-0 opacity-[0.06]"
+            className="absolute inset-0 opacity-[0.05]"
             style={{
               backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
             }}
@@ -270,19 +420,16 @@ const Home = () => {
 
           {/* Radial glow */}
           <div
-            className="absolute top-0 right-0 w-[600px] h-[600px] opacity-20 pointer-events-none"
-            style={{
-              background: "radial-gradient(circle at 70% 30%, #1E9C17 0%, transparent 60%)",
-            }}
+            className="absolute top-0 right-0 w-[700px] h-[700px] opacity-[0.15] pointer-events-none"
+            style={{ background: "radial-gradient(circle at 70% 25%, #1E9C17 0%, transparent 60%)" }}
           />
 
-          {/* ── Main hero layout ── */}
+          {/* Hero layout */}
           <div className="relative flex-1 flex flex-col lg:flex-row items-center max-w-7xl mx-auto w-full px-6 lg:px-16 pt-32 pb-16 gap-12">
 
-            {/* Left: headline + CTAs */}
+            {/* Left */}
             <div className="flex-1 min-w-0">
 
-              {/* Eyebrow */}
               {ready && (
                 <div className="flex items-center gap-3 mb-8 hero-word w1">
                   <span className="w-8 h-px bg-[#1E9C17]" />
@@ -292,7 +439,6 @@ const Home = () => {
                 </div>
               )}
 
-              {/* Giant headline — 5 words, each animates in */}
               <h1
                 className="cd font-bold leading-[0.9] text-white"
                 style={{ fontSize: "clamp(3.2rem, 9vw, 8rem)" }}
@@ -306,17 +452,13 @@ const Home = () => {
                 )}
               </h1>
 
-              {/* Subtext */}
               {ready && (
-                <p
-                  className="hero-word w5 mt-8 text-[#a0b8a0] text-lg lg:text-xl leading-relaxed max-w-lg"
-                >
-                  MeroBari connects the farmers who grow your food directly with the people who eat it.
-                  Transparent prices. Real harvests. Fair deals for everyone.
+                <p className="hero-word w5 mt-8 text-[#a0b8a0] text-lg lg:text-xl leading-relaxed max-w-lg">
+                  MeroBari connects Nepal's farmers directly with consumers.
+                  No middlemen. No hidden markups. Real harvests at fair prices.
                 </p>
               )}
 
-              {/* CTAs */}
               {ready && (
                 <div className="hero-word w6 mt-10 flex flex-wrap gap-4">
                   <Link
@@ -333,43 +475,50 @@ const Home = () => {
                     <span className="absolute inset-0 bg-white/15 translate-x-[-101%] group-hover:translate-x-0 transition-transform duration-500 skew-x-12" />
                     <span className="relative">Shop Fresh Produce</span>
                   </Link>
+                  <Link
+                    to="/login"
+                    className="border-2 border-white/20 text-white cd font-semibold px-8 py-4 rounded-2xl text-sm tracking-wide transition-all hover:border-white/50 hover:-translate-y-1"
+                  >
+                    Sign In
+                  </Link>
                 </div>
               )}
 
-              {/* Inline stats */}
+              {/* Feature pills */}
               {ready && (
-                <div className="hero-word w6 mt-14 grid grid-cols-3 gap-0 border border-white/10 rounded-2xl overflow-hidden">
+                <div className="hero-word w7 mt-8 flex flex-wrap gap-3">
                   {[
-                    { n: "500",  s: "+", l: "Farmers"    },
-                    { n: "10000",s: "+", l: "Orders"     },
-                    { n: "15",   s: "+", l: "Categories" },
-                  ].map((s, i) => (
-                    <div
-                      key={i}
-                      className={`px-5 py-4 text-center ${i < 2 ? "border-r border-white/10" : ""}`}
+                    "Free to register",
+                    "Nearby farms first",
+                    "eSewa and COD",
+                    "2-day returns",
+                  ].map((f) => (
+                    <span
+                      key={f}
+                      className="bg-white/8 border border-white/12 text-white/60 text-xs font-medium px-4 py-2 rounded-full"
                     >
-                      <p className="cd font-bold text-white text-2xl">
-                        {s.n}{s.s}
-                      </p>
-                      <p className="text-[#a0b8a0] text-xs mt-0.5 tracking-wide uppercase">{s.l}</p>
-                    </div>
+                      {f}
+                    </span>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Right: rotating crop wheel */}
+            {/* Right — floating veggie wheel */}
             {ready && (
               <div
-                className="w-72 h-72 lg:w-96 lg:h-96 flex-shrink-0"
-                style={{ animation: "scaleIn 1s cubic-bezier(.16,1,.3,1) 0.4s both" }}
+                className="w-72 h-72 lg:w-[400px] lg:h-[400px] flex-shrink-0"
+                style={{
+                  animation: `scaleIn 1s cubic-bezier(.16,1,.3,1) 0.4s both,
+                              floatY 5s ease-in-out 1.4s infinite`,
+                }}
               >
-                <CropWheel />
+                <VeggieWheel />
               </div>
             )}
           </div>
 
-          {/* Bottom fade into cream */}
+          {/* Bottom fade */}
           <div className="h-16 bg-gradient-to-b from-transparent to-[#F5F0E8]" />
         </section>
 
@@ -379,248 +528,39 @@ const Home = () => {
         <Ticker />
 
         {/* ══════════════════════════════════════════════════════
-            WHAT IS MEROBARI — 2-column editorial
+            FLIGHT PATH — HOW IT WORKS
         ══════════════════════════════════════════════════════ */}
-        <section className="bg-[#F5F0E8] py-28 px-6 lg:px-16">
-          <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-16 lg:gap-24 items-start">
-
-            {/* Left: big bold pull statement */}
-            <div>
-              <div className="inline-flex items-center gap-2 mb-8">
-                <span className="w-6 h-6 rounded-full bg-[#1E9C17] flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </span>
-                <span className="text-xs font-semibold tracking-[0.25em] uppercase text-[#1E9C17]">Why MeroBari</span>
-              </div>
-
-              <h2
-                className="cd font-bold text-[#0A1F0A] leading-[0.95]"
-                style={{ fontSize: "clamp(2.5rem, 5vw, 4.5rem)" }}
-              >
-                Food grown in Nepal,
-                <br />
-                <span className="text-[#C4846A]">priced in Nepal,</span>
-                <br />
-                delivered in Nepal.
-              </h2>
-
-              {/* Decorative underline */}
-              <div className="mt-6 h-1 w-24 bg-[#1E9C17] rounded-full" />
-
-              <p className="mt-8 text-[#3a5a3a] text-lg leading-relaxed">
-                Every product on MeroBari comes directly from the farmer who grew it.
-                You see the harvest date, the farm location, and the price the farmer
-                set themselves — nothing hidden, nothing inflated.
-              </p>
-
-              <div className="mt-10 space-y-4">
-                {[
-                  { icon: "🌱", text: "Prices set by the farmer, not a supply chain" },
-                  { icon: "📍", text: "Geo-based discovery — closest farms first"    },
-                  { icon: "🏭", text: "Bulk pricing for restaurants and traders"     },
-                  { icon: "🔄", text: "Simple return system if anything goes wrong"  },
-                ].map((f) => (
-                  <div key={f.text} className="flex items-center gap-4">
-                    <span className="text-2xl leading-none w-8 text-center flex-shrink-0">{f.icon}</span>
-                    <p className="text-[#3a5a3a] text-sm font-medium">{f.text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Right: stat tiles in a bold asymmetric grid */}
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                {
-                  val:    <Counter to={90} suffix="%" />,
-                  label:  "Revenue goes to the farmer",
-                  bg:     "bg-[#0A1F0A]",
-                  text:   "text-[#1E9C17]",
-                  sub:    "text-[#a0b8a0]",
-                  span:   "col-span-2",
-                  large:  true,
-                },
-                {
-                  val:    <Counter to={500} suffix="+" />,
-                  label:  "Registered farmers",
-                  bg:     "bg-[#1E9C17]",
-                  text:   "text-white",
-                  sub:    "text-white/70",
-                  span:   "",
-                },
-                {
-                  val:    <Counter to={2} suffix=" days" />,
-                  label:  "Return window",
-                  bg:     "bg-[#E8A020]",
-                  text:   "text-[#0A1F0A]",
-                  sub:    "text-[#0A1F0A]/60",
-                  span:   "",
-                },
-                {
-                  val:    <Counter to={15} suffix="+" />,
-                  label:  "Crop categories",
-                  bg:     "bg-[#C4846A]",
-                  text:   "text-white",
-                  sub:    "text-white/70",
-                  span:   "",
-                },
-                {
-                  val:    "Rs.50",
-                  label:  "Base delivery fee",
-                  bg:     "bg-[#F5F0E8] border-2 border-[#0A1F0A]/10",
-                  text:   "text-[#0A1F0A]",
-                  sub:    "text-[#6a7a6a]",
-                  span:   "",
-                },
-              ].map((s, i) => (
-                <div
-                  key={i}
-                  className={`${s.bg} ${s.span} rounded-2xl p-7 flex flex-col justify-between min-h-[120px]`}
-                >
-                  <p className={`cd font-bold ${s.text} ${s.large ? "text-5xl" : "text-3xl"}`}>
-                    {s.val}
-                  </p>
-                  <p className={`${s.sub} text-xs font-medium mt-2 leading-snug`}>{s.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        <div
+          ref={howRef}
+          style={{
+            opacity:    howOn ? 1 : 0,
+            transform:  howOn ? "translateY(0)" : "translateY(40px)",
+            transition: "all 0.8s ease",
+          }}
+        >
+          <FlightPath />
+        </div>
 
         {/* ══════════════════════════════════════════════════════
-            HOW IT WORKS
+            TWO DOORS
         ══════════════════════════════════════════════════════ */}
-        <section ref={howRef} className="bg-[#0A1F0A] py-28 px-6 lg:px-16 overflow-hidden">
+        <section ref={doorsRef} className="bg-[#0A1F0A] py-28 px-6 lg:px-16">
           <div className="max-w-6xl mx-auto">
+
             <div
-              className="mb-16"
+              className="text-center mb-14"
               style={{
-                opacity:    howOn ? 1 : 0,
-                transform:  howOn ? "translateY(0)" : "translateY(30px)",
+                opacity:    doorsOn ? 1 : 0,
+                transform:  doorsOn ? "translateY(0)" : "translateY(24px)",
                 transition: "all 0.7s ease",
               }}
             >
-              <span className="text-[#E8A020] text-xs font-semibold tracking-[0.3em] uppercase">The process</span>
+              <span className="text-xs font-semibold tracking-[0.3em] uppercase text-[#E8A020]">
+                Built for both sides
+              </span>
               <h2
                 className="cd font-bold text-white mt-3 leading-tight"
-                style={{ fontSize: "clamp(2.2rem, 4vw, 3.8rem)" }}
-              >
-                Simple. Transparent.<br />Repeatable.
-              </h2>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
-              {HOW.map((step, i) => (
-                <div
-                  key={i}
-                  className="relative bg-white/5 border border-white/10 rounded-3xl p-8 hover:bg-white/10 hover:border-white/20 transition-all group"
-                  style={{
-                    opacity:    howOn ? 1 : 0,
-                    transform:  howOn ? "translateY(0)" : "translateY(40px)",
-                    transition: `all 0.7s ease ${i * 130}ms`,
-                  }}
-                >
-                  {/* Large step number watermark */}
-                  <div
-                    className="absolute top-5 right-6 cd font-bold text-7xl leading-none select-none pointer-events-none"
-                    style={{ color: step.color, opacity: 0.12 }}
-                  >
-                    {step.n}
-                  </div>
-
-                  {/* Step dot */}
-                  <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center cd font-bold text-[#0A1F0A] text-lg mb-6 group-hover:scale-110 transition-transform"
-                    style={{ backgroundColor: step.color }}
-                  >
-                    {step.n}
-                  </div>
-
-                  <h3 className="cd font-semibold text-white text-xl mb-3 leading-tight">
-                    {step.head}
-                  </h3>
-                  <p className="text-[#7a9a7a] text-sm leading-relaxed">
-                    {step.body}
-                  </p>
-
-                  {/* Bottom accent line */}
-                  <div
-                    className="absolute bottom-0 left-8 right-8 h-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ backgroundColor: step.color }}
-                  />
-                </div>
-              ))}
-            </div>
-
-            {/* Payment methods strip */}
-            <div
-              className="mt-12 border border-white/10 rounded-2xl p-6 flex flex-wrap items-center gap-6"
-              style={{
-                opacity:    howOn ? 1 : 0,
-                transform:  howOn ? "translateY(0)" : "translateY(20px)",
-                transition: "all 0.7s ease 500ms",
-              }}
-            >
-              <p className="text-[#7a9a7a] text-xs font-semibold uppercase tracking-widest">Accepted payments</p>
-              <div className="flex flex-wrap gap-3">
-                {["eSewa", "Khalti", "Bank QR", "Bank Transfer", "Cash on Delivery"].map((m) => (
-                  <span
-                    key={m}
-                    className="bg-white/8 border border-white/15 text-white/80 text-xs font-semibold px-4 py-2 rounded-xl"
-                  >
-                    {m}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ══════════════════════════════════════════════════════
-            STATS BAR
-        ══════════════════════════════════════════════════════ */}
-        <section ref={statsRef} className="bg-[#1E9C17] py-16 px-6 lg:px-16">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-0 md:divide-x md:divide-white/20">
-              {[
-                { to: 500,   s: "+",  l: "Farmers"          },
-                { to: 10000, s: "+",  l: "Orders fulfilled"  },
-                { to: 15,    s: "+",  l: "Crop categories"   },
-                { to: 100,   s: "%",  l: "Transparent pricing"},
-              ].map((s, i) => (
-                <div
-                  key={i}
-                  className="text-center md:px-8"
-                  style={{
-                    opacity:    statsOn ? 1 : 0,
-                    transform:  statsOn ? "scale(1)" : "scale(0.9)",
-                    transition: `all 0.6s ease ${i * 100}ms`,
-                  }}
-                >
-                  <p className="cd font-bold text-white text-5xl leading-none">
-                    <Counter to={s.to} suffix={s.s} />
-                  </p>
-                  <p className="text-white/70 text-xs uppercase tracking-widest mt-3 font-medium">{s.l}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ══════════════════════════════════════════════════════
-            FOR FARMERS / FOR CONSUMERS — split
-        ══════════════════════════════════════════════════════ */}
-        <section className="bg-[#F5F0E8] py-28 px-6 lg:px-16">
-          <div className="max-w-6xl mx-auto">
-
-            {/* Section label */}
-            <div className="text-center mb-16">
-              <span className="text-xs font-semibold tracking-[0.3em] uppercase text-[#C4846A]">Built for both sides</span>
-              <h2
-                className="cd font-bold text-[#0A1F0A] mt-3 leading-tight"
-                style={{ fontSize: "clamp(2rem, 4vw, 3.5rem)" }}
+                style={{ fontSize: "clamp(2rem, 4vw, 3.2rem)" }}
               >
                 One platform. Two doors.
               </h2>
@@ -629,27 +569,40 @@ const Home = () => {
             <div className="grid md:grid-cols-2 gap-6">
 
               {/* Farmer door */}
-              <div className="group bg-[#0A1F0A] rounded-3xl p-10 overflow-hidden relative hover:-translate-y-1 transition-transform">
-                <div className="absolute top-0 right-0 w-40 h-40 opacity-20"
-                  style={{ background: "radial-gradient(circle, #1E9C17 0%, transparent 70%)" }} />
+              <div
+                className="relative bg-white/5 border border-white/10 rounded-3xl p-10 overflow-hidden hover:bg-white/8 hover:-translate-y-1 transition-all"
+                style={{
+                  opacity:    doorsOn ? 1 : 0,
+                  transform:  doorsOn ? "translateY(0)" : "translateY(32px)",
+                  transition: "all 0.7s ease 100ms",
+                }}
+              >
+                <div
+                  className="absolute top-0 right-0 w-40 h-40 opacity-10 pointer-events-none"
+                  style={{ background: "radial-gradient(circle, #1E9C17 0%, transparent 70%)" }}
+                />
 
-                <span className="text-5xl block mb-6">🌾</span>
-                <h3 className="cd font-bold text-white text-3xl mb-4 leading-tight">
-                  For Farmers
-                </h3>
-                <p className="text-[#a0b8a0] leading-relaxed mb-8 text-sm">
-                  List your crops, set regular and bulk prices, manage orders, accept multiple payment methods,
-                  and handle returns — all from one dashboard.
+                {/* Farmer SVG icon */}
+                <div className="w-14 h-14 rounded-2xl bg-[#1E9C17]/15 border border-[#1E9C17]/20 flex items-center justify-center mb-6">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#1E9C17" strokeWidth="1.5" className="w-7 h-7">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 2a7 7 0 0 1 7 7c0 5.25-7 13-7 13S5 14.25 5 9a7 7 0 0 1 7-7z" />
+                    <circle cx="12" cy="9" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+
+                <h3 className="cd font-bold text-white text-2xl mb-3">For Farmers</h3>
+                <p className="text-[#a0b8a0] text-sm leading-relaxed mb-8">
+                  List your crops, set your own prices, manage orders and returns — all from a single dashboard built for Nepal's farmers.
                 </p>
-                <ul className="space-y-2 mb-10">
+                <ul className="space-y-3 mb-10">
                   {[
-                    "Free to register and list",
-                    "Set your own prices",
-                    "Accept bulk orders from traders",
-                    "Location-based visibility",
+                    "Free to register and list crops",
+                    "Set regular and bulk pricing",
+                    "Accept multiple payment methods",
+                    "Geo-based visibility to nearby buyers",
                   ].map((f) => (
-                    <li key={f} className="flex items-center gap-3 text-[#c0d0c0] text-sm">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#1E9C17] flex-shrink-0" />
+                    <li key={f} className="flex items-start gap-3 text-[#c0d0c0] text-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#1E9C17] flex-shrink-0 mt-1.5" />
                       {f}
                     </li>
                   ))}
@@ -666,34 +619,48 @@ const Home = () => {
               </div>
 
               {/* Consumer door */}
-              <div className="group bg-[#ECEAE0] border-2 border-[#0A1F0A]/10 rounded-3xl p-10 overflow-hidden relative hover:-translate-y-1 transition-transform">
-                <div className="absolute top-0 right-0 w-40 h-40 opacity-20"
-                  style={{ background: "radial-gradient(circle, #E8A020 0%, transparent 70%)" }} />
+              <div
+                className="relative bg-white/5 border border-white/10 rounded-3xl p-10 overflow-hidden hover:bg-white/8 hover:-translate-y-1 transition-all"
+                style={{
+                  opacity:    doorsOn ? 1 : 0,
+                  transform:  doorsOn ? "translateY(0)" : "translateY(32px)",
+                  transition: "all 0.7s ease 220ms",
+                }}
+              >
+                <div
+                  className="absolute top-0 right-0 w-40 h-40 opacity-10 pointer-events-none"
+                  style={{ background: "radial-gradient(circle, #E8A020 0%, transparent 70%)" }}
+                />
 
-                <span className="text-5xl block mb-6">🛒</span>
-                <h3 className="cd font-bold text-[#0A1F0A] text-3xl mb-4 leading-tight">
-                  For Consumers
-                </h3>
-                <p className="text-[#4a6a4a] leading-relaxed mb-8 text-sm">
-                  Browse crops from farms near you, see harvest dates and real prices, choose Normal or Bulk
-                  per item, and pay with the method that works for you.
+                {/* Consumer SVG icon */}
+                <div className="w-14 h-14 rounded-2xl bg-[#E8A020]/15 border border-[#E8A020]/20 flex items-center justify-center mb-6">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#E8A020" strokeWidth="1.5" className="w-7 h-7">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                    <line x1="3" y1="6" x2="21" y2="6" strokeLinecap="round" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 10a4 4 0 0 1-8 0" />
+                  </svg>
+                </div>
+
+                <h3 className="cd font-bold text-white text-2xl mb-3">For Consumers</h3>
+                <p className="text-[#a0b8a0] text-sm leading-relaxed mb-8">
+                  Browse fresh produce from farms near you, choose normal or bulk quantities, and pay with the method that suits you.
                 </p>
-                <ul className="space-y-2 mb-10">
+                <ul className="space-y-3 mb-10">
                   {[
                     "Farms sorted by distance from you",
-                    "Normal & bulk pricing per product",
-                    "eSewa, Khalti, COD and more",
+                    "Normal and bulk pricing per item",
+                    "eSewa, FonePay, COD accepted",
                     "2-day return window on deliveries",
                   ].map((f) => (
-                    <li key={f} className="flex items-center gap-3 text-[#3a5a3a] text-sm">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#E8A020] flex-shrink-0" />
+                    <li key={f} className="flex items-start gap-3 text-[#c0d0c0] text-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#E8A020] flex-shrink-0 mt-1.5" />
                       {f}
                     </li>
                   ))}
                 </ul>
                 <Link
                   to="/register"
-                  className="inline-flex items-center gap-2 bg-[#0A1F0A] text-white cd font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#1a3f1a] transition-colors"
+                  className="inline-flex items-center gap-2 bg-[#E8A020] text-[#0A1F0A] cd font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#d49018] transition-colors"
                 >
                   Start Shopping
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -708,17 +675,39 @@ const Home = () => {
         {/* ══════════════════════════════════════════════════════
             VOICES
         ══════════════════════════════════════════════════════ */}
-        <section ref={voiceRef} className="bg-[#F5F0E8] pt-0 pb-28 px-6 lg:px-16">
+        <section ref={voiceRef} className="bg-[#F5F0E8] py-28 px-6 lg:px-16">
           <div className="max-w-6xl mx-auto">
-            <div className="border-t-2 border-[#0A1F0A]/10 pt-16 mb-14">
+            <div className="text-center mb-14">
               <span className="text-xs font-semibold tracking-[0.3em] uppercase text-[#C4846A]">In their words</span>
+              <h2
+                className="cd font-bold text-[#0A1F0A] mt-3"
+                style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)" }}
+              >
+                Real people. Real results.
+              </h2>
             </div>
 
             <div className="grid md:grid-cols-3 gap-6">
-              {VOICES.map((v, i) => (
+              {[
+                {
+                  quote: "I set my own price for the first time in 12 years of farming.",
+                  name:  "Ramesh B.", place: "Bhaktapur", init: "RB", role: "Farmer",
+                  accent: "#1E9C17",
+                },
+                {
+                  quote: "My restaurant saves thousands every month buying directly from farms.",
+                  name:  "Bikash T.", place: "Kathmandu", init: "BT", role: "Consumer",
+                  accent: "#E8A020",
+                },
+                {
+                  quote: "I know exactly which farm my food comes from and when it was harvested.",
+                  name:  "Sita M.",   place: "Lalitpur",  init: "SM", role: "Consumer",
+                  accent: "#C4846A",
+                },
+              ].map((v, i) => (
                 <div
                   key={i}
-                  className="bg-[#0A1F0A] rounded-2xl p-8 relative overflow-hidden"
+                  className="bg-[#0A1F0A] rounded-2xl p-8 relative overflow-hidden border border-white/5"
                   style={{
                     opacity:    voiceOn ? 1 : 0,
                     transform:  voiceOn ? "translateY(0)" : "translateY(32px)",
@@ -726,18 +715,33 @@ const Home = () => {
                   }}
                 >
                   {/* Quote mark */}
-                  <p className="text-[#1E9C17] text-6xl font-serif leading-none absolute top-4 right-6 select-none opacity-30">"</p>
+                  <div
+                    className="absolute top-5 right-6 cd font-black text-6xl leading-none select-none opacity-10"
+                    style={{ color: v.accent }}
+                  >
+                    "
+                  </div>
 
-                  <p className="text-white/85 text-sm leading-relaxed mb-8 relative">
-                    "{v.quote}"
+                  {/* Accent top line */}
+                  <div
+                    className="w-8 h-0.5 rounded-full mb-6"
+                    style={{ backgroundColor: v.accent }}
+                  />
+
+                  <p className="text-white/80 text-sm leading-relaxed mb-8">
+                    {v.quote}
                   </p>
+
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-[#1E9C17] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                      style={{ backgroundColor: v.accent }}
+                    >
                       {v.init}
                     </div>
                     <div>
                       <p className="text-white font-semibold text-sm">{v.name}</p>
-                      <p className="text-[#7a9a7a] text-xs">{v.place}</p>
+                      <p className="text-[#7a9a7a] text-xs">{v.place} · {v.role}</p>
                     </div>
                   </div>
                 </div>
@@ -750,13 +754,14 @@ const Home = () => {
             FINAL CTA
         ══════════════════════════════════════════════════════ */}
         <section ref={ctaRef} className="bg-[#0A1F0A] py-32 px-6 lg:px-16 relative overflow-hidden">
-          {/* Large decorative text behind */}
+
+          {/* Giant watermark */}
           <div
             className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
             aria-hidden="true"
           >
             <span
-              className="cd font-bold text-white/[0.03] whitespace-nowrap"
+              className="cd font-bold text-white/[0.025] whitespace-nowrap"
               style={{ fontSize: "clamp(6rem, 18vw, 20rem)" }}
             >
               MEROBARI
@@ -773,7 +778,9 @@ const Home = () => {
           >
             <div className="inline-flex items-center gap-2 mb-8">
               <span className="w-8 h-px bg-[#E8A020]" />
-              <span className="text-[#E8A020] text-xs font-semibold tracking-[0.3em] uppercase">Join today</span>
+              <span className="text-[#E8A020] text-xs font-semibold tracking-[0.3em] uppercase">
+                Join today
+              </span>
               <span className="w-8 h-px bg-[#E8A020]" />
             </div>
 
@@ -788,29 +795,29 @@ const Home = () => {
               Free to join. No listing fees. Built for Nepal's farmers and the people who love fresh food.
             </p>
 
-            <div className="mt-12 flex flex-wrap gap-5 justify-center">
+            <div className="mt-12 flex flex-wrap gap-4 justify-center">
               <Link
                 to="/register"
                 className="bg-[#1E9C17] text-white cd font-semibold px-10 py-5 rounded-2xl text-base hover:bg-[#158212] hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#1E9C17]/30 transition-all"
               >
-                Register Free
+                Register as Farmer
               </Link>
               <Link
-                to="/about"
+                to="/register"
+                className="bg-[#E8A020] text-[#0A1F0A] cd font-semibold px-10 py-5 rounded-2xl text-base hover:bg-[#d49018] hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#E8A020]/30 transition-all"
+              >
+                Shop as Consumer
+              </Link>
+              <Link
+                to="/login"
                 className="border-2 border-white/20 text-white cd font-semibold px-10 py-5 rounded-2xl text-base hover:border-white/50 hover:-translate-y-1 transition-all"
               >
-                Read Our Story
-              </Link>
-              <Link
-                to="/contact"
-                className="border-2 border-[#E8A020]/40 text-[#E8A020] cd font-semibold px-10 py-5 rounded-2xl text-base hover:border-[#E8A020] hover:-translate-y-1 transition-all"
-              >
-                Contact Us
+                Sign In
               </Link>
             </div>
 
             <p className="mt-14 text-[#4a6a4a] text-xs">
-              Final Year Project · Kathmandu Engineering College · Nepal 🇳🇵
+              Final Year Project · Kathmandu Engineering College · Nepal
             </p>
           </div>
         </section>
