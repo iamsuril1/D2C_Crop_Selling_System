@@ -86,7 +86,7 @@ const LocationMap = ({ lat, lng, onLocationChange }) => {
 
   if (!leafletReady) {
     return (
-      <div className="h-64 rounded-2xl bg-gray-100 flex items-center justify-center">
+      <div className="h-56 sm:h-64 rounded-2xl bg-gray-100 flex items-center justify-center">
         <div className="flex flex-col items-center gap-2 text-gray-400">
           <div className="w-8 h-8 border-2 border-gray-300 border-t-green-600 rounded-full animate-spin" />
           <span className="text-sm">Loading map…</span>
@@ -98,7 +98,7 @@ const LocationMap = ({ lat, lng, onLocationChange }) => {
   return (
     <div
       ref={mapRef}
-      className="h-72 w-full rounded-2xl overflow-hidden border-2 border-gray-200 shadow-sm"
+      className="h-56 sm:h-72 w-full rounded-2xl overflow-hidden border-2 border-gray-200 shadow-sm"
       style={{ position: "relative", zIndex: 0 }}
     />
   );
@@ -339,12 +339,11 @@ const Profile = () => {
 
   if (!user) return null;
 
-  /* initials for the avatar */
   const initials =
     ((user.firstName?.[0] || "") + (user.lastName?.[0] || "")).toUpperCase() || "U";
 
   return (
-    <div className="min-h-screen bg-gray-100 py-10 px-4">
+    <div className="min-h-screen bg-gray-100 py-6 sm:py-10 px-3 sm:px-4">
 
       <AlertModal
         isOpen={alertModal.isOpen}
@@ -356,21 +355,22 @@ const Profile = () => {
         onConfirm={alertModal.onConfirm}
       />
 
-      {/* Custom confirm modal with optional password field */}
+      {/* Custom confirm modal */}
       {confirmModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={closeConfirm}
           />
-          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
-            <div className="bg-red-50 border-b border-red-200 px-6 py-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                <span className="text-xl text-red-600">⚠</span>
+          {/* Slides up from bottom on mobile, centered modal on sm+ */}
+          <div className="relative bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md overflow-hidden">
+            <div className="bg-red-50 border-b border-red-200 px-5 sm:px-6 py-4 flex items-center gap-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-lg sm:text-xl text-red-600">⚠</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">{confirmModal.title}</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900">{confirmModal.title}</h3>
             </div>
-            <div className="px-6 py-6 space-y-4">
+            <div className="px-5 sm:px-6 py-5 sm:py-6 space-y-4">
               <p className="text-gray-700 text-sm leading-relaxed">{confirmModal.message}</p>
               {confirmModal.extra === "password" && (
                 <input
@@ -382,10 +382,10 @@ const Profile = () => {
                 />
               )}
             </div>
-            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+            <div className="px-5 sm:px-6 py-4 bg-gray-50 flex gap-3">
               <button
                 onClick={closeConfirm}
-                className="border border-gray-300 text-gray-700 font-semibold px-6 py-2 rounded-lg hover:bg-gray-100 transition text-sm"
+                className="flex-1 border border-gray-300 text-gray-700 font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-100 transition text-sm"
               >
                 Cancel
               </button>
@@ -395,7 +395,7 @@ const Profile = () => {
                   confirmModal.action?.(deletePassword);
                 }}
                 disabled={deleteLoading}
-                className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-lg transition disabled:opacity-60 text-sm"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2.5 rounded-xl transition disabled:opacity-60 text-sm"
               >
                 {deleteLoading ? "Deleting…" : "Confirm"}
               </button>
@@ -404,29 +404,26 @@ const Profile = () => {
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
 
         {/* ── Profile card ── */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
 
-          {/* Gradient header with initials avatar */}
-          <div className="bg-gradient-to-r from-green-600 to-green-700 p-8 text-white">
-            <div className="flex items-center gap-6">
-
-              {/* Initials avatar — no image */}
-              <div className="w-20 h-20 rounded-full bg-white/20 border-4 border-white/40 flex items-center justify-center flex-shrink-0">
-                <span className="text-3xl font-bold text-white select-none">
+          {/* Gradient header */}
+          <div className="bg-gradient-to-r from-green-600 to-green-700 p-5 sm:p-8 text-white">
+            <div className="flex items-center gap-4 sm:gap-6">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/20 border-4 border-white/40 flex items-center justify-center flex-shrink-0">
+                <span className="text-2xl sm:text-3xl font-bold text-white select-none">
                   {initials}
                 </span>
               </div>
-
               <div className="min-w-0">
-                <h1 className="text-2xl font-bold truncate">
+                <h1 className="text-xl sm:text-2xl font-bold truncate">
                   {user.firstName} {user.lastName}
                 </h1>
-                <p className="text-green-100 text-sm mt-0.5 truncate">{user.email}</p>
+                <p className="text-green-100 text-xs sm:text-sm mt-0.5 truncate">{user.email}</p>
                 {user.phone && (
-                  <p className="text-green-100 text-sm mt-0.5">📞 {user.phone}</p>
+                  <p className="text-green-100 text-xs sm:text-sm mt-0.5">📞 {user.phone}</p>
                 )}
                 <span className="inline-block mt-2 px-3 py-1 text-xs font-semibold rounded-full bg-white/20 uppercase tracking-wide">
                   {user.role}
@@ -436,8 +433,9 @@ const Profile = () => {
           </div>
 
           {/* Info grid */}
-          <div className="p-8">
-            <div className="grid sm:grid-cols-2 gap-6 mb-8">
+          <div className="p-4 sm:p-8">
+            {/* Single column on mobile, 2 cols on sm+ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
               <InfoRow label="User ID"  value={(user.id || user._id || "").toString()} mono />
               <InfoRow label="Email"    value={user.email} />
               <InfoRow label="Phone"    value={user.phone || "Not set"} />
@@ -448,12 +446,12 @@ const Profile = () => {
               )}
             </div>
 
-            {/* Action buttons */}
-            <div className="flex flex-wrap gap-3">
+            {/* Action buttons — full width stacked on mobile */}
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => navigate("/profile/edit")}
-                className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition"
+                className="w-full sm:w-auto bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold px-6 py-3 sm:py-2.5 rounded-xl text-sm transition"
               >
                 Edit Profile
               </button>
@@ -461,7 +459,7 @@ const Profile = () => {
                 type="button"
                 onClick={handleDeleteAccount}
                 disabled={deleteLoading}
-                className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition disabled:opacity-60"
+                className="w-full sm:w-auto bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold px-6 py-3 sm:py-2.5 rounded-xl text-sm transition disabled:opacity-60"
               >
                 {deleteLoading ? "Deleting…" : "Delete Account"}
               </button>
@@ -471,22 +469,24 @@ const Profile = () => {
 
         {/* ── Location card ── */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="px-8 pt-7 pb-5 border-b border-gray-100">
-            <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="px-4 sm:px-8 pt-5 sm:pt-7 pb-4 sm:pb-5 border-b border-gray-100">
+            {/* Header — stacks on mobile */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">My Location</h2>
-                <p className="text-sm text-gray-500 mt-0.5">
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">My Location</h2>
+                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
                   {hasMapLocation
                     ? "Click the map or drag the pin to update your position"
                     : "Share your location to discover nearby farms and products"}
                 </p>
               </div>
+              {/* Location action buttons */}
               <div className="flex items-center gap-2 flex-wrap">
                 {hasCoords && (
                   <button
                     type="button"
                     onClick={handleClearLocation}
-                    className="text-sm text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition font-medium"
+                    className="text-sm text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-2 sm:py-1.5 rounded-lg transition font-medium"
                   >
                     Clear
                   </button>
@@ -495,7 +495,7 @@ const Profile = () => {
                   type="button"
                   onClick={handleRequestLocation}
                   disabled={locationLoading}
-                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-sm font-semibold px-4 py-2 rounded-xl transition"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-sm font-semibold px-4 py-2.5 sm:py-2 rounded-xl transition"
                 >
                   {locationLoading ? (
                     <>
@@ -510,20 +510,18 @@ const Profile = () => {
             </div>
 
             {locationDenied && (
-              <div className="mt-3 flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                <span className="text-base mt-0.5 flex-shrink-0">⚠️</span>
+              <div className="mt-3 flex items-start gap-2 text-xs sm:text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 sm:px-4 py-3">
+                <span className="text-sm mt-0.5 flex-shrink-0">⚠️</span>
                 <span>
                   Location access was denied. You can still{" "}
-                  <strong>click anywhere on the map</strong> to set your
-                  location manually.
+                  <strong>click anywhere on the map</strong> to set your location manually.
                 </span>
               </div>
             )}
           </div>
 
-          <div className="p-8 space-y-5">
+          <div className="p-4 sm:p-8 space-y-4 sm:space-y-5">
 
-            {/* Map or placeholder */}
             {hasMapLocation ? (
               <LocationMap
                 lat={mapLat}
@@ -534,14 +532,14 @@ const Profile = () => {
               <button
                 type="button"
                 onClick={handleRequestLocation}
-                className="w-full h-64 rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50
-                           hover:bg-green-50 hover:border-green-500/50
+                className="w-full h-52 sm:h-64 rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50
+                           hover:bg-green-50 hover:border-green-500/50 active:bg-green-100
                            flex flex-col items-center justify-center gap-3 transition group"
               >
-                <div className="w-16 h-16 rounded-full bg-green-100 group-hover:bg-green-200 flex items-center justify-center transition">
-                  <span className="text-3xl">📍</span>
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-green-100 group-hover:bg-green-200 flex items-center justify-center transition">
+                  <span className="text-2xl sm:text-3xl">📍</span>
                 </div>
-                <div className="text-center">
+                <div className="text-center px-4">
                   <p className="font-semibold text-gray-700 group-hover:text-green-700 transition text-sm">
                     Click to share your location
                   </p>
@@ -571,22 +569,22 @@ const Profile = () => {
               </p>
             </div>
 
-            {/* Coordinate display */}
+            {/* Coordinate display — side by side on all sizes */}
             {hasMapLocation && (
-              <div className="flex gap-3">
-                <div className="flex-1 bg-gray-50 rounded-xl px-4 py-3">
+              <div className="flex gap-2 sm:gap-3">
+                <div className="flex-1 bg-gray-50 rounded-xl px-3 sm:px-4 py-3">
                   <span className="text-gray-400 text-xs uppercase tracking-wide block mb-0.5">
                     Latitude
                   </span>
-                  <span className="font-mono font-semibold text-gray-800 text-sm">
+                  <span className="font-mono font-semibold text-gray-800 text-xs sm:text-sm">
                     {mapLat.toFixed(6)}
                   </span>
                 </div>
-                <div className="flex-1 bg-gray-50 rounded-xl px-4 py-3">
+                <div className="flex-1 bg-gray-50 rounded-xl px-3 sm:px-4 py-3">
                   <span className="text-gray-400 text-xs uppercase tracking-wide block mb-0.5">
                     Longitude
                   </span>
-                  <span className="font-mono font-semibold text-gray-800 text-sm">
+                  <span className="font-mono font-semibold text-gray-800 text-xs sm:text-sm">
                     {mapLng.toFixed(6)}
                   </span>
                 </div>
@@ -599,10 +597,10 @@ const Profile = () => {
                 type="button"
                 onClick={handleSaveLocation}
                 disabled={savingLocation || (!locationChanged && hasCoords)}
-                className={`w-full font-semibold py-3 rounded-xl text-sm transition
+                className={`w-full font-semibold py-3.5 sm:py-3 rounded-xl text-sm transition
                   flex items-center justify-center gap-2
                   ${locationChanged || !hasCoords
-                    ? "bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                    ? "bg-green-600 hover:bg-green-700 active:bg-green-800 text-white shadow-sm"
                     : "bg-gray-100 text-gray-400 cursor-not-allowed"
                   } disabled:opacity-60`}
               >

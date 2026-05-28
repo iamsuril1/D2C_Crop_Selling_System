@@ -12,7 +12,7 @@ import {
   BULK_MIN_KG,
 } from "../utils/orderConstants";
 
-const BULK_THRESHOLD = BULK_MIN_KG; // 100
+const BULK_THRESHOLD = BULK_MIN_KG;
 
 const ProductForm = () => {
   const navigate = useNavigate();
@@ -23,7 +23,7 @@ const ProductForm = () => {
     subcategory: "",
     price:       "",
     bulkPrice:   "",
-    minOrderQty: String(NORMAL_MIN_KG), // default to normal minimum
+    minOrderQty: String(NORMAL_MIN_KG),
     quantity:    "",
     unit:        "kg",
     description: "",
@@ -106,17 +106,17 @@ const ProductForm = () => {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 py-8 sm:py-12 px-4">
       <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
 
           {/* ── Main Form ── */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-2 h-10 bg-green-600 rounded-full" />
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-8">
+              <div className="flex items-center gap-3 mb-6 sm:mb-8">
+                <div className="w-2 h-10 bg-green-600 rounded-full flex-shrink-0" />
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Add New Product</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Add New Product</h2>
                   <p className="text-sm text-gray-500 mt-1">
                     Upload fresh products to reach more customers directly
                   </p>
@@ -129,10 +129,10 @@ const ProductForm = () => {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
 
                 {/* Name & Category */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Product Name <span className="text-red-500">*</span>
@@ -163,8 +163,8 @@ const ProductForm = () => {
                   </div>
                 </div>
 
-                {/* Quantity + Unit + Min Order */}
-                <div className="grid grid-cols-3 gap-4">
+                {/* Quantity + Unit + Min Order — wraps gracefully on mobile */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Quantity <span className="text-red-500">*</span>
@@ -172,14 +172,14 @@ const ProductForm = () => {
                     <input
                       type="number" name="quantity" value={form.quantity}
                       placeholder="0" onChange={handleChange} min="0" required
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full border border-gray-200 rounded-xl px-3 sm:px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Unit</label>
                     <select
                       name="unit" value={form.unit} onChange={handleChange}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full border border-gray-200 rounded-xl px-3 sm:px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                     >
                       <option value="kg">kg</option>
                       <option value="g">g</option>
@@ -189,16 +189,15 @@ const ProductForm = () => {
                       <option value="ml">ml</option>
                     </select>
                   </div>
-                  <div>
+                  <div className="col-span-2 sm:col-span-1">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Min. Order ({form.unit || "kg"}) <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number" name="minOrderQty" value={form.minOrderQty}
                       placeholder={String(NORMAL_MIN_KG)} onChange={handleChange} min="1"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full border border-gray-200 rounded-xl px-3 sm:px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
-                    {/* Hint under minOrderQty */}
                     <p className="text-xs text-gray-400 mt-1">
                       Normal: {NORMAL_MIN_KG}–{NORMAL_MAX_KG} · Bulk: {BULK_MIN_KG}+
                     </p>
@@ -206,8 +205,8 @@ const ProductForm = () => {
                 </div>
 
                 {/* Pricing section */}
-                <div className="border border-gray-200 rounded-2xl p-5 space-y-4">
-                  <div className="flex items-center gap-2">
+                <div className="border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-base font-semibold text-gray-900">Pricing</span>
                     <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-medium">
                       Bulk discount optional
@@ -253,22 +252,22 @@ const ProductForm = () => {
 
                   {/* Live pricing preview */}
                   {form.price && (
-                    <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                    <div className="bg-gray-50 rounded-xl p-3 sm:p-4 space-y-2">
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                         Pricing Preview
                       </p>
-                      <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center justify-between text-sm flex-wrap gap-1">
                         <span className="text-gray-600">
-                          Normal order ({NORMAL_MIN_KG}–{NORMAL_MAX_KG} {form.unit || "kg"})
+                          Normal ({NORMAL_MIN_KG}–{NORMAL_MAX_KG} {form.unit || "kg"})
                         </span>
                         <span className="font-bold text-gray-900">
                           Rs. {Number(form.price).toFixed(2)} / {form.unit || "kg"}
                         </span>
                       </div>
                       {showBulkSaving ? (
-                        <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center justify-between text-sm flex-wrap gap-1">
                           <span className="text-gray-600">
-                            Bulk order ({BULK_MIN_KG}+ {form.unit || "kg"})
+                            Bulk ({BULK_MIN_KG}+ {form.unit || "kg"})
                           </span>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-green-700">
@@ -280,9 +279,9 @@ const ProductForm = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center justify-between text-sm flex-wrap gap-1">
                           <span className="text-gray-600">
-                            Bulk order ({BULK_MIN_KG}+ {form.unit || "kg"})
+                            Bulk ({BULK_MIN_KG}+ {form.unit || "kg"})
                           </span>
                           <span className="text-gray-400 italic text-xs">No bulk discount set</span>
                         </div>
@@ -292,7 +291,7 @@ const ProductForm = () => {
                 </div>
 
                 {/* Harvest Date + Shelf Life */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Harvest Date (Optional)
@@ -326,40 +325,40 @@ const ProductForm = () => {
                   />
                 </div>
 
-                {/* Image */}
+                {/* Image upload */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Product Image (PNG, JPG up to 10MB)
                   </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-green-400 transition">
+                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 sm:p-8 text-center hover:border-green-400 transition">
                     <input
                       type="file" accept="image/jpeg,image/png,image/jpg"
                       onChange={handleImageChange} className="hidden"
                       id="image-upload"
                     />
                     <label htmlFor="image-upload" className="cursor-pointer flex flex-col items-center gap-2 group">
-                      <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center mx-auto group-hover:bg-gray-200 transition">
-                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gray-100 rounded-xl flex items-center justify-center mx-auto group-hover:bg-gray-200 transition">
+                        <svg className="w-7 h-7 sm:w-8 sm:h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                             d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                           />
                         </svg>
                       </div>
                       <p className="text-sm font-medium text-gray-900 group-hover:text-green-600 transition">
-                        Click to upload or drag & drop
+                        Click to upload or drag &amp; drop
                       </p>
                     </label>
                   </div>
                   {image && (
                     <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-xl">
-                      <p className="text-sm text-green-700 font-medium">{image.name}</p>
+                      <p className="text-sm text-green-700 font-medium truncate">{image.name}</p>
                       <p className="text-xs text-green-600">{(image.size / 1024 / 1024).toFixed(1)} MB</p>
                     </div>
                   )}
                 </div>
 
-                {/* Submit */}
-                <div className="flex gap-3 pt-4">
+                {/* Submit / Cancel */}
+                <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2 sm:pt-4">
                   <button
                     type="button" onClick={() => navigate("/farmer")} disabled={loading}
                     className="flex-1 bg-white border border-gray-200 text-gray-700 text-sm font-medium py-3 px-6 rounded-xl hover:bg-gray-50 transition disabled:opacity-60"
@@ -389,51 +388,46 @@ const ProductForm = () => {
             </div>
           </div>
 
-          {/* ── Sidebar tips ── */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 sticky top-24 space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-2 h-10 bg-blue-500 rounded-full" />
-                <h3 className="text-lg font-bold text-gray-900">Quick Tips</h3>
+          {/* ── Sidebar tips — appears above form on mobile ── */}
+          <div className="lg:col-span-1 order-first lg:order-none">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-8 lg:sticky lg:top-24 space-y-3 sm:space-y-4">
+              <div className="flex items-center gap-3 mb-1 sm:mb-2">
+                <div className="w-2 h-10 bg-blue-500 rounded-full flex-shrink-0" />
+                <h3 className="text-base sm:text-lg font-bold text-gray-900">Quick Tips</h3>
               </div>
 
-              {/* Tip 1 — order types */}
-              <div className="flex items-start gap-3 p-4 bg-green-50 rounded-xl">
+              <div className="flex items-start gap-3 p-3 sm:p-4 bg-green-50 rounded-xl">
                 <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0" />
-                <p className="text-gray-700 text-sm leading-relaxed">
+                <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
                   Consumers choose between <strong>Normal orders</strong> ({NORMAL_MIN_KG}–{NORMAL_MAX_KG} kg, regular price) and{" "}
                   <strong>Bulk orders</strong> ({BULK_MIN_KG}+ kg, bulk price). Set both prices below.
                 </p>
               </div>
 
-              {/* Tip 2 — min order */}
-              <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-xl">
+              <div className="flex items-start gap-3 p-3 sm:p-4 bg-blue-50 rounded-xl">
                 <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
-                <p className="text-gray-700 text-sm leading-relaxed">
+                <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
                   <strong>Minimum order</strong> prevents uneconomical small orders. The platform enforces a global minimum of {NORMAL_MIN_KG} kg for Normal orders and {BULK_MIN_KG} kg for Bulk orders.
                 </p>
               </div>
 
-              {/* Tip 3 — bulk discount */}
-              <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl">
+              <div className="flex items-start gap-3 p-3 sm:p-4 bg-amber-50 rounded-xl">
                 <div className="w-2 h-2 bg-amber-500 rounded-full mt-2 flex-shrink-0" />
-                <p className="text-gray-700 text-sm leading-relaxed">
-                  <strong>Bulk price</strong> kicks in automatically for orders of {BULK_MIN_KG} kg or more. Attracts restaurants, hotels and traders.
+                <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
+                  <strong>Bulk price</strong> kicks in automatically for orders of {BULK_MIN_KG} kg or more. Attracts restaurants, hotels, and traders.
                 </p>
               </div>
 
-              {/* Tip 4 — sweet spot */}
-              <div className="flex items-start gap-3 p-4 bg-purple-50 rounded-xl">
+              <div className="flex items-start gap-3 p-3 sm:p-4 bg-purple-50 rounded-xl">
                 <div className="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0" />
-                <p className="text-gray-700 text-sm leading-relaxed">
+                <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
                   A <strong>10–15% bulk discount</strong> is the sweet spot — attractive to large buyers without hurting your margins.
                 </p>
               </div>
 
-              {/* Tip 5 — photos */}
-              <div className="flex items-start gap-3 p-4 bg-pink-50 rounded-xl">
+              <div className="flex items-start gap-3 p-3 sm:p-4 bg-pink-50 rounded-xl">
                 <div className="w-2 h-2 bg-pink-500 rounded-full mt-2 flex-shrink-0" />
-                <p className="text-gray-700 text-sm leading-relaxed">
+                <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
                   Use crisp, well-lit photos. Products with photos get <strong>3× more views</strong>.
                 </p>
               </div>

@@ -35,12 +35,12 @@ const MiniBar = ({ value, max, color = "#1E9C17" }) => {
 };
 
 const StatCard = ({ label, value, sub, color, border, icon }) => (
-  <div className={`bg-white rounded-2xl border-2 ${border} p-5 shadow-sm`}>
+  <div className={`bg-white rounded-2xl border-2 ${border} p-4 shadow-sm`}>
     <div className="flex items-start justify-between mb-2">
-      <span className="text-2xl">{icon}</span>
+      <span className="text-xl sm:text-2xl">{icon}</span>
     </div>
-    <p className={`text-2xl font-bold ${color}`}>{value}</p>
-    <p className="text-sm font-medium text-gray-700 mt-1">{label}</p>
+    <p className={`text-lg sm:text-2xl font-bold ${color} leading-tight`}>{value}</p>
+    <p className="text-xs sm:text-sm font-medium text-gray-700 mt-1">{label}</p>
     {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
   </div>
 );
@@ -195,13 +195,13 @@ const FarmerEarnings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gray-50 px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-start sm:items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Earnings</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Earnings</h1>
             <p className="text-gray-500 mt-1 text-sm">
               {enriched.length > 0
                 ? `${enriched.length} shipment${enriched.length !== 1 ? "s" : ""} across all orders`
@@ -210,7 +210,7 @@ const FarmerEarnings = () => {
           </div>
           <button
             onClick={() => navigate("/farmer/payment-settings")}
-            className="text-sm bg-white border border-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-xl hover:bg-gray-50 transition"
+            className="text-sm bg-white border border-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-xl hover:bg-gray-50 transition whitespace-nowrap"
           >
             Payment Settings →
           </button>
@@ -218,7 +218,7 @@ const FarmerEarnings = () => {
 
         {/* ── Empty state ── */}
         {enriched.length === 0 && !loading && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-16 text-center">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 sm:p-16 text-center">
             <div className="text-5xl mb-4">💰</div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">No earnings yet</h3>
             <p className="text-gray-500 text-sm mb-6">
@@ -236,7 +236,7 @@ const FarmerEarnings = () => {
         {enriched.length > 0 && (
           <>
             {/* ── Summary cards ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <StatCard
                 icon="💼"
                 label="Total earned"
@@ -273,9 +273,9 @@ const FarmerEarnings = () => {
 
             {/* ── Progress bar ── */}
             {totalEarned > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Earnings flow</p>
-                <div className="flex rounded-full overflow-hidden h-5 gap-px mb-3">
+                <div className="flex rounded-full overflow-hidden h-4 sm:h-5 gap-px mb-3">
                   {totalReceived > 0 && (
                     <div className="bg-green-500 transition-all flex items-center justify-center" style={{ flex: totalReceived }}>
                       {totalReceived / totalEarned > 0.15 && <span className="text-white text-[10px] font-bold">{Math.round((totalReceived / totalEarned) * 100)}%</span>}
@@ -292,30 +292,30 @@ const FarmerEarnings = () => {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                <div className="flex flex-wrap gap-3 text-xs text-gray-500">
                   <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-green-500" />Received (Rs. {Math.round(totalReceived).toLocaleString()})</span>
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-400" />Awaiting payment (Rs. {Math.round(releasedNotPaid).toLocaleString()})</span>
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-blue-300" />Pending release (Rs. {Math.round(pendingRelease).toLocaleString()})</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-400" />Awaiting (Rs. {Math.round(releasedNotPaid).toLocaleString()})</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-blue-300" />Pending (Rs. {Math.round(pendingRelease).toLocaleString()})</span>
                 </div>
               </div>
             )}
 
             {/* ── Analytics Grid ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
 
               {/* Monthly Earnings Chart */}
               {monthlyData.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
                   <h3 className="text-base font-bold text-gray-900 mb-1">Monthly Earnings</h3>
-                  <p className="text-xs text-gray-400 mb-5">Last 6 months of shipment revenue</p>
+                  <p className="text-xs text-gray-400 mb-4 sm:mb-5">Last 6 months of shipment revenue</p>
                   <div className="space-y-3">
                     {monthlyData.map((m) => (
                       <div key={m.key}>
-                        <div className="flex justify-between text-sm mb-1.5">
-                          <span className="font-medium text-gray-700">{m.label}</span>
-                          <div className="flex items-center gap-3 text-xs">
+                        <div className="flex justify-between text-sm mb-1.5 gap-2">
+                          <span className="font-medium text-gray-700 text-xs sm:text-sm">{m.label}</span>
+                          <div className="flex items-center gap-2 text-xs flex-shrink-0">
                             <span className="text-green-600 font-semibold">Rs. {Math.round(m.total).toLocaleString()}</span>
-                            <span className="text-gray-400">{m.count} order{m.count !== 1 ? "s" : ""}</span>
+                            <span className="text-gray-400 hidden sm:inline">{m.count} order{m.count !== 1 ? "s" : ""}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -334,18 +334,18 @@ const FarmerEarnings = () => {
 
               {/* Crop Revenue Breakdown */}
               {cropBreakdown.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
                   <h3 className="text-base font-bold text-gray-900 mb-1">Top Selling Crops</h3>
-                  <p className="text-xs text-gray-400 mb-5">Revenue by product across all orders</p>
+                  <p className="text-xs text-gray-400 mb-4 sm:mb-5">Revenue by product across all orders</p>
                   <div className="space-y-4">
                     {cropBreakdown.map((c, i) => (
                       <div key={c.name}>
-                        <div className="flex justify-between text-sm mb-1.5">
-                          <div className="flex items-center gap-2">
+                        <div className="flex justify-between text-sm mb-1.5 gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <span className="w-5 h-5 rounded-md bg-green-100 text-green-800 font-bold text-xs flex items-center justify-center flex-shrink-0">
                               {i + 1}
                             </span>
-                            <span className="font-medium text-gray-800 truncate">{c.name}</span>
+                            <span className="font-medium text-gray-800 truncate text-xs sm:text-sm">{c.name}</span>
                           </div>
                           <div className="text-right text-xs flex-shrink-0">
                             <p className="font-bold text-gray-900">Rs. {Math.round(c.revenue).toLocaleString()}</p>
@@ -366,9 +366,9 @@ const FarmerEarnings = () => {
 
               {/* Payment Method Breakdown */}
               {paymentBreakdown.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
                   <h3 className="text-base font-bold text-gray-900 mb-1">Payment Methods</h3>
-                  <p className="text-xs text-gray-400 mb-5">How consumers paid for your orders</p>
+                  <p className="text-xs text-gray-400 mb-4 sm:mb-5">How consumers paid for your orders</p>
                   <div className="space-y-3">
                     {paymentBreakdown.map((p) => {
                       const meta = METHOD_LABELS[p.method] || { label: p.method, color: "bg-gray-100 text-gray-600" };
@@ -377,7 +377,7 @@ const FarmerEarnings = () => {
                           <span className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${meta.color}`}>
                             {meta.label}
                           </span>
-                          <div className="flex-1 flex items-center gap-2">
+                          <div className="flex-1 flex items-center gap-2 min-w-0">
                             <MiniBar value={p.amount} max={Math.max(...paymentBreakdown.map(x => x.amount), 1)} color="#1E9C17" />
                           </div>
                           <div className="text-right text-xs flex-shrink-0">
@@ -392,9 +392,9 @@ const FarmerEarnings = () => {
               )}
 
               {/* Quick Stats */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <h3 className="text-base font-bold text-gray-900 mb-5">Quick Stats</h3>
-                <div className="space-y-4">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
+                <h3 className="text-base font-bold text-gray-900 mb-4 sm:mb-5">Quick Stats</h3>
+                <div className="space-y-3">
                   {[
                     {
                       label: "Average order value",
@@ -420,14 +420,14 @@ const FarmerEarnings = () => {
                       icon: "✅",
                     },
                     {
-                      label: "Platform commission kept",
+                      label: "Platform commission",
                       value: `Rs. ${(enriched.length * 25).toLocaleString()}`,
                       sub: "Rs. 25 per order",
                       icon: "🏢",
                     },
                   ].map((s) => (
                     <div key={s.label} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                      <span className="text-xl flex-shrink-0">{s.icon}</span>
+                      <span className="text-lg sm:text-xl flex-shrink-0">{s.icon}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-gray-500">{s.label}</p>
                         {s.sub && <p className="text-xs text-gray-400">{s.sub}</p>}
@@ -442,19 +442,20 @@ const FarmerEarnings = () => {
             {/* ── Filter tabs ── */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-1.5 flex gap-1 overflow-x-auto">
               {[
-                { value: "all",             label: "All Orders",        count: enriched.length },
-                { value: "received",        label: "Received",          count: enriched.filter((e) => e.farmerPaid).length },
-                { value: "released",        label: "Awaiting Payment",  count: enriched.filter((e) => e.adminReleased && !e.farmerPaid).length },
-                { value: "pending_release", label: "Pending Release",   count: enriched.filter((e) => !e.adminReleased).length },
+                { value: "all",             label: "All",             labelFull: "All Orders",        count: enriched.length },
+                { value: "received",        label: "Received",        labelFull: "Received",          count: enriched.filter((e) => e.farmerPaid).length },
+                { value: "released",        label: "Awaiting",        labelFull: "Awaiting Payment",  count: enriched.filter((e) => e.adminReleased && !e.farmerPaid).length },
+                { value: "pending_release", label: "Pending",         labelFull: "Pending Release",   count: enriched.filter((e) => !e.adminReleased).length },
               ].map((t) => (
                 <button
                   key={t.value}
                   onClick={() => setFilter(t.value)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition ${
                     filter === t.value ? "bg-green-600 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
                   }`}
                 >
-                  {t.label}
+                  <span className="hidden sm:inline">{t.labelFull}</span>
+                  <span className="sm:hidden">{t.label}</span>
                   <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
                     filter === t.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
                   }`}>
@@ -466,7 +467,7 @@ const FarmerEarnings = () => {
 
             {/* ── Order list ── */}
             {filtered.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
+              <div className="bg-white rounded-2xl border border-gray-100 p-10 sm:p-12 text-center shadow-sm">
                 <p className="text-gray-400 text-sm">No orders in this category.</p>
               </div>
             ) : (
@@ -486,14 +487,14 @@ const FarmerEarnings = () => {
                       {/* Summary row */}
                       <button
                         onClick={() => setExpanded(isOpen ? null : e.orderId?.toString())}
-                        className="w-full text-left px-5 py-4 flex items-center justify-between gap-4"
+                        className="w-full text-left px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between gap-3"
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                           <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${si.dot}`} />
                           <div className="min-w-0">
                             <p className="font-semibold text-gray-900 text-sm">
                               Order #{displayId}
-                              <span className={`ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              <span className={`ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full ${
                                 e.orderType === "bulk" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-600"
                               }`}>
                                 {e.orderType || "normal"}
@@ -505,16 +506,18 @@ const FarmerEarnings = () => {
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4 flex-shrink-0">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                           <div className="text-right hidden sm:block">
                             <p className="text-xs text-gray-400">Your earnings</p>
                             <p className="font-bold text-gray-900">Rs. {e.subtotal.toLocaleString()}</p>
                           </div>
+                          {/* On mobile show earnings inline */}
+                          <p className="font-bold text-gray-900 text-sm sm:hidden">Rs. {e.subtotal.toLocaleString()}</p>
                           <PayBadge method={e.paymentMethod} />
-                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${si.color}`}>
+                          <span className={`text-xs font-semibold px-2 py-1 rounded-full hidden sm:inline ${si.color}`}>
                             {si.label}
                           </span>
-                          <svg className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                          <svg className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`}
                             fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
@@ -523,21 +526,21 @@ const FarmerEarnings = () => {
 
                       {/* Expanded detail */}
                       {isOpen && (
-                        <div className="border-t border-gray-100 px-5 py-5 space-y-4">
+                        <div className="border-t border-gray-100 px-4 sm:px-5 py-4 sm:py-5 space-y-4">
                           {/* Items */}
                           <div>
                             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Items in your shipment</p>
                             <div className="space-y-1.5">
                               {e.items.map((item, i) => (
                                 <div key={i} className="flex justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
-                                  <span className="font-medium text-gray-900">
+                                  <span className="font-medium text-gray-900 text-xs sm:text-sm">
                                     {item.name}
                                     <span className="text-gray-400 font-normal ml-1">×{item.quantity}</span>
                                     {item.orderType === "bulk" && (
                                       <span className="ml-1.5 text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full font-semibold">bulk</span>
                                     )}
                                   </span>
-                                  <span>Rs. {((item.price || 0) * (item.quantity || 0)).toFixed(0)}</span>
+                                  <span className="text-xs sm:text-sm flex-shrink-0">Rs. {((item.price || 0) * (item.quantity || 0)).toFixed(0)}</span>
                                 </div>
                               ))}
                             </div>
@@ -548,7 +551,7 @@ const FarmerEarnings = () => {
                           </div>
 
                           {/* Payment journey */}
-                          <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                          <div className="bg-gray-50 rounded-xl p-3 sm:p-4 space-y-3">
                             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment journey</p>
 
                             {[
@@ -575,17 +578,17 @@ const FarmerEarnings = () => {
                                 done: e.farmerPaid,
                               },
                             ].map((step) => (
-                              <div key={step.step} className="flex items-center gap-3 text-sm">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                              <div key={step.step} className="flex items-start gap-3 text-sm">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${
                                   step.done ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"
                                 }`}>
                                   {step.done ? "✓" : step.step}
                                 </div>
-                                <div>
-                                  <p className="font-medium text-gray-900">{step.title}</p>
-                                  <p className="text-xs text-gray-400">{step.desc}</p>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 text-xs sm:text-sm">{step.title}</p>
+                                  <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{step.desc}</p>
                                 </div>
-                                <div className="ml-auto">
+                                <div className="flex-shrink-0">
                                   <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                                     step.done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
                                   }`}>
@@ -598,12 +601,12 @@ const FarmerEarnings = () => {
 
                           {/* Payout record if received */}
                           {e.farmerPaid && e.paidRecord && (
-                            <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm">
+                            <div className="bg-green-50 border border-green-200 rounded-xl p-3 sm:p-4 text-sm">
                               <p className="font-semibold text-green-800 mb-2">✓ Payment received</p>
-                              <div className="grid grid-cols-2 gap-2 text-xs text-green-700">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-green-700">
                                 <div><span className="text-gray-500">Method: </span><span className="font-medium">{METHOD_LABELS[e.paidRecord.method]?.label || e.paidRecord.method}</span></div>
-                                {e.paidRecord.reference && <div><span className="text-gray-500">Ref: </span><span className="font-mono font-medium">{e.paidRecord.reference}</span></div>}
-                                {e.paidRecord.paidAt && <div className="col-span-2"><span className="text-gray-500">Date: </span><span className="font-medium">{new Date(e.paidRecord.paidAt).toLocaleString()}</span></div>}
+                                {e.paidRecord.reference && <div><span className="text-gray-500">Ref: </span><span className="font-mono font-medium break-all">{e.paidRecord.reference}</span></div>}
+                                {e.paidRecord.paidAt && <div className="sm:col-span-2"><span className="text-gray-500">Date: </span><span className="font-medium">{new Date(e.paidRecord.paidAt).toLocaleString()}</span></div>}
                               </div>
                             </div>
                           )}
@@ -616,7 +619,7 @@ const FarmerEarnings = () => {
             )}
 
             {/* How payouts work */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-sm text-gray-600 space-y-2">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 text-sm text-gray-600 space-y-2">
               <p className="font-semibold text-gray-800">How payouts work</p>
               <p>1. Consumer pays via eSewa, Bank QR, or Cash on Delivery. Funds go to the MeroBari platform.</p>
               <p>2. Admin reviews and releases your earnings — this usually happens within 1–2 business days of delivery.</p>

@@ -1,7 +1,7 @@
 /* src/pages/Orders.jsx
    Per-item Normal / Bulk order type.
    - Each cart row has its own Normal | Bulk toggle
-   - Price shown updates live (bulk price when available + quantity ≥ 100)
+   - Price shown updates live (bulk price when available + quantity >= 100)
    - No global OrderTypePicker at the bottom
    - Backend receives items: [{ productId, quantity, orderType }]
 */
@@ -10,7 +10,7 @@ import React, { useContext, useMemo, useState, useEffect, useCallback } from "re
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { CartContext } from "../context/CartContext";
-import { AuthContext }  from "../context/AuthContext";
+import { AuthContext } from "../context/AuthContext";
 import { APIBASEURL } from "../utils/config";
 import AlertModal from "../components/AlertModal";
 import {
@@ -37,21 +37,22 @@ const ItemTypePicker = ({ item, itemType, onTypeChange }) => {
 
   return (
     <div className="mt-3 space-y-2">
-      {/* Toggle buttons */}
       <div className="flex gap-2">
         {/* Normal */}
         <button
           type="button"
           onClick={() => onTypeChange(ORDER_TYPES.NORMAL)}
-          className={`flex-1 flex flex-col items-center py-2 px-3 rounded-xl border-2 text-xs font-semibold transition-all ${
+          className={`flex-1 flex flex-col items-center py-2 px-2 sm:px-3 rounded-xl border-2 text-xs font-semibold transition-all ${
             itemType === ORDER_TYPES.NORMAL
               ? "border-green-500 bg-green-50 text-green-800"
               : "border-gray-200 text-gray-500 hover:border-green-300"
           }`}
         >
-          <span className="text-base mb-0.5">🛒</span>
+          <i className="ti ti-shopping-cart mb-0.5" style={{ fontSize: "1rem" }} aria-hidden="true" />
           <span>Normal</span>
-          <span className="font-normal opacity-70">{NORMAL_MIN_KG}–{NORMAL_MAX_KG} {item?.unit || "kg"}</span>
+          <span className="font-normal opacity-70">
+            {NORMAL_MIN_KG}–{NORMAL_MAX_KG} {item?.unit || "kg"}
+          </span>
           <span className="font-bold mt-0.5">
             Rs. {Number(item?.price || 0).toFixed(0)}/{item?.unit || "kg"}
           </span>
@@ -61,15 +62,17 @@ const ItemTypePicker = ({ item, itemType, onTypeChange }) => {
         <button
           type="button"
           onClick={() => onTypeChange(ORDER_TYPES.BULK)}
-          className={`flex-1 flex flex-col items-center py-2 px-3 rounded-xl border-2 text-xs font-semibold transition-all ${
+          className={`flex-1 flex flex-col items-center py-2 px-2 sm:px-3 rounded-xl border-2 text-xs font-semibold transition-all ${
             itemType === ORDER_TYPES.BULK
               ? "border-amber-500 bg-amber-50 text-amber-800"
               : "border-gray-200 text-gray-500 hover:border-amber-300"
           }`}
         >
-          <span className="text-base mb-0.5">🏭</span>
+          <i className="ti ti-building-warehouse mb-0.5" style={{ fontSize: "1rem" }} aria-hidden="true" />
           <span>Bulk</span>
-          <span className="font-normal opacity-70">≥ {BULK_MIN_KG} {item?.unit || "kg"}</span>
+          <span className="font-normal opacity-70">
+            &ge;{BULK_MIN_KG} {item?.unit || "kg"}
+          </span>
           {hasBulkPrice ? (
             <span className="font-bold mt-0.5 text-amber-700">
               Rs. {Number(item.bulkPrice).toFixed(0)}/{item?.unit || "kg"}
@@ -83,10 +86,9 @@ const ItemTypePicker = ({ item, itemType, onTypeChange }) => {
         </button>
       </div>
 
-      {/* Validation error for this item */}
       {currentError && (
         <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5">
-          ⚠ {currentError}
+          {currentError}
         </p>
       )}
     </div>
@@ -94,7 +96,7 @@ const ItemTypePicker = ({ item, itemType, onTypeChange }) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
-   EFFECTIVE PRICE — uses bulk price when type=bulk and available
+   EFFECTIVE PRICE
 ───────────────────────────────────────────────────────────── */
 const effectiveUnitPrice = (item, itemType) => {
   if (
@@ -115,14 +117,11 @@ const Orders = () => {
   const { cartItems, removeFromCart, updateQty, clearCart } = useContext(CartContext);
   const { user } = useContext(AuthContext);
 
-  /* Per-item order types: { [itemId]: "normal" | "bulk" } */
-  const [itemTypes, setItemTypes] = useState({});
-  /* Per-item raw qty strings for the input */
-  const [rawQtys,   setRawQtys]   = useState({});
-
-  const [estimate,        setEstimate]        = useState(null);
-  const [placingOrder,    setPlacingOrder]    = useState(false);
-  const [loadingEstimate, setLoadingEstimate] = useState(false);
+  const [itemTypes,        setItemTypes]        = useState({});
+  const [rawQtys,          setRawQtys]          = useState({});
+  const [estimate,         setEstimate]         = useState(null);
+  const [placingOrder,     setPlacingOrder]     = useState(false);
+  const [loadingEstimate,  setLoadingEstimate]  = useState(false);
 
   const [alertModal, setAlertModal] = useState({
     isOpen: false, type: "", title: "", message: "",
@@ -132,7 +131,6 @@ const Orders = () => {
   const closeAlert = () =>
     setAlertModal((p) => ({ ...p, isOpen: false }));
 
-  /* Seed per-item state for new items */
   useEffect(() => {
     if (!cartItems?.length) return;
     setItemTypes((prev) => {
@@ -154,12 +152,11 @@ const Orders = () => {
     });
   }, [cartItems?.length]);
 
-  /* Build items array for API */
   const buildOrderItems = useMemo(() =>
     (cartItems || [])
       .map((it) => {
-        const id      = it?.id || it?.productId || it?._id;
-        const type    = itemTypes[id] || ORDER_TYPES.NORMAL;
+        const id   = it?.id || it?.productId || it?._id;
+        const type = itemTypes[id] || ORDER_TYPES.NORMAL;
         return {
           productId: id,
           quantity:  Math.max(1, Number(it?.quantity || 1)),
@@ -170,7 +167,6 @@ const Orders = () => {
     [cartItems, itemTypes]
   );
 
-  /* Validation: check every item */
   const itemErrors = useMemo(() => {
     const errs = {};
     (cartItems || []).forEach((it) => {
@@ -185,7 +181,6 @@ const Orders = () => {
 
   const hasErrors = Object.keys(itemErrors).length > 0;
 
-  /* Estimate */
   const fetchEstimate = useCallback(async (items) => {
     if (!items?.length) return;
     setLoadingEstimate(true);
@@ -193,7 +188,11 @@ const Orders = () => {
       const res = await api.post("/api/orders/estimate", { items });
       setEstimate(res.data);
     } catch (err) {
-      showAlert("Delivery Estimate Failed", err.response?.data?.message || "Failed to calculate delivery.", "error");
+      showAlert(
+        "Delivery Estimate Failed",
+        err.response?.data?.message || "Failed to calculate delivery.",
+        "error"
+      );
     } finally {
       setLoadingEstimate(false);
     }
@@ -205,7 +204,6 @@ const Orders = () => {
     return () => clearTimeout(t);
   }, [JSON.stringify(buildOrderItems), hasErrors]);
 
-  /* Qty handlers */
   const handleQtyChange = (itemId, raw) => {
     setRawQtys((prev) => ({ ...prev, [itemId]: raw }));
     const parsed = parseInt(raw, 10);
@@ -220,12 +218,11 @@ const Orders = () => {
     setRawQtys((prev) => ({ ...prev, [itemId]: String(clamped) }));
   };
 
-  /* Type change: also snap quantity to the type's minimum */
   const handleTypeChange = (itemId, newType) => {
     setItemTypes((prev) => ({ ...prev, [itemId]: newType }));
-    const item     = cartItems?.find((it) => (it?.id || it?.productId) === itemId);
-    const qty      = Number(item?.quantity || 0);
-    const snapQty  = newType === ORDER_TYPES.BULK
+    const item    = cartItems?.find((it) => (it?.id || it?.productId) === itemId);
+    const qty     = Number(item?.quantity || 0);
+    const snapQty = newType === ORDER_TYPES.BULK
       ? Math.max(qty, BULK_MIN_KG)
       : Math.max(Math.min(qty, NORMAL_MAX_KG), NORMAL_MIN_KG);
     if (snapQty !== qty) {
@@ -235,7 +232,6 @@ const Orders = () => {
     setEstimate(null);
   };
 
-  /* Price summary */
   const fallbackSubtotal = useMemo(() =>
     (cartItems || []).reduce((sum, it) => {
       const id    = it?.id || it?.productId;
@@ -246,10 +242,10 @@ const Orders = () => {
     [cartItems, itemTypes]
   );
 
-  const subtotal       = estimate?.itemsSubtotal   ?? fallbackSubtotal;
-  const deliveryTotal  = estimate?.deliveryTotal    ?? 0;
-  const platformCharge = estimate?.platformCharge   ?? PLATFORM_CHARGE;
-  const grandTotal     = estimate?.grandTotal       ?? subtotal + deliveryTotal + platformCharge;
+  const subtotal       = estimate?.itemsSubtotal ?? fallbackSubtotal;
+  const deliveryTotal  = estimate?.deliveryTotal  ?? 0;
+  const platformCharge = estimate?.platformCharge ?? PLATFORM_CHARGE;
+  const grandTotal     = estimate?.grandTotal     ?? subtotal + deliveryTotal + platformCharge;
 
   const buildImgSrc = (item) => {
     if (!item?.image) return "/placeholder-product.jpg";
@@ -257,7 +253,6 @@ const Orders = () => {
     return img.startsWith("http") ? img : `${APIBASEURL}${img.startsWith("/") ? img : `/${img}`}`;
   };
 
-  /* Checkout */
   const handleCheckout = async () => {
     if (placingOrder || !buildOrderItems.length || hasErrors) return;
     setPlacingOrder(true);
@@ -266,7 +261,11 @@ const Orders = () => {
       clearCart();
       navigate("/payment", { state: { order: res.data } });
     } catch (err) {
-      showAlert("Checkout Failed", err.response?.data?.message || "Checkout failed. Please try again.", "error");
+      showAlert(
+        "Checkout Failed",
+        err.response?.data?.message || "Checkout failed. Please try again.",
+        "error"
+      );
     } finally {
       setPlacingOrder(false);
     }
@@ -276,12 +275,14 @@ const Orders = () => {
 
   if (!cartItems?.length) {
     return (
-      <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-10">
-        <div className="max-w-5xl mx-auto bg-white rounded-2xl border p-10 text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Your Cart</h1>
+      <div className="min-h-screen bg-gray-50 px-4 sm:px-6 md:px-8 py-10">
+        <div className="max-w-5xl mx-auto bg-white rounded-2xl border p-8 sm:p-10 text-center">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Your Cart</h1>
           <p className="text-gray-600 mb-8">Your cart is empty.</p>
-          <button onClick={() => navigate("/consumer")}
-            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-3 rounded-xl transition">
+          <button
+            onClick={() => navigate("/consumer")}
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-3 rounded-xl transition"
+          >
             Continue Shopping
           </button>
         </div>
@@ -290,68 +291,80 @@ const Orders = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-10">
-      <AlertModal isOpen={alertModal.isOpen} onClose={closeAlert}
-        type={alertModal.type} title={alertModal.title}
-        message={alertModal.message} confirmText="OK" />
+    <div className="min-h-screen bg-gray-50 px-4 sm:px-6 md:px-8 py-6 sm:py-10">
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+      />
 
       <div className="max-w-6xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Shopping Cart</h1>
+            <p className="text-gray-600 mt-1 text-sm sm:text-base">
               {cartItems.length} item{cartItems.length !== 1 ? "s" : ""} — choose Normal or Bulk per product
             </p>
           </div>
-          <button onClick={() => navigate("/consumer")}
-            className="text-green-600 hover:underline font-medium text-sm">
+          <button
+            onClick={() => navigate("/consumer")}
+            className="self-start text-green-600 hover:underline font-medium text-sm"
+          >
             Continue Shopping
           </button>
         </div>
 
         {/* No location warning */}
         {!hasLocation && (
-          <div className="mb-6 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
-            <span className="text-xl mt-0.5">📍</span>
+          <div className="mb-5 sm:mb-6 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 sm:px-5 py-4">
+            <i className="ti ti-map-pin text-amber-600 mt-0.5 flex-shrink-0" style={{ fontSize: "1.25rem" }} aria-hidden="true" />
             <div>
-              <p className="font-semibold text-amber-800 text-sm">Location not set — delivery fee is estimated</p>
+              <p className="font-semibold text-amber-800 text-sm">
+                Location not set — delivery fee is estimated
+              </p>
               <p className="text-amber-700 text-xs mt-0.5">
                 Set your location in{" "}
-                <button onClick={() => navigate("/profile")} className="underline font-semibold">Profile</button>
-                {" "}for accurate distance-based delivery.
+                <button onClick={() => navigate("/profile")} className="underline font-semibold">
+                  Profile
+                </button>{" "}
+                for accurate distance-based delivery.
               </p>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6 sm:gap-8">
 
-          {/* ── Left: Cart items ── */}
+          {/* ── Cart items ── */}
           <div className="lg:col-span-2 space-y-4">
             {cartItems.map((item, index) => {
-              const itemId   = item?.id || item?.productId;
-              const key      = itemId || index;
-              const rawVal   = rawQtys[itemId] ?? String(item?.quantity || NORMAL_MIN_KG);
-              const itemType = itemTypes[itemId] || ORDER_TYPES.NORMAL;
+              const itemId    = item?.id || item?.productId;
+              const key       = itemId || index;
+              const rawVal    = rawQtys[itemId] ?? String(item?.quantity || NORMAL_MIN_KG);
+              const itemType  = itemTypes[itemId] || ORDER_TYPES.NORMAL;
               const unitPrice = effectiveUnitPrice(item, itemType);
               const rowTotal  = unitPrice * Number(item?.quantity || 1);
-              const imgSrc   = buildImgSrc(item);
-              const isBulk   = itemType === ORDER_TYPES.BULK;
+              const imgSrc    = buildImgSrc(item);
+              const isBulk    = itemType === ORDER_TYPES.BULK;
 
               return (
                 <div
                   key={key}
-                  className={`bg-white border-2 rounded-2xl p-5 hover:shadow-sm transition ${
+                  className={`bg-white border-2 rounded-2xl p-4 sm:p-5 hover:shadow-sm transition ${
                     isBulk ? "border-amber-200" : "border-gray-100"
                   }`}
                 >
-                  <div className="flex gap-4 items-start">
+                  <div className="flex gap-3 sm:gap-4 items-start">
                     {/* Image */}
                     <img
-                      src={imgSrc} alt={item?.name}
-                      className="h-20 w-20 rounded-xl object-cover bg-gray-100 flex-shrink-0"
+                      src={imgSrc}
+                      alt={item?.name}
+                      className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover bg-gray-100 flex-shrink-0"
                       onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
                     />
 
@@ -359,7 +372,9 @@ const Orders = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h3 className="font-bold text-gray-900 truncate">{item?.name || "Product"}</h3>
+                          <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">
+                            {item?.name || "Product"}
+                          </h3>
                           <p className="text-xs text-gray-400 mt-0.5 truncate">
                             {item?.farmer?.firstName
                               ? `${item.farmer.firstName} ${item.farmer.lastName}`
@@ -370,50 +385,53 @@ const Orders = () => {
                           type="button"
                           onClick={() => removeFromCart(item?.id)}
                           className="text-gray-300 hover:text-red-500 transition p-1 flex-shrink-0"
-                          aria-label="Remove"
+                          aria-label="Remove item"
                         >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
+                          <i className="ti ti-x" style={{ fontSize: "1.25rem" }} aria-hidden="true" />
                         </button>
                       </div>
 
-                      {/* Price + qty row */}
-                      <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
-                        {/* Unit price (live) */}
-                        <div>
+                      {/* Price + qty row — wraps on small screens */}
+                      <div className="flex flex-wrap items-center justify-between mt-2 gap-x-4 gap-y-2">
+                        {/* Unit price */}
+                        <div className="flex items-center flex-wrap gap-1">
                           <span className="text-sm font-bold text-gray-900">
                             Rs. {unitPrice.toFixed(0)}
                           </span>
-                          <span className="text-xs text-gray-400"> /{item?.unit || "kg"}</span>
+                          <span className="text-xs text-gray-400">/{item?.unit || "kg"}</span>
                           {isBulk && item?.bulkPrice && Number(item.bulkPrice) > 0 && (
-                            <span className="ml-1.5 text-xs text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded-full">
+                            <span className="text-xs text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded-full">
                               Bulk price
                             </span>
                           )}
                           {!isBulk && (
-                            <span className="ml-1.5 text-xs text-green-700 font-semibold bg-green-50 px-1.5 py-0.5 rounded-full">
-                              Regular price
+                            <span className="text-xs text-green-700 font-semibold bg-green-50 px-1.5 py-0.5 rounded-full">
+                              Regular
                             </span>
                           )}
                         </div>
 
                         {/* Qty input */}
                         <div className="flex items-center gap-2">
-                          <label className="text-xs text-gray-400">Qty ({item?.unit || "kg"})</label>
+                          <label className="text-xs text-gray-400">
+                            Qty ({item?.unit || "kg"})
+                          </label>
                           <input
-                            type="number" inputMode="numeric"
+                            type="number"
+                            inputMode="numeric"
                             value={rawVal}
                             onChange={(e) => handleQtyChange(itemId, e.target.value)}
                             onBlur={() => handleQtyBlur(itemId)}
                             min={1}
-                            className="w-20 text-center font-bold text-gray-900 border-2 border-gray-200 rounded-xl px-2 py-1.5 text-sm focus:outline-none focus:border-green-500 transition"
+                            className="w-16 sm:w-20 text-center font-bold text-gray-900 border-2 border-gray-200 rounded-xl px-2 py-1.5 text-sm focus:outline-none focus:border-green-500 transition"
                           />
                         </div>
 
                         {/* Row total */}
                         <div className="text-right">
-                          <p className="font-bold text-gray-900">Rs. {rowTotal.toFixed(0)}</p>
+                          <p className="font-bold text-gray-900 text-sm sm:text-base">
+                            Rs. {rowTotal.toFixed(0)}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -431,22 +449,26 @@ const Orders = () => {
 
             {/* Delivery breakdown */}
             {estimate?.shipments?.length > 0 && (
-              <div className="bg-white border border-gray-100 rounded-2xl p-5">
-                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <span>🚚</span> Delivery Breakdown
+              <div className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-5">
+                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2 text-sm sm:text-base">
+                  <i className="ti ti-truck text-gray-600" style={{ fontSize: "1.1rem" }} aria-hidden="true" />
+                  Delivery Breakdown
                 </h3>
                 <div className="space-y-3">
                   {estimate.shipments.map((sh, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-xl px-4 py-3">
-                      <div>
-                        <p className="font-semibold text-gray-800">{sh.farmerName}</p>
+                    <div
+                      key={i}
+                      className="flex items-center justify-between text-sm bg-gray-50 rounded-xl px-3 sm:px-4 py-3"
+                    >
+                      <div className="min-w-0 mr-3">
+                        <p className="font-semibold text-gray-800 truncate">{sh.farmerName}</p>
                         <p className="text-gray-500 text-xs mt-0.5">
                           {sh.distanceKm !== null
                             ? `${sh.distanceKm} km away`
                             : "Distance unknown — base rate"}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex-shrink-0">
                         <p className="font-bold text-gray-900">Rs. {sh.deliveryFee}</p>
                         {sh.distanceKm !== null && (
                           <p className="text-xs text-gray-400">
@@ -459,31 +481,33 @@ const Orders = () => {
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-800">
-                  First 10 km → Rs. 50 · Every extra km → +Rs. 5 · Max Rs. 500
+                <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl px-3 sm:px-4 py-3 text-xs text-blue-800">
+                  First 10 km: Rs. 50 &middot; Every extra km: +Rs. 5 &middot; Max Rs. 500
                 </div>
               </div>
             )}
           </div>
 
-          {/* ── Right: Summary ── */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 lg:sticky lg:top-8 h-fit shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900 mb-5">Order Summary</h2>
+          {/* ── Order Summary ── */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-5 sm:p-6 lg:sticky lg:top-8 h-fit shadow-sm">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-5">Order Summary</h2>
 
-            {/* Per-item type chips */}
+            {/* Per-item lines */}
             <div className="space-y-1.5 mb-4">
               {cartItems.map((it) => {
-                const id   = it?.id || it?.productId;
-                const type = itemTypes[id] || ORDER_TYPES.NORMAL;
+                const id        = it?.id || it?.productId;
+                const type      = itemTypes[id] || ORDER_TYPES.NORMAL;
                 const unitPrice = effectiveUnitPrice(it, type);
                 return (
                   <div key={id} className="flex justify-between text-sm">
                     <span className="text-gray-600 truncate mr-2 flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        type === ORDER_TYPES.BULK ? "bg-amber-400" : "bg-green-400"
-                      }`} />
-                      {it?.name}
-                      <span className="text-xs text-gray-400">
+                      <span
+                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          type === ORDER_TYPES.BULK ? "bg-amber-400" : "bg-green-400"
+                        }`}
+                      />
+                      <span className="truncate">{it?.name}</span>
+                      <span className="text-xs text-gray-400 flex-shrink-0">
                         ({type === ORDER_TYPES.BULK ? "Bulk" : "Normal"})
                       </span>
                     </span>
@@ -499,8 +523,8 @@ const Orders = () => {
             {loadingEstimate && (
               <div className="flex items-center gap-2 text-xs text-gray-400 mb-3 px-1">
                 <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
                 Recalculating…
               </div>
@@ -512,11 +536,10 @@ const Orders = () => {
                 <span className="font-medium">Rs. {subtotal.toFixed(0)}</span>
               </div>
 
-              {/* Per-shipment delivery */}
               {estimate?.shipments?.map((sh, i) => (
                 <div key={i} className="flex justify-between text-sm text-gray-500">
                   <span className="flex items-center gap-1 truncate mr-2">
-                    <span className="text-xs">🚚</span>
+                    <i className="ti ti-truck flex-shrink-0" style={{ fontSize: "0.85rem" }} aria-hidden="true" />
                     <span className="truncate">{sh.farmerName}</span>
                     {sh.distanceKm !== null && (
                       <span className="text-gray-400 text-xs flex-shrink-0">· {sh.distanceKm} km</span>
@@ -525,6 +548,7 @@ const Orders = () => {
                   <span className="flex-shrink-0">Rs. {sh.deliveryFee}</span>
                 </div>
               ))}
+
               {!estimate && (
                 <div className="flex justify-between text-sm text-gray-400">
                   <span>Delivery</span>
@@ -540,7 +564,9 @@ const Orders = () => {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500 flex items-center gap-1">
                   Platform charge
-                  <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md">MeroBari</span>
+                  <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md">
+                    MeroBari
+                  </span>
                 </span>
                 <span className="font-medium text-gray-700">Rs. {platformCharge}</span>
               </div>
@@ -558,7 +584,7 @@ const Orders = () => {
               <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700 space-y-1">
                 <p className="font-semibold">Fix quantity issues before checkout:</p>
                 {Object.values(itemErrors).map((err, i) => (
-                  <p key={i}>• {err}</p>
+                  <p key={i}>- {err}</p>
                 ))}
               </div>
             )}
@@ -566,7 +592,7 @@ const Orders = () => {
             <button
               disabled={placingOrder || loadingEstimate || !buildOrderItems.length || hasErrors}
               onClick={handleCheckout}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-bold py-4 px-6 rounded-xl text-lg transition shadow-sm"
+              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-bold py-3.5 sm:py-4 px-6 rounded-xl text-base sm:text-lg transition shadow-sm"
             >
               {placingOrder
                 ? "Placing Order…"
@@ -578,7 +604,7 @@ const Orders = () => {
             </button>
 
             <p className="text-xs text-gray-400 text-center mt-3">
-              Normal: {NORMAL_MIN_KG}–{NORMAL_MAX_KG} kg · Bulk: ≥{BULK_MIN_KG} kg · Rs. {PLATFORM_CHARGE} platform fee
+              Normal: {NORMAL_MIN_KG}–{NORMAL_MAX_KG} kg · Bulk: &ge;{BULK_MIN_KG} kg · Rs. {PLATFORM_CHARGE} platform fee
             </p>
           </div>
         </div>

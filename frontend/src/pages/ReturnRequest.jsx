@@ -36,12 +36,11 @@ const ReturnRequest = () => {
   const [submitting,    setSubmitting]    = useState(false);
   const [errors,        setErrors]        = useState({});
 
-  // Refund payment state
-  const [refundMethod,    setRefundMethod]    = useState("");
-  const [esewaId,         setEsewaId]         = useState("");
-  const [bankName,        setBankName]         = useState("");
-  const [accountNumber,   setAccountNumber]   = useState("");
-  const [accountName,     setAccountName]     = useState("");
+  const [refundMethod,  setRefundMethod]  = useState("");
+  const [esewaId,       setEsewaId]       = useState("");
+  const [bankName,      setBankName]      = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName,   setAccountName]   = useState("");
 
   const [alertModal, setAlertModal] = useState({
     isOpen: false, type: "", title: "", message: "", onConfirm: null,
@@ -60,13 +59,13 @@ const ReturnRequest = () => {
   if (!isValidId(farmerId) || !isValidId(orderId)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center max-w-sm w-full">
-          <p className="text-gray-600 mb-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 text-center max-w-sm w-full">
+          <p className="text-gray-600 mb-4 text-sm sm:text-base">
             Return details could not be loaded. Please go back and try again.
           </p>
           <button
             onClick={() => navigate("/my-orders", { replace: true })}
-            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition"
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition"
           >
             Back to my orders
           </button>
@@ -149,7 +148,7 @@ const ReturnRequest = () => {
   const totalAmount = items.reduce((s, i) => s + (i.price ?? 0) * (i.quantity ?? 0), 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
+    <div className="min-h-screen bg-gray-50 px-3 sm:px-4 md:px-8 py-5 sm:py-8">
 
       <AlertModal
         isOpen={alertModal.isOpen}
@@ -162,9 +161,11 @@ const ReturnRequest = () => {
       />
 
       <div className="max-w-2xl mx-auto">
+
+        {/* Back link */}
         <button
           onClick={() => navigate("/my-orders")}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-6 transition"
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-4 sm:mb-6 transition"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -173,18 +174,20 @@ const ReturnRequest = () => {
         </button>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-50 to-red-50 border-b px-6 py-5">
-            <h1 className="text-2xl font-bold text-gray-900">Request a return</h1>
-            <p className="text-sm text-gray-500 mt-1">
+
+          {/* Header */}
+          <div className="bg-gradient-to-r from-orange-50 to-red-50 border-b px-4 sm:px-6 py-4 sm:py-5">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Request a return</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">
               Order #{orderDisplayId || orderId.slice(-6)} · {farmerName}
             </p>
           </div>
 
-          <div className="px-6 py-6 space-y-6">
+          <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-5 sm:space-y-6">
 
             {/* Items summary */}
-            <div className="bg-gray-50 rounded-xl p-4">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            <div className="bg-gray-50 rounded-xl p-3 sm:p-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 sm:mb-3">
                 Items in this shipment
               </p>
               {items.length === 0 ? (
@@ -192,25 +195,25 @@ const ReturnRequest = () => {
               ) : (
                 <div className="space-y-2">
                   {items.map((item, i) => (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span className="text-gray-800 font-medium">
+                    <div key={i} className="flex justify-between text-sm gap-2">
+                      <span className="text-gray-800 font-medium min-w-0 truncate">
                         {item.name}
                         <span className="text-gray-400 font-normal ml-1">×{item.quantity}</span>
                       </span>
-                      <span className="text-gray-700">
+                      <span className="text-gray-700 flex-shrink-0">
                         Rs. {((item.price ?? 0) * (item.quantity ?? 0)).toFixed(0)}
                       </span>
                     </div>
                   ))}
                 </div>
               )}
-              <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between text-sm font-bold text-gray-900">
-                <span>Refund amount (if approved)</span>
-                <span className="text-green-700">Rs. {totalAmount.toFixed(0)}</span>
+              <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between text-sm font-bold text-gray-900 gap-2">
+                <span className="min-w-0">Refund amount (if approved)</span>
+                <span className="text-green-700 flex-shrink-0">Rs. {totalAmount.toFixed(0)}</span>
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
 
               {/* ── Reason picker ── */}
               <div>
@@ -226,7 +229,7 @@ const ReturnRequest = () => {
                         setReason(value);
                         setErrors((p) => { const e = { ...p }; delete e.reason; return e; });
                       }}
-                      className={`text-left px-4 py-3 rounded-xl border-2 text-sm transition ${
+                      className={`text-left px-3 sm:px-4 py-3 rounded-xl border-2 text-sm transition active:scale-[0.98] ${
                         reason === value
                           ? "border-orange-500 bg-orange-50 text-orange-800 font-medium"
                           : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
@@ -252,7 +255,7 @@ const ReturnRequest = () => {
                   onChange={(e) => setReasonDetail(e.target.value)}
                   rows={3}
                   placeholder="Describe the issue in more detail..."
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                  className="w-full border border-gray-200 rounded-xl px-3 sm:px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
                 />
               </div>
 
@@ -278,13 +281,13 @@ const ReturnRequest = () => {
                     </button>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-orange-400 transition">
-                    <svg className="w-8 h-8 text-gray-300 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <label className="flex flex-col items-center justify-center w-full h-28 sm:h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-orange-400 active:bg-orange-50 transition">
+                    <svg className="w-7 sm:w-8 h-7 sm:h-8 text-gray-300 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                         d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span className="text-sm text-gray-400">Click to upload photo</span>
-                    <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
+                    <span className="text-sm text-gray-400">Tap to upload photo</span>
+                    <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
                   </label>
                 )}
                 {errors.photo && (
@@ -293,22 +296,22 @@ const ReturnRequest = () => {
               </div>
 
               {/* ── Refund payment method ── */}
-              <div className="border-t border-gray-100 pt-6">
+              <div className="border-t border-gray-100 pt-5 sm:pt-6">
                 <div className="mb-3">
                   <h3 className="text-sm font-bold text-gray-900">
                     How would you like your refund? <span className="text-red-500">*</span>
                   </h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    If your return is approved, admin will send Rs.{totalAmount.toFixed(0)} using the details below.
+                    If approved, admin will send Rs.{totalAmount.toFixed(0)} using the details below.
                   </p>
                 </div>
 
-                {/* Method selector */}
+                {/* Method selector — 3 equal cols on all sizes */}
                 <div className="grid grid-cols-3 gap-2 mb-4">
                   {[
-                    { value: "esewa",         label: "eSewa",          icon: "💚", desc: "Digital wallet" },
-                    { value: "bank_transfer", label: "Bank Transfer",  icon: "🏦", desc: "Direct to account" },
-                    { value: "cash",          label: "Cash",           icon: "💵", desc: "Physical handover" },
+                    { value: "esewa",         label: "eSewa",         icon: "💚", desc: "Digital wallet" },
+                    { value: "bank_transfer", label: "Bank",          icon: "🏦", desc: "To account" },
+                    { value: "cash",          label: "Cash",          icon: "💵", desc: "Handover" },
                   ].map((m) => (
                     <button
                       key={m.value}
@@ -317,22 +320,22 @@ const ReturnRequest = () => {
                         setRefundMethod(m.value);
                         setErrors((p) => { const e = { ...p }; delete e.refund; return e; });
                       }}
-                      className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 text-xs font-semibold transition ${
+                      className={`flex flex-col items-center py-3 px-1 sm:px-2 rounded-xl border-2 text-xs font-semibold transition active:scale-[0.97] ${
                         refundMethod === m.value
                           ? "border-green-500 bg-green-50 text-green-800"
                           : "border-gray-200 text-gray-600 hover:border-gray-300"
                       }`}
                     >
-                      <span className="text-xl mb-1">{m.icon}</span>
-                      <span>{m.label}</span>
-                      <span className="font-normal text-gray-400 mt-0.5">{m.desc}</span>
+                      <span className="text-lg sm:text-xl mb-1">{m.icon}</span>
+                      <span className="text-center leading-tight">{m.label}</span>
+                      <span className="font-normal text-gray-400 mt-0.5 hidden sm:block">{m.desc}</span>
                     </button>
                   ))}
                 </div>
 
                 {/* eSewa detail */}
                 {refundMethod === "esewa" && (
-                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-3 sm:p-4 space-y-3">
                     <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">eSewa Details</p>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -340,11 +343,12 @@ const ReturnRequest = () => {
                       </label>
                       <input
                         type="tel"
+                        inputMode="numeric"
                         value={esewaId}
                         onChange={(e) => setEsewaId(e.target.value)}
                         placeholder="98XXXXXXXX"
                         maxLength={10}
-                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                        className="w-full border border-gray-200 rounded-xl px-3 sm:px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
                       />
                     </div>
                   </div>
@@ -352,8 +356,9 @@ const ReturnRequest = () => {
 
                 {/* Bank transfer detail */}
                 {refundMethod === "bank_transfer" && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-4 space-y-3">
                     <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Bank Account Details</p>
+                    {/* Single column on mobile, 2 cols on sm+ */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -373,6 +378,7 @@ const ReturnRequest = () => {
                         </label>
                         <input
                           type="text"
+                          inputMode="numeric"
                           value={accountNumber}
                           onChange={(e) => setAccountNumber(e.target.value)}
                           placeholder="XXXXXXXXXXXX"
@@ -397,7 +403,7 @@ const ReturnRequest = () => {
 
                 {/* Cash detail */}
                 {refundMethod === "cash" && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 sm:p-4">
                     <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Cash Refund</p>
                     <p className="text-sm text-amber-800">
                       Admin will arrange for cash of Rs.{totalAmount.toFixed(0)} to be returned to you directly.
@@ -414,8 +420,8 @@ const ReturnRequest = () => {
               </div>
 
               {/* Info box */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-                <p className="font-medium mb-1">What happens next</p>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-4 text-sm text-blue-800">
+                <p className="font-medium mb-1 text-xs sm:text-sm">What happens next</p>
                 <ul className="space-y-0.5 list-disc list-inside text-blue-700 text-xs">
                   <li>Your request is sent to the farmer for review</li>
                   <li>Farmer has up to 2 days to approve or reject</li>
@@ -424,21 +430,22 @@ const ReturnRequest = () => {
                 </ul>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              {/* Action buttons — stacked on mobile */}
+              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-1">
                 <button
                   type="button"
                   onClick={() => navigate("/my-orders")}
                   disabled={submitting}
-                  className="flex-1 border border-gray-200 text-gray-700 font-medium py-3 rounded-xl hover:bg-gray-50 transition disabled:opacity-50"
+                  className="flex-1 border border-gray-200 text-gray-700 font-medium py-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition disabled:opacity-50 text-sm"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting || !reason || !refundMethod}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-semibold py-3 rounded-xl transition disabled:cursor-not-allowed"
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 disabled:bg-orange-300 text-white font-semibold py-3 rounded-xl transition disabled:cursor-not-allowed text-sm"
                 >
-                  {submitting ? "Submitting..." : "Submit return request"}
+                  {submitting ? "Submitting…" : "Submit return request"}
                 </button>
               </div>
             </form>

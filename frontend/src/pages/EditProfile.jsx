@@ -153,7 +153,7 @@ const EditProfile = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className="min-h-screen bg-gray-50 py-8 sm:py-12 px-3 sm:px-4">
       <AlertModal
         isOpen={alertModal.isOpen}
         onClose={closeAlert}
@@ -167,18 +167,18 @@ const EditProfile = () => {
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-green-600 to-green-700 px-8 py-6">
-            <h2 className="text-2xl font-bold text-white">Edit Profile</h2>
+          <div className="bg-gradient-to-r from-green-600 to-green-700 px-5 sm:px-8 py-5 sm:py-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-white">Edit Profile</h2>
             <p className="text-green-100 text-sm mt-1">
               Update your account information
             </p>
           </div>
 
-          <div className="p-8">
-            <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="p-5 sm:p-8">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
 
-              {/* Name row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Name row — stacks on mobile */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                 <FormField
                   label="First Name"
                   name="firstName"
@@ -228,8 +228,9 @@ const EditProfile = () => {
 
               {/* Farmer location section */}
               {isFarmer && (
-                <div className="border border-gray-200 rounded-xl p-5 space-y-4 bg-gray-50">
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="border border-gray-200 rounded-xl p-4 sm:p-5 space-y-4 bg-gray-50">
+                  {/* Section header — stacks on small mobile */}
+                  <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3">
                     <div>
                       <h3 className="font-semibold text-gray-900">Farm location</h3>
                       <p className="text-xs text-gray-500 mt-0.5">
@@ -240,13 +241,14 @@ const EditProfile = () => {
                       type="button"
                       onClick={handleUseCurrentLocation}
                       disabled={locLoading}
-                      className="text-sm border border-gray-300 bg-white px-4 py-2 rounded-lg hover:bg-gray-50 transition disabled:opacity-60 font-medium"
+                      className="self-start xs:self-auto text-sm border border-gray-300 bg-white px-4 py-2.5 rounded-lg hover:bg-gray-50 transition disabled:opacity-60 font-medium min-h-[44px] whitespace-nowrap"
                     >
                       {locLoading ? "Getting location…" : "📍 Use current location"}
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Lat/lng — stacks on mobile */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField
                       label="Latitude"
                       name="lat"
@@ -275,19 +277,27 @@ const EditProfile = () => {
                     type="button"
                     onClick={handleSaveLocation}
                     disabled={locLoading}
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg transition disabled:opacity-60 text-sm font-semibold"
+                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition disabled:opacity-60 text-sm font-semibold min-h-[44px]"
                   >
                     {locLoading ? "Saving location…" : "Save location"}
                   </button>
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="flex gap-4 pt-4 border-t border-gray-100">
+              {/* Actions — stacks on mobile (save on top, cancel below) */}
+              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => navigate("/profile")}
+                  disabled={loading}
+                  className="flex-1 border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold text-sm hover:bg-gray-50 transition disabled:opacity-60 min-h-[48px]"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-6 py-3 rounded-xl font-semibold text-sm transition disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-6 py-3 rounded-xl font-semibold text-sm transition disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[48px]"
                 >
                   {loading ? (
                     <>
@@ -300,14 +310,6 @@ const EditProfile = () => {
                       Saving…
                     </>
                   ) : "Save changes"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/profile")}
-                  disabled={loading}
-                  className="flex-1 border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold text-sm hover:bg-gray-50 transition disabled:opacity-60"
-                >
-                  Cancel
                 </button>
               </div>
             </form>
@@ -325,7 +327,7 @@ const FormField = ({ label, ...props }) => (
     </label>
     <input
       {...props}
-      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white placeholder-gray-400 transition"
+      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white placeholder-gray-400 transition min-h-[44px]"
     />
   </div>
 );

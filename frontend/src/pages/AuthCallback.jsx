@@ -5,32 +5,32 @@ import api from "../api/axios";
 
 const RoleModal = ({ onSelect }) => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-    <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 max-w-sm w-full text-center">
-      <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+    <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8 max-w-sm w-full text-center">
+      <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
         <span className="text-2xl">👋</span>
       </div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Almost there!</h2>
-      <p className="text-gray-500 text-sm mb-8">
+      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Almost there!</h2>
+      <p className="text-gray-500 text-sm mb-6 sm:mb-8">
         How would you like to use MeroBari?
       </p>
       <div className="space-y-3">
         <button
           onClick={() => onSelect("consumer")}
-          className="w-full flex items-center gap-4 border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 rounded-2xl px-5 py-4 transition text-left group"
+          className="w-full flex items-center gap-3 sm:gap-4 border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 transition text-left group active:scale-[0.98]"
         >
-          <span className="text-3xl">🛒</span>
+          <span className="text-2xl sm:text-3xl">🛒</span>
           <div>
-            <p className="font-bold text-gray-900 group-hover:text-green-800">Shop as Consumer</p>
+            <p className="font-bold text-gray-900 group-hover:text-green-800 text-sm sm:text-base">Shop as Consumer</p>
             <p className="text-xs text-gray-500">Browse and buy fresh produce from local farms</p>
           </div>
         </button>
         <button
           onClick={() => onSelect("farmer")}
-          className="w-full flex items-center gap-4 border-2 border-gray-200 hover:border-amber-500 hover:bg-amber-50 rounded-2xl px-5 py-4 transition text-left group"
+          className="w-full flex items-center gap-3 sm:gap-4 border-2 border-gray-200 hover:border-amber-500 hover:bg-amber-50 rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 transition text-left group active:scale-[0.98]"
         >
-          <span className="text-3xl">🌾</span>
+          <span className="text-2xl sm:text-3xl">🌾</span>
           <div>
-            <p className="font-bold text-gray-900 group-hover:text-amber-800">Sell as Farmer</p>
+            <p className="font-bold text-gray-900 group-hover:text-amber-800 text-sm sm:text-base">Sell as Farmer</p>
             <p className="text-xs text-gray-500">List your crops and sell directly to consumers</p>
           </div>
         </button>
@@ -39,7 +39,6 @@ const RoleModal = ({ onSelect }) => (
   </div>
 );
 
-// Helper — call after user object is known
 const getRoleRoute = (role) => {
   if (role === "farmer")   return "/farmer";
   if (role === "consumer") return "/consumer";
@@ -48,9 +47,9 @@ const getRoleRoute = (role) => {
 };
 
 const AuthCallback = () => {
-  const [params]            = useSearchParams();
-  const navigate            = useNavigate();
-  const { login, setUser }  = useContext(AuthContext);
+  const [params]           = useSearchParams();
+  const navigate           = useNavigate();
+  const { login, setUser } = useContext(AuthContext);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [tempToken, setTempToken]         = useState(null);
   const [error, setError]                 = useState("");
@@ -74,13 +73,9 @@ const AuthCallback = () => {
 
   const finishLogin = async (token) => {
     try {
-      // Store token first so the API call is authenticated
       localStorage.setItem("token", token);
-
-      // Fetch the real user object from the server instead of decoding JWT
       const res = await api.get("/api/auth/me");
       const userData = res.data?.user;
-
       login(token, userData);
       navigate(getRoleRoute(userData?.role), { replace: true });
     } catch (err) {
@@ -103,11 +98,14 @@ const AuthCallback = () => {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="text-center">
-          <p className="text-red-600 font-semibold mb-4">{error}</p>
+        <div className="text-center max-w-xs w-full">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-xl">⚠️</span>
+          </div>
+          <p className="text-red-600 font-semibold mb-4 text-sm sm:text-base">{error}</p>
           <button
             onClick={() => navigate("/login")}
-            className="bg-green-600 text-white px-6 py-2 rounded-xl font-semibold"
+            className="w-full sm:w-auto bg-green-600 text-white px-6 py-2.5 rounded-xl font-semibold text-sm active:scale-[0.98] transition"
           >
             Back to Login
           </button>
@@ -119,7 +117,7 @@ const AuthCallback = () => {
   if (showRoleModal) return <RoleModal onSelect={handleRoleSelect} />;
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center px-4">
       <div className="text-center">
         <div className="w-10 h-10 border-2 border-gray-200 border-t-green-600 rounded-full animate-spin mx-auto mb-3" />
         <p className="text-gray-500 text-sm">Signing you in…</p>

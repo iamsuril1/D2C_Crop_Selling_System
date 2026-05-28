@@ -1,9 +1,4 @@
-/* src/pages/PaymentSelection.jsx
-   Two payment modes:
-     Pre Payment  → eSewa only (pay before delivery)
-     Post Payment → Cash on Delivery | FonePay on Delivery (pay during delivery)
-*/
-
+// PaymentSelection.jsx
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/axios";
@@ -24,9 +19,9 @@ const PaymentSelection = () => {
   const location = useLocation();
   const order    = location.state?.order;
 
-  const [paymentMode,   setPaymentMode]   = useState(PAYMENT_MODES.PRE);
-  const [postMethod,    setPostMethod]    = useState(POST_METHODS.COD);
-  const [submitting,    setSubmitting]    = useState(false);
+  const [paymentMode, setPaymentMode] = useState(PAYMENT_MODES.PRE);
+  const [postMethod,  setPostMethod]  = useState(POST_METHODS.COD);
+  const [submitting,  setSubmitting]  = useState(false);
 
   const [alertModal, setAlertModal] = useState({
     isOpen: false, type: "", title: "", message: "", onConfirm: null,
@@ -52,7 +47,6 @@ const PaymentSelection = () => {
     s.farmer?._id || s.farmer?.id || s.farmer
   ) || [];
 
-  /* ── eSewa ── */
   const handleEsewa = async () => {
     setSubmitting(true);
     try {
@@ -93,7 +87,6 @@ const PaymentSelection = () => {
     }
   };
 
-  /* ── COD ── */
   const handleCOD = async () => {
     setSubmitting(true);
     try {
@@ -110,7 +103,6 @@ const PaymentSelection = () => {
     }
   };
 
-  /* ── FonePay on Delivery ── */
   const handleFonePay = async () => {
     setSubmitting(true);
     try {
@@ -138,7 +130,6 @@ const PaymentSelection = () => {
 
   const total = order.totalAmount || 0;
 
-  /* ── button label ── */
   const payButtonLabel = () => {
     if (submitting) return null;
     if (paymentMode === PAYMENT_MODES.PRE)
@@ -155,7 +146,7 @@ const PaymentSelection = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className="min-h-screen bg-gray-50 py-8 px-3 sm:py-12 sm:px-4">
       <AlertModal
         isOpen={alertModal.isOpen}
         onClose={closeAlert}
@@ -169,9 +160,9 @@ const PaymentSelection = () => {
       <div className="max-w-lg mx-auto">
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl p-6 text-white mb-6">
-          <h1 className="text-2xl font-bold mb-1">Complete Payment</h1>
-          <div className="flex items-center gap-3 text-sm text-green-100">
+        <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl p-4 sm:p-6 text-white mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold mb-1">Complete Payment</h1>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-green-100">
             <span>Order #{orderDisplayId}</span>
             <span>·</span>
             <span>{order.shipments?.length} shipment{order.shipments?.length !== 1 ? "s" : ""}</span>
@@ -181,7 +172,7 @@ const PaymentSelection = () => {
         </div>
 
         {/* Order breakdown */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 mb-4 sm:mb-5">
           <h3 className="font-semibold text-gray-800 mb-3 text-sm">Order Summary</h3>
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between text-gray-600">
@@ -204,14 +195,14 @@ const PaymentSelection = () => {
         </div>
 
         {/* Payment mode tabs */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-4 sm:mb-5">
 
           {/* Tab headers */}
           <div className="grid grid-cols-2 border-b border-gray-100">
             <button
               type="button"
               onClick={() => setPaymentMode(PAYMENT_MODES.PRE)}
-              className={`py-4 text-sm font-semibold transition-all ${
+              className={`py-3 sm:py-4 text-xs sm:text-sm font-semibold transition-all ${
                 paymentMode === PAYMENT_MODES.PRE
                   ? "bg-green-50 text-green-700 border-b-2 border-green-500"
                   : "text-gray-500 hover:bg-gray-50"
@@ -219,12 +210,12 @@ const PaymentSelection = () => {
             >
               <span className="block text-base mb-0.5">💳</span>
               Pre Payment
-              <span className="block text-xs font-normal opacity-70 mt-0.5">Pay before delivery</span>
+              <span className="block text-xs font-normal opacity-70 mt-0.5 hidden sm:block">Pay before delivery</span>
             </button>
             <button
               type="button"
               onClick={() => setPaymentMode(PAYMENT_MODES.POST)}
-              className={`py-4 text-sm font-semibold transition-all border-l border-gray-100 ${
+              className={`py-3 sm:py-4 text-xs sm:text-sm font-semibold transition-all border-l border-gray-100 ${
                 paymentMode === PAYMENT_MODES.POST
                   ? "bg-blue-50 text-blue-700 border-b-2 border-blue-500"
                   : "text-gray-500 hover:bg-gray-50"
@@ -232,27 +223,26 @@ const PaymentSelection = () => {
             >
               <span className="block text-base mb-0.5">🚪</span>
               Post Payment
-              <span className="block text-xs font-normal opacity-70 mt-0.5">Pay on delivery</span>
+              <span className="block text-xs font-normal opacity-70 mt-0.5 hidden sm:block">Pay on delivery</span>
             </button>
           </div>
 
           {/* Tab content */}
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
 
-            {/* ── Pre Payment (eSewa only) ── */}
+            {/* Pre Payment */}
             {paymentMode === PAYMENT_MODES.PRE && (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <p className="text-xs text-gray-500">
                   Pay securely online before your order is processed. Farmers confirm immediately after payment.
                 </p>
 
-                {/* eSewa */}
-                <div className="flex items-center gap-4 border-2 border-green-500 bg-green-50 rounded-2xl p-4">
-                  <div className="w-12 h-12 rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-black text-sm">eSewa</span>
+                <div className="flex items-center gap-3 sm:gap-4 border-2 border-green-500 bg-green-50 rounded-2xl p-3 sm:p-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-black text-xs sm:text-sm">eSewa</span>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-900">eSewa</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-900 text-sm sm:text-base">eSewa</p>
                     <p className="text-xs text-gray-500 mt-0.5">Nepal's most popular digital wallet</p>
                   </div>
                   <span className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
@@ -269,16 +259,16 @@ const PaymentSelection = () => {
               </div>
             )}
 
-            {/* ── Post Payment (COD or FonePay on Delivery) ── */}
+            {/* Post Payment */}
             {paymentMode === PAYMENT_MODES.POST && (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <p className="text-xs text-gray-500">
                   Choose how you'd like to pay when your order arrives at your door.
                 </p>
 
                 {/* Cash on Delivery */}
                 <label
-                  className={`flex items-center gap-4 border-2 rounded-2xl p-4 cursor-pointer transition-all ${
+                  className={`flex items-center gap-3 sm:gap-4 border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${
                     postMethod === POST_METHODS.COD
                       ? "border-blue-400 bg-blue-50"
                       : "border-gray-200 hover:border-gray-300"
@@ -292,13 +282,13 @@ const PaymentSelection = () => {
                     onChange={() => setPostMethod(POST_METHODS.COD)}
                     className="sr-only"
                   />
-                  <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-900">Cash on Delivery</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-900 text-sm sm:text-base">Cash on Delivery</p>
                     <p className="text-xs text-gray-500 mt-0.5">
                       Hand cash of Rs. {total.toFixed(0)} to the farmer on arrival
                     </p>
@@ -312,7 +302,7 @@ const PaymentSelection = () => {
 
                 {/* FonePay on Delivery */}
                 <label
-                  className={`flex items-center gap-4 border-2 rounded-2xl p-4 cursor-pointer transition-all ${
+                  className={`flex items-center gap-3 sm:gap-4 border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${
                     postMethod === POST_METHODS.FONEPAY
                       ? "border-[#8B1A1A] bg-red-50"
                       : "border-gray-200 hover:border-gray-300"
@@ -326,12 +316,12 @@ const PaymentSelection = () => {
                     onChange={() => setPostMethod(POST_METHODS.FONEPAY)}
                     className="sr-only"
                   />
-                  <div className="w-12 h-12 rounded-xl bg-[#8B1A1A] flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#8B1A1A] flex items-center justify-center flex-shrink-0">
                     <span className="text-white font-black text-xs leading-tight text-center">Fone<br/>Pay</span>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-gray-900">FonePay on Delivery</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <p className="font-bold text-gray-900 text-sm sm:text-base">FonePay on Delivery</p>
                       <span className="text-xs bg-red-100 text-[#8B1A1A] font-semibold px-2 py-0.5 rounded-full">
                         Digital
                       </span>
@@ -347,9 +337,8 @@ const PaymentSelection = () => {
                   </div>
                 </label>
 
-                {/* Contextual info based on selection */}
                 {postMethod === POST_METHODS.COD && (
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
                       <p className="font-semibold mb-0.5">ℹ How it works</p>
                       <p>1. Order placed → Farmer prepares your items</p>
@@ -364,7 +353,7 @@ const PaymentSelection = () => {
                 )}
 
                 {postMethod === POST_METHODS.FONEPAY && (
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-xs text-[#8B1A1A]">
                       <p className="font-semibold mb-0.5">ℹ How FonePay on Delivery works</p>
                       <p>1. Order placed → Farmer prepares your items</p>
@@ -387,7 +376,7 @@ const PaymentSelection = () => {
         <button
           onClick={handlePay}
           disabled={submitting}
-          className={`w-full font-bold py-4 rounded-2xl text-white text-lg transition shadow-lg ${
+          className={`w-full font-bold py-3.5 sm:py-4 rounded-2xl text-white text-base sm:text-lg transition shadow-lg ${
             submitting
               ? "bg-gray-400 cursor-not-allowed"
               : payButtonColor()
@@ -406,7 +395,7 @@ const PaymentSelection = () => {
           )}
         </button>
 
-        <p className="text-xs text-gray-400 text-center mt-4">
+        <p className="text-xs text-gray-400 text-center mt-3 sm:mt-4">
           By confirming you agree to MeroBari's terms and conditions.
         </p>
       </div>

@@ -21,25 +21,25 @@ const useReveal = (threshold = 0.12) => {
 };
 
 /* ────────────────────────────────────────────────────────────
-   VEGETABLES (SVG icons instead of emojis)
+   VEGETABLES with emojis (wheel only)
 ──────────────────────────────────────────────────────────── */
 const VEGGIES = [
-  { name: "Tomato",    color: "#E74C3C" },
-  { name: "Spinach",   color: "#27AE60" },
-  { name: "Potato",    color: "#D4A853" },
-  { name: "Carrot",    color: "#E67E22" },
-  { name: "Garlic",    color: "#F0E6D3" },
-  { name: "Onion",     color: "#9B59B6" },
-  { name: "Corn",      color: "#F1C40F" },
-  { name: "Broccoli",  color: "#1E9C17" },
-  { name: "Eggplant",  color: "#6C3483" },
-  { name: "Coriander", color: "#2ECC71" },
-  { name: "Capsicum",  color: "#E74C3C" },
-  { name: "Cucumber",  color: "#28B463" },
+  { name: "Tomato",    color: "#E74C3C", emoji: "🍅" },
+  { name: "Spinach",   color: "#27AE60", emoji: "🥬" },
+  { name: "Potato",    color: "#D4A853", emoji: "🥔" },
+  { name: "Carrot",    color: "#E67E22", emoji: "🥕" },
+  { name: "Garlic",    color: "#C8A97E", emoji: "🧄" },
+  { name: "Onion",     color: "#9B59B6", emoji: "🧅" },
+  { name: "Corn",      color: "#F1C40F", emoji: "🌽" },
+  { name: "Broccoli",  color: "#1E9C17", emoji: "🥦" },
+  { name: "Eggplant",  color: "#6C3483", emoji: "🍆" },
+  { name: "Coriander", color: "#2ECC71", emoji: "🌿" },
+  { name: "Capsicum",  color: "#E74C3C", emoji: "🫑" },
+  { name: "Cucumber",  color: "#28B463", emoji: "🥒" },
 ];
 
 /* ────────────────────────────────────────────────────────────
-   ROTATING VEGGIE WHEEL
+   ROTATING VEGGIE WHEEL — emojis on the ring
 ──────────────────────────────────────────────────────────── */
 const VeggieWheel = () => {
   const [angle, setAngle] = useState(0);
@@ -65,28 +65,13 @@ const VeggieWheel = () => {
       <circle cx={cx} cy={cy} r={130} fill="none" stroke="#E8A020" strokeWidth="0.5" opacity="0.12" />
       <circle cx={cx} cy={cy} r={60}  fill="none" stroke="#1E9C17" strokeWidth="0.5" opacity="0.2"  strokeDasharray="3 3" />
 
-      {/* Rotating colored dots with labels */}
-      {VEGGIES.map((v, i) => {
-        const a = (i * (360 / VEGGIES.length) + angle) * (Math.PI / 180);
-        const x = cx + radius * Math.cos(a);
-        const y = cy + radius * Math.sin(a);
-        const scale = 0.75 + 0.35 * ((Math.sin(a) + 1) / 2);
-        const r     = Math.round(9 * scale);
-        return (
-          <g key={i}>
-            <circle cx={x} cy={y} r={r} fill={v.color} opacity={0.85} />
-            <circle cx={x} cy={y} r={r} fill="none" stroke="white" strokeWidth="0.8" opacity={0.4} />
-          </g>
-        );
-      })}
-
-      {/* Spoke lines from center to each dot */}
+      {/* Spoke lines */}
       {VEGGIES.map((v, i) => {
         const a  = (i * (360 / VEGGIES.length) + angle) * (Math.PI / 180);
         const x  = cx + radius * Math.cos(a);
         const y  = cy + radius * Math.sin(a);
-        const x0 = cx + 60 * Math.cos(a);
-        const y0 = cy + 60 * Math.sin(a);
+        const x0 = cx + 62 * Math.cos(a);
+        const y0 = cy + 62 * Math.sin(a);
         return (
           <line
             key={`spoke-${i}`}
@@ -94,8 +79,30 @@ const VeggieWheel = () => {
             x2={x}  y2={y}
             stroke={v.color}
             strokeWidth="0.6"
-            opacity="0.25"
+            opacity="0.2"
           />
+        );
+      })}
+
+      {/* Rotating emoji dots */}
+      {VEGGIES.map((v, i) => {
+        const a    = (i * (360 / VEGGIES.length) + angle) * (Math.PI / 180);
+        const x    = cx + radius * Math.cos(a);
+        const y    = cy + radius * Math.sin(a);
+        const scale = 0.78 + 0.32 * ((Math.sin(a) + 1) / 2);
+        const size  = Math.round(20 * scale);
+        return (
+          <text
+            key={i}
+            x={x}
+            y={y}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={size}
+            style={{ userSelect: "none" }}
+          >
+            {v.emoji}
+          </text>
         );
       })}
 
@@ -119,26 +126,13 @@ const VeggieWheel = () => {
 };
 
 /* ────────────────────────────────────────────────────────────
-   AIRPLANE FLIGHT PATH
+   FLIGHT PATH — plane emoji + box emoji animated
 ──────────────────────────────────────────────────────────── */
-const PlaneIcon = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-    <path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/>
-  </svg>
-);
-
-const BoxIcon = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-    <path d="M21 8l-9-6-9 6v8l9 6 9-6V8zm-9 11.5L4 14v-5.5l8 5.33 8-5.33V14l-8 5.5zM12 3.8L19.5 8.5 12 13.2 4.5 8.5 12 3.8z"/>
-  </svg>
-);
-
 const FlightPath = () => {
   return (
     <div className="relative w-full overflow-hidden py-20 px-6 lg:px-16 bg-[#F5F0E8]">
       <div className="max-w-5xl mx-auto">
 
-        {/* Section label */}
         <div className="text-center mb-16">
           <span className="text-xs font-semibold tracking-[0.3em] uppercase text-[#1E9C17]">
             How it works
@@ -193,19 +187,20 @@ const FlightPath = () => {
               markerEnd="url(#arrowGold)"
             />
 
-            {/* Animated plane on path 1 */}
-            <g fill="#1E9C17">
+            {/* Animated plane emoji on path 1 */}
+            <text fontSize="22" textAnchor="middle" dominantBaseline="central" style={{ userSelect: "none" }}>
+              ✈️
               <animateMotion
                 dur="3.2s"
                 repeatCount="indefinite"
                 path="M 130,90 Q 280,25 430,90"
                 rotate="auto"
               />
-              <polygon points="0,-6 14,0 0,6 4,0" />
-            </g>
+            </text>
 
-            {/* Animated box on path 2 */}
-            <g fill="#E8A020">
+            {/* Animated box emoji on path 2 */}
+            <text fontSize="20" textAnchor="middle" dominantBaseline="central" style={{ userSelect: "none" }}>
+              📦
               <animateMotion
                 dur="3.2s"
                 repeatCount="indefinite"
@@ -213,8 +208,7 @@ const FlightPath = () => {
                 path="M 470,90 Q 620,25 760,90"
                 rotate="auto"
               />
-              <rect x="-6" y="-6" width="12" height="12" rx="2" />
-            </g>
+            </text>
           </svg>
 
           {/* Three nodes */}
@@ -224,9 +218,8 @@ const FlightPath = () => {
             <div className="flex flex-col items-center gap-3 text-center w-28">
               <div className="w-16 h-16 rounded-2xl bg-[#0A1F0A] flex items-center justify-center shadow-xl">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#1E9C17" strokeWidth="1.5" className="w-8 h-8">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3a9 9 0 0 0-9 9c0 3.87 2.45 7.17 5.9 8.43L12 21l3.1-0.57A9 9 0 0 0 21 12a9 9 0 0 0-9-9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12c0-2.21 1.79-4 4-4s4 1.79 4 4" />
-                  <line x1="12" y1="8" x2="12" y2="3" strokeLinecap="round" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2a7 7 0 0 1 7 7c0 5.25-7 13-7 13S5 14.25 5 9a7 7 0 0 1 7-7z" />
+                  <circle cx="12" cy="9" r="2.5" />
                 </svg>
               </div>
               <div>
@@ -291,24 +284,18 @@ const FlightPath = () => {
               key={i}
               className="bg-white rounded-2xl p-7 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all relative overflow-hidden"
             >
-              {/* Large watermark number */}
               <span
                 className="absolute top-4 right-5 cd font-black text-6xl leading-none select-none pointer-events-none"
                 style={{ color: s.color, opacity: 0.08 }}
               >
                 {s.num}
               </span>
-
-              {/* Accent dot */}
               <div
                 className="w-3 h-3 rounded-full mb-5"
                 style={{ backgroundColor: s.color }}
               />
-
               <h3 className="cd font-bold text-[#0A1F0A] text-lg mb-2">{s.title}</h3>
               <p className="text-[#5a7a5a] text-sm leading-relaxed">{s.body}</p>
-
-              {/* Bottom accent */}
               <div
                 className="absolute bottom-0 left-0 h-1 w-full rounded-b-2xl opacity-20"
                 style={{ backgroundColor: s.color }}
@@ -322,7 +309,7 @@ const FlightPath = () => {
 };
 
 /* ────────────────────────────────────────────────────────────
-   TICKER (vegetable names + color dots, no emojis)
+   TICKER — color dots + names, no emojis
 ──────────────────────────────────────────────────────────── */
 const Ticker = () => {
   const items = [...VEGGIES, ...VEGGIES];
@@ -410,21 +397,17 @@ const Home = () => {
         ══════════════════════════════════════════════════════ */}
         <section className="relative min-h-screen bg-[#0A1F0A] flex flex-col overflow-hidden">
 
-          {/* Background texture */}
           <div
             className="absolute inset-0 opacity-[0.05]"
             style={{
               backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
             }}
           />
-
-          {/* Radial glow */}
           <div
             className="absolute top-0 right-0 w-[700px] h-[700px] opacity-[0.15] pointer-events-none"
             style={{ background: "radial-gradient(circle at 70% 25%, #1E9C17 0%, transparent 60%)" }}
           />
 
-          {/* Hero layout */}
           <div className="relative flex-1 flex flex-col lg:flex-row items-center max-w-7xl mx-auto w-full px-6 lg:px-16 pt-32 pb-16 gap-12">
 
             {/* Left */}
@@ -484,7 +467,6 @@ const Home = () => {
                 </div>
               )}
 
-              {/* Feature pills */}
               {ready && (
                 <div className="hero-word w7 mt-8 flex flex-wrap gap-3">
                   {[
@@ -504,7 +486,7 @@ const Home = () => {
               )}
             </div>
 
-            {/* Right — floating veggie wheel */}
+            {/* Right — floating wheel */}
             {ready && (
               <div
                 className="w-72 h-72 lg:w-[400px] lg:h-[400px] flex-shrink-0"
@@ -518,7 +500,6 @@ const Home = () => {
             )}
           </div>
 
-          {/* Bottom fade */}
           <div className="h-16 bg-gradient-to-b from-transparent to-[#F5F0E8]" />
         </section>
 
@@ -528,7 +509,7 @@ const Home = () => {
         <Ticker />
 
         {/* ══════════════════════════════════════════════════════
-            FLIGHT PATH — HOW IT WORKS
+            FLIGHT PATH
         ══════════════════════════════════════════════════════ */}
         <div
           ref={howRef}
@@ -577,16 +558,13 @@ const Home = () => {
                   transition: "all 0.7s ease 100ms",
                 }}
               >
-                <div
-                  className="absolute top-0 right-0 w-40 h-40 opacity-10 pointer-events-none"
-                  style={{ background: "radial-gradient(circle, #1E9C17 0%, transparent 70%)" }}
-                />
+                <div className="absolute top-0 right-0 w-40 h-40 opacity-10 pointer-events-none"
+                  style={{ background: "radial-gradient(circle, #1E9C17 0%, transparent 70%)" }} />
 
-                {/* Farmer SVG icon */}
                 <div className="w-14 h-14 rounded-2xl bg-[#1E9C17]/15 border border-[#1E9C17]/20 flex items-center justify-center mb-6">
                   <svg viewBox="0 0 24 24" fill="none" stroke="#1E9C17" strokeWidth="1.5" className="w-7 h-7">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 2a7 7 0 0 1 7 7c0 5.25-7 13-7 13S5 14.25 5 9a7 7 0 0 1 7-7z" />
-                    <circle cx="12" cy="9" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="12" cy="9" r="2.5" />
                   </svg>
                 </div>
 
@@ -627,12 +605,9 @@ const Home = () => {
                   transition: "all 0.7s ease 220ms",
                 }}
               >
-                <div
-                  className="absolute top-0 right-0 w-40 h-40 opacity-10 pointer-events-none"
-                  style={{ background: "radial-gradient(circle, #E8A020 0%, transparent 70%)" }}
-                />
+                <div className="absolute top-0 right-0 w-40 h-40 opacity-10 pointer-events-none"
+                  style={{ background: "radial-gradient(circle, #E8A020 0%, transparent 70%)" }} />
 
-                {/* Consumer SVG icon */}
                 <div className="w-14 h-14 rounded-2xl bg-[#E8A020]/15 border border-[#E8A020]/20 flex items-center justify-center mb-6">
                   <svg viewBox="0 0 24 24" fill="none" stroke="#E8A020" strokeWidth="1.5" className="w-7 h-7">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
@@ -678,7 +653,9 @@ const Home = () => {
         <section ref={voiceRef} className="bg-[#F5F0E8] py-28 px-6 lg:px-16">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-14">
-              <span className="text-xs font-semibold tracking-[0.3em] uppercase text-[#C4846A]">In their words</span>
+              <span className="text-xs font-semibold tracking-[0.3em] uppercase text-[#C4846A]">
+                In their words
+              </span>
               <h2
                 className="cd font-bold text-[#0A1F0A] mt-3"
                 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)" }}
@@ -690,18 +667,18 @@ const Home = () => {
             <div className="grid md:grid-cols-3 gap-6">
               {[
                 {
-                  quote: "I set my own price for the first time in 12 years of farming.",
-                  name:  "Ramesh B.", place: "Bhaktapur", init: "RB", role: "Farmer",
+                  quote:  "I set my own price for the first time in 12 years of farming.",
+                  name:   "Ramesh B.", place: "Bhaktapur", init: "RB", role: "Farmer",
                   accent: "#1E9C17",
                 },
                 {
-                  quote: "My restaurant saves thousands every month buying directly from farms.",
-                  name:  "Bikash T.", place: "Kathmandu", init: "BT", role: "Consumer",
+                  quote:  "My restaurant saves thousands every month buying directly from farms.",
+                  name:   "Bikash T.", place: "Kathmandu", init: "BT", role: "Consumer",
                   accent: "#E8A020",
                 },
                 {
-                  quote: "I know exactly which farm my food comes from and when it was harvested.",
-                  name:  "Sita M.",   place: "Lalitpur",  init: "SM", role: "Consumer",
+                  quote:  "I know exactly which farm my food comes from and when it was harvested.",
+                  name:   "Sita M.",   place: "Lalitpur",  init: "SM", role: "Consumer",
                   accent: "#C4846A",
                 },
               ].map((v, i) => (
@@ -714,24 +691,14 @@ const Home = () => {
                     transition: `all 0.7s ease ${i * 130}ms`,
                   }}
                 >
-                  {/* Quote mark */}
                   <div
                     className="absolute top-5 right-6 cd font-black text-6xl leading-none select-none opacity-10"
                     style={{ color: v.accent }}
                   >
                     "
                   </div>
-
-                  {/* Accent top line */}
-                  <div
-                    className="w-8 h-0.5 rounded-full mb-6"
-                    style={{ backgroundColor: v.accent }}
-                  />
-
-                  <p className="text-white/80 text-sm leading-relaxed mb-8">
-                    {v.quote}
-                  </p>
-
+                  <div className="w-8 h-0.5 rounded-full mb-6" style={{ backgroundColor: v.accent }} />
+                  <p className="text-white/80 text-sm leading-relaxed mb-8">{v.quote}</p>
                   <div className="flex items-center gap-3">
                     <div
                       className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
@@ -755,7 +722,6 @@ const Home = () => {
         ══════════════════════════════════════════════════════ */}
         <section ref={ctaRef} className="bg-[#0A1F0A] py-32 px-6 lg:px-16 relative overflow-hidden">
 
-          {/* Giant watermark */}
           <div
             className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
             aria-hidden="true"
@@ -778,9 +744,7 @@ const Home = () => {
           >
             <div className="inline-flex items-center gap-2 mb-8">
               <span className="w-8 h-px bg-[#E8A020]" />
-              <span className="text-[#E8A020] text-xs font-semibold tracking-[0.3em] uppercase">
-                Join today
-              </span>
+              <span className="text-[#E8A020] text-xs font-semibold tracking-[0.3em] uppercase">Join today</span>
               <span className="w-8 h-px bg-[#E8A020]" />
             </div>
 

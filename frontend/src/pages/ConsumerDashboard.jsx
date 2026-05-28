@@ -45,7 +45,7 @@ const DEFAULT_FILTERS = {
 };
 
 /* ── Filter Panel ── */
-const FilterPanel = ({ filters, onChange, onReset, productCount }) => {
+const FilterPanel = ({ filters, onChange, onReset, productCount, onClose }) => {
   const set = (key, val) => onChange({ ...filters, [key]: val });
   const toggleCat = (cat) => {
     const next = filters.categories.includes(cat)
@@ -59,13 +59,27 @@ const FilterPanel = ({ filters, onChange, onReset, productCount }) => {
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <span className="font-bold text-gray-900 text-sm">Filters</span>
-        <button
-          type="button"
-          onClick={onReset}
-          className="text-xs text-green-600 hover:text-green-700 font-semibold hover:underline transition"
-        >
-          Reset all
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-xs text-green-600 hover:text-green-700 font-semibold hover:underline transition"
+          >
+            Reset all
+          </button>
+          {/* Close button visible only on mobile */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="md:hidden w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="p-5 space-y-6">
@@ -294,35 +308,35 @@ const ConsumerDashboard = () => {
           <button type="button" onClick={() => openProduct(p)} className="w-full text-left block">
             <img
               src={imgSrc} alt={p?.name}
-              className="h-48 w-full object-cover group-hover:scale-105 transition-transform duration-300"
+              className="h-40 sm:h-48 w-full object-cover group-hover:scale-105 transition-transform duration-300"
               onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
             />
           </button>
         </div>
 
-        <div className="p-4 space-y-2.5">
+        <div className="p-3 sm:p-4 space-y-2 sm:space-y-2.5">
           <div>
-            <h3 className="font-bold text-gray-900 truncate leading-snug">{p?.name}</h3>
+            <h3 className="font-bold text-gray-900 truncate leading-snug text-sm sm:text-base">{p?.name}</h3>
             <p className="text-xs text-gray-400 mt-0.5 truncate">{farmName}</p>
           </div>
 
           {/* Prices */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="text-lg font-extrabold text-gray-900">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <div className="text-base sm:text-lg font-extrabold text-gray-900">
               Rs.{p?.price}
               <span className="text-xs font-medium text-gray-400 ml-0.5">/{p?.unit}</span>
             </div>
             {hasBulk && (
               <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                Bulk Rs.{p.bulkPrice} (–{saving}%)
+                Bulk –{saving}%
               </span>
             )}
           </div>
 
           <div className="flex items-center justify-between text-xs text-gray-400">
-            <span>{p?.quantity} {p?.unit} available</span>
+            <span className="truncate mr-1">{p?.quantity} {p?.unit}</span>
             {p?.category && (
-              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full capitalize">{p.category}</span>
+              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full capitalize flex-shrink-0">{p.category}</span>
             )}
           </div>
 
@@ -330,7 +344,7 @@ const ConsumerDashboard = () => {
             type="button"
             onClick={() => handleAddToCart(p)}
             disabled={!inStock}
-            className={`w-full font-bold py-2.5 rounded-xl text-sm transition ${
+            className={`w-full font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm transition ${
               inStock
                 ? "bg-green-600 hover:bg-green-700 text-white"
                 : "bg-gray-100 text-gray-400 cursor-not-allowed"
@@ -352,31 +366,31 @@ const ConsumerDashboard = () => {
     const inStock  = Number(p?.quantity || 0) > 0;
 
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex gap-4 items-center hover:shadow-md transition-shadow">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 flex gap-3 sm:gap-4 items-center hover:shadow-md transition-shadow">
         <button type="button" onClick={() => openProduct(p)} className="shrink-0">
           <img
             src={imgSrc} alt={p?.name}
-            className="h-20 w-28 object-cover rounded-xl"
+            className="h-16 w-20 sm:h-20 sm:w-28 object-cover rounded-xl"
             onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
           />
         </button>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-bold text-gray-900 truncate">{p?.name}</h3>
-            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full capitalize">{p?.category}</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <h3 className="font-bold text-gray-900 truncate text-sm sm:text-base">{p?.name}</h3>
+            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full capitalize hidden sm:inline">{p?.category}</span>
           </div>
           <p className="text-xs text-gray-400 truncate">{farmName}</p>
-          <p className="text-sm text-gray-600 line-clamp-1 mt-0.5">{p?.description || "No description"}</p>
+          <p className="text-xs sm:text-sm text-gray-600 line-clamp-1 mt-0.5 hidden sm:block">{p?.description || "No description"}</p>
         </div>
 
-        <div className="text-right space-y-1.5 flex-shrink-0">
-          <div className="text-lg font-extrabold text-gray-900">
+        <div className="text-right space-y-1 sm:space-y-1.5 flex-shrink-0">
+          <div className="text-sm sm:text-lg font-extrabold text-gray-900">
             Rs.{p?.price}
             <span className="text-xs font-medium text-gray-400 ml-0.5">/{p?.unit}</span>
           </div>
           {hasBulk && (
-            <div className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+            <div className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full hidden sm:block">
               Bulk –{saving}%
             </div>
           )}
@@ -384,13 +398,13 @@ const ConsumerDashboard = () => {
             type="button"
             onClick={() => handleAddToCart(p)}
             disabled={!inStock}
-            className={`px-4 py-2 rounded-xl font-bold text-sm transition ${
+            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-bold text-xs sm:text-sm transition ${
               inStock
                 ? "bg-green-600 hover:bg-green-700 text-white"
                 : "bg-gray-100 text-gray-400 cursor-not-allowed"
             }`}
           >
-            {inStock ? "Add to Cart" : "Unavailable"}
+            {inStock ? "Add" : "N/A"}
           </button>
         </div>
       </div>
@@ -409,7 +423,7 @@ const ConsumerDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
+    <div className="min-h-screen bg-gray-50 px-3 sm:px-4 md:px-8 py-5 sm:py-8">
       <AlertModal
         isOpen={alertModal.isOpen}
         onClose={closeAlert}
@@ -419,12 +433,33 @@ const ConsumerDashboard = () => {
         confirmText="OK"
       />
 
+      {/* Mobile filter drawer overlay */}
+      {showFilters && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={() => setShowFilters(false)}
+        />
+      )}
+
+      {/* Mobile filter drawer */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-white shadow-2xl transition-transform duration-300 md:hidden overflow-y-auto ${
+        showFilters ? "translate-x-0" : "-translate-x-full"
+      }`}>
+        <FilterPanel
+          filters={filters}
+          onChange={setFilters}
+          onReset={() => setFilters(DEFAULT_FILTERS)}
+          productCount={filteredProducts.length}
+          onClose={() => setShowFilters(false)}
+        />
+      </div>
+
       <div className="max-w-7xl mx-auto">
 
         {/* ── Page header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4 mb-5 sm:mb-6">
           <div>
-            <h1 className="text-3xl font-extrabold text-gray-900">Fresh Products</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">Fresh Products</h1>
             <p className="text-gray-500 mt-1 text-sm">Discover fresh produce from local farms</p>
           </div>
           {/* All / Nearby toggle */}
@@ -434,7 +469,7 @@ const ConsumerDashboard = () => {
                 key={mode}
                 type="button"
                 onClick={() => { setProductMode(mode); loadProducts(mode); }}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold border-2 transition ${
+                className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold border-2 transition ${
                   productMode === mode
                     ? "bg-green-600 border-green-600 text-white"
                     : "bg-white border-gray-200 text-gray-600 hover:border-green-400"
@@ -447,11 +482,11 @@ const ConsumerDashboard = () => {
         </div>
 
         {/* ── Search + Filter bar ── */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="flex gap-2 sm:gap-3 mb-4 sm:mb-6">
 
           {/* Search input */}
           <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+            <div className="absolute inset-y-0 left-3 sm:left-4 flex items-center pointer-events-none">
               <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -460,8 +495,8 @@ const ConsumerDashboard = () => {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by product name, category, or farmer…"
-              className="w-full bg-white border-2 border-gray-200 focus:border-green-500 rounded-2xl pl-11 pr-10 py-3 text-sm focus:outline-none transition shadow-sm"
+              placeholder="Search products…"
+              className="w-full bg-white border-2 border-gray-200 focus:border-green-500 rounded-2xl pl-9 sm:pl-11 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm focus:outline-none transition shadow-sm"
             />
             {query && (
               <button
@@ -480,7 +515,7 @@ const ConsumerDashboard = () => {
           <button
             type="button"
             onClick={() => setShowFilters((v) => !v)}
-            className={`relative flex items-center gap-2.5 px-5 py-3 rounded-2xl border-2 font-semibold text-sm transition shadow-sm flex-shrink-0 ${
+            className={`relative flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl border-2 font-semibold text-sm transition shadow-sm flex-shrink-0 ${
               showFilters || activeFilterCount > 0
                 ? "bg-green-600 border-green-600 text-white"
                 : "bg-white border-gray-200 text-gray-700 hover:border-green-400"
@@ -489,9 +524,9 @@ const ConsumerDashboard = () => {
             <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
             </svg>
-            Filters
+            <span className="hidden sm:inline">Filters</span>
             {activeFilterCount > 0 && (
-              <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold flex items-center justify-center ${
+              <span className={`min-w-[18px] sm:min-w-[20px] h-4 sm:h-5 px-1 sm:px-1.5 rounded-full text-xs font-bold flex items-center justify-center ${
                 showFilters ? "bg-white text-green-700" : "bg-green-600 text-white"
               }`}>
                 {activeFilterCount}
@@ -517,7 +552,7 @@ const ConsumerDashboard = () => {
                 key={mode}
                 type="button"
                 onClick={() => setViewMode(mode)}
-                className={`px-3.5 py-2.5 transition ${
+                className={`px-3 py-2.5 transition ${
                   viewMode === mode ? "bg-green-600 text-white" : "text-gray-500 hover:bg-gray-50"
                 }`}
               >
@@ -529,7 +564,7 @@ const ConsumerDashboard = () => {
 
         {/* ── Active filter chips ── */}
         {activeFilterCount > 0 && (
-          <div className="flex flex-wrap gap-2 mb-5">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-5">
             {filters.categories.map((cat) => (
               <button
                 key={cat}
@@ -607,12 +642,12 @@ const ConsumerDashboard = () => {
           </div>
         )}
 
-        {/* ── Main layout: sidebar + products ── */}
+        {/* ── Main layout: sidebar (desktop only) + products ── */}
         <div className="flex gap-6 items-start">
 
-          {/* Filter sidebar */}
+          {/* Filter sidebar — desktop only */}
           {showFilters && (
-            <div className="w-64 flex-shrink-0 sticky top-24">
+            <div className="hidden md:block w-64 flex-shrink-0 sticky top-24">
               <FilterPanel
                 filters={filters}
                 onChange={setFilters}
@@ -626,11 +661,11 @@ const ConsumerDashboard = () => {
           <div className="flex-1 min-w-0">
 
             {/* Result summary */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
               <p className="text-sm text-gray-500">
                 <span className="font-bold text-gray-900">{filteredProducts.length}</span> products
                 {query && (
-                  <span> for <span className="font-semibold text-green-700">"{query}"</span></span>
+                  <span className="hidden sm:inline"> for <span className="font-semibold text-green-700">"{query}"</span></span>
                 )}
               </p>
               {(query || activeFilterCount > 0) && (
@@ -645,7 +680,7 @@ const ConsumerDashboard = () => {
             </div>
 
             {filteredProducts.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
+              <div className="bg-white rounded-2xl border border-gray-100 p-10 sm:p-16 text-center">
                 <div className="text-5xl mb-4">🔍</div>
                 <h3 className="font-bold text-gray-900 text-lg mb-1">No products found</h3>
                 <p className="text-sm text-gray-500 mb-5">
@@ -662,17 +697,17 @@ const ConsumerDashboard = () => {
                 </button>
               </div>
             ) : viewMode === "grid" ? (
-              <div className={`grid gap-5 ${
+              <div className={`grid gap-3 sm:gap-5 ${
                 showFilters
-                  ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
-                  : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                  ? "grid-cols-2 xl:grid-cols-3"
+                  : "grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
               }`}>
                 {filteredProducts.map((p) => (
                   <ProductCard key={p.id || p._id} p={p} />
                 ))}
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {filteredProducts.map((p) => (
                   <ProductRow key={p.id || p._id} p={p} />
                 ))}
@@ -686,4 +721,4 @@ const ConsumerDashboard = () => {
   );
 };
 
-export default ConsumerDashboard; 
+export default ConsumerDashboard;

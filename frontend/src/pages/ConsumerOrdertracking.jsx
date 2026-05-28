@@ -233,7 +233,7 @@ const ConsumerOrderTracking = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 md:px-8 py-8">
+    <div className="min-h-screen bg-gray-50 px-3 sm:px-4 md:px-8 py-5 sm:py-8">
 
       <AlertModal
         isOpen={alertModal.isOpen}
@@ -255,13 +255,13 @@ const ConsumerOrderTracking = () => {
       />
 
       <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">My orders</h1>
-          <p className="text-gray-500 text-sm">Click any card to view details</p>
+        <div className="mb-5 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">My orders</h1>
+          <p className="text-gray-500 text-sm">Tap any card to view details</p>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-3 mb-6">
+        {/* Stats — 2×2 on mobile, 4-col on sm+ */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5 sm:mb-6">
           {[
             { label: "Total",     value: orders.length,                                                            color: "text-gray-900"   },
             { label: "Active",    value: orders.filter(o => !["delivered","cancelled"].includes(o.status)).length, color: "text-yellow-600" },
@@ -269,14 +269,14 @@ const ConsumerOrderTracking = () => {
             { label: "Cancelled", value: orders.filter(o => o.status === "cancelled").length,                      color: "text-red-600"    },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl shadow-sm p-3 text-center border border-gray-100">
-              <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+              <p className={`text-xl sm:text-2xl font-bold ${s.color}`}>{s.value}</p>
               <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
 
-        {/* Filter tabs */}
-        <div className="bg-white rounded-xl shadow-sm p-1.5 mb-6 flex gap-1 border border-gray-100">
+        {/* Filter tabs — scrollable on mobile */}
+        <div className="bg-white rounded-xl shadow-sm p-1 sm:p-1.5 mb-5 sm:mb-6 flex gap-1 border border-gray-100 overflow-x-auto">
           {[
             { value: "all",       label: "All"       },
             { value: "active",    label: "Active"    },
@@ -286,7 +286,7 @@ const ConsumerOrderTracking = () => {
             <button
               key={tab.value}
               onClick={() => setFilter(tab.value)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium flex-1 transition ${
+              className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex-1 transition whitespace-nowrap min-w-fit ${
                 filter === tab.value ? "bg-green-600 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
               }`}
             >
@@ -296,7 +296,7 @@ const ConsumerOrderTracking = () => {
         </div>
 
         {filteredOrders.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
+          <div className="bg-white rounded-xl shadow-sm p-10 sm:p-12 text-center border border-gray-100">
             <h3 className="text-lg font-semibold text-gray-900 mb-1">No orders found</h3>
             <p className="text-gray-500 text-sm mb-5">
               {filter === "all" ? "You haven't placed any orders yet." : `No ${filter} orders.`}
@@ -310,8 +310,8 @@ const ConsumerOrderTracking = () => {
           </div>
         ) : (
           <>
-            {/* Order cards grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            {/* Order cards grid — 2-col mobile, 3-col sm, 4-col md+ */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3 mb-4">
               {filteredOrders.map((order) => {
                 const orderId        = order._id || order.id;
                 const orderDisplayId = orderId?.toString().slice(-6);
@@ -326,7 +326,7 @@ const ConsumerOrderTracking = () => {
                   <div key={orderId} className="relative">
                     <button
                       onClick={() => setExpandedOrder(isSelected ? null : orderId)}
-                      className={`w-full aspect-square flex flex-col justify-between rounded-2xl p-4 text-left transition-all duration-200 border-2 ${
+                      className={`w-full aspect-square flex flex-col justify-between rounded-2xl p-3 sm:p-4 text-left transition-all duration-200 border-2 ${
                         isSelected
                           ? "border-green-500 shadow-lg bg-white"
                           : needsPayment
@@ -335,33 +335,33 @@ const ConsumerOrderTracking = () => {
                       }`}
                     >
                       <div className="flex items-start justify-between">
-                        <div className={`w-2.5 h-2.5 rounded-full mt-0.5 flex-shrink-0 ${si.dot}`} />
+                        <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full mt-0.5 flex-shrink-0 ${si.dot}`} />
                         <div className="flex flex-col items-end gap-1">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${si.color}`}>
+                          <span className={`text-[10px] sm:text-xs font-semibold px-1.5 sm:px-2 py-0.5 rounded-full ${si.color}`}>
                             {si.label}
                           </span>
                           {needsPayment && (
-                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 animate-pulse">
-                              Pay Now
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 animate-pulse">
+                              Pay
                             </span>
                           )}
                           {hasReturn && !needsPayment && (
-                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">
                               Return
                             </span>
                           )}
                         </div>
                       </div>
                       <div>
-                        <div className="text-xl font-bold text-gray-900">#{orderDisplayId}</div>
-                        <div className="text-xs text-gray-400 mt-0.5">
+                        <div className="text-base sm:text-xl font-bold text-gray-900">#{orderDisplayId}</div>
+                        <div className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
                           {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                         </div>
                       </div>
                       <div>
-                        <div className="text-base font-bold text-gray-900">Rs.{order.totalAmount?.toFixed(0)}</div>
-                        <div className="text-xs text-gray-400">
-                          {order.shipments?.length || 0} shipment{(order.shipments?.length || 0) !== 1 ? "s" : ""}
+                        <div className="text-sm sm:text-base font-bold text-gray-900">Rs.{order.totalAmount?.toFixed(0)}</div>
+                        <div className="text-[10px] sm:text-xs text-gray-400">
+                          {order.shipments?.length || 0} ship.
                         </div>
                       </div>
                     </button>
@@ -370,7 +370,7 @@ const ConsumerOrderTracking = () => {
                       <button
                         onClick={(e) => requestCancel(orderId, e)}
                         disabled={cancellingOrder === orderId}
-                        className="absolute bottom-3 right-3 text-xs bg-red-50 hover:bg-red-100 text-red-600 font-semibold px-2 py-1 rounded-lg transition disabled:opacity-50"
+                        className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 text-[10px] sm:text-xs bg-red-50 hover:bg-red-100 text-red-600 font-semibold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg transition disabled:opacity-50"
                       >
                         {cancellingOrder === orderId ? "..." : "Cancel"}
                       </button>
@@ -398,47 +398,48 @@ const ConsumerOrderTracking = () => {
               return (
                 <div className="bg-white rounded-2xl border-2 border-green-500 shadow-xl overflow-hidden mt-2">
                   {/* Header */}
-                  <div className="bg-gradient-to-r from-green-50 to-blue-50 px-6 py-5 border-b flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-3 mb-1 flex-wrap">
-                        <h3 className="text-xl font-bold text-gray-900">Order #{orderIdStr?.slice(-6)}</h3>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${si.color}`}>
-                          {order.status?.toUpperCase()}
-                        </span>
-                        {needsPayment && (
-                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 animate-pulse">
-                            PAYMENT PENDING
+                  <div className="bg-gradient-to-r from-green-50 to-blue-50 px-4 sm:px-6 py-4 sm:py-5 border-b">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h3 className="text-lg sm:text-xl font-bold text-gray-900">Order #{orderIdStr?.slice(-6)}</h3>
+                          <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-bold ${si.color}`}>
+                            {order.status?.toUpperCase()}
                           </span>
-                        )}
+                          {needsPayment && (
+                            <span className="px-2 sm:px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 animate-pulse">
+                              PAY PENDING
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs sm:text-sm text-gray-500">
+                          {new Date(order.createdAt).toLocaleDateString()} · {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </p>
                       </div>
-                      <p className="text-sm text-gray-500">
-                        {new Date(order.createdAt).toLocaleDateString()} at {new Date(order.createdAt).toLocaleTimeString()}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <div className="text-xs text-gray-500">Total</div>
-                        <div className="text-2xl font-bold text-gray-900">Rs. {order.totalAmount?.toFixed(0)}</div>
+                      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                        <div className="text-right">
+                          <div className="text-xs text-gray-500">Total</div>
+                          <div className="text-xl sm:text-2xl font-bold text-gray-900">Rs.{order.totalAmount?.toFixed(0)}</div>
+                        </div>
+                        <button
+                          onClick={() => setExpandedOrder(null)}
+                          className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-xs sm:text-sm font-bold transition flex-shrink-0"
+                        >
+                          ✕
+                        </button>
                       </div>
-                      <button
-                        onClick={() => setExpandedOrder(null)}
-                        className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-sm font-bold transition"
-                      >
-                        X
-                      </button>
                     </div>
                   </div>
 
                   {/* Payment pending banner */}
                   {needsPayment && (
-                    <div className="bg-amber-50 border-b-2 border-amber-200 px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl flex-shrink-0">⏳</span>
+                    <div className="bg-amber-50 border-b-2 border-amber-200 px-4 sm:px-6 py-3 sm:py-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-xl sm:text-2xl flex-shrink-0">⏳</span>
                         <div>
-                          <p className="font-bold text-amber-900">Payment not completed</p>
-                          <p className="text-sm text-amber-700 mt-0.5">
-                            Your order is saved but needs payment to proceed. Choose a method below.
-                            Orders without payment are automatically cancelled after 1 hour.
+                          <p className="font-bold text-amber-900 text-sm sm:text-base">Payment not completed</p>
+                          <p className="text-xs sm:text-sm text-amber-700 mt-0.5">
+                            Your order needs payment to proceed. Orders are auto-cancelled after 1 hour.
                           </p>
                         </div>
                       </div>
@@ -447,9 +448,9 @@ const ConsumerOrderTracking = () => {
 
                   {/* Progress bar */}
                   {order.status !== "cancelled" && (
-                    <div className="px-6 py-5 bg-gray-50 border-b">
+                    <div className="px-4 sm:px-6 py-4 sm:py-5 bg-gray-50 border-b">
                       <div className="relative flex justify-between items-start">
-                        <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200 z-0">
+                        <div className="absolute top-3 sm:top-4 left-0 right-0 h-0.5 bg-gray-200 z-0">
                           <div
                             className="h-full bg-green-500 transition-all duration-500"
                             style={{ width: `${Math.max(0, (stepIndex / (statusSteps.length - 1)) * 100)}%` }}
@@ -460,16 +461,16 @@ const ConsumerOrderTracking = () => {
                           const current = order.status === step;
                           return (
                             <div key={step} className="flex-1 flex flex-col items-center relative z-10">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                              <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold transition-all ${
                                 active ? "bg-green-500 text-white" : "bg-gray-200 text-gray-400"
-                              } ${current ? "ring-4 ring-green-100 scale-110" : ""}`}>
+                              } ${current ? "ring-2 sm:ring-4 ring-green-100 scale-110" : ""}`}>
                                 {active ? (
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                   </svg>
                                 ) : idx + 1}
                               </div>
-                              <div className={`text-xs mt-1.5 font-medium capitalize ${active ? "text-gray-800" : "text-gray-400"}`}>{step}</div>
+                              <div className={`text-[9px] sm:text-xs mt-1 sm:mt-1.5 font-medium capitalize text-center ${active ? "text-gray-800" : "text-gray-400"}`}>{step}</div>
                             </div>
                           );
                         })}
@@ -478,7 +479,7 @@ const ConsumerOrderTracking = () => {
                   )}
 
                   {/* Shipments */}
-                  <div className="px-6 py-5 space-y-4">
+                  <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4">
                     <h4 className="font-semibold text-gray-800 text-sm">
                       Shipment details ({order.shipments?.length || 0})
                     </h4>
@@ -498,47 +499,47 @@ const ConsumerOrderTracking = () => {
                       const windowOpen = daysSince <= RETURN_WINDOW_DAYS;
 
                       return (
-                        <div key={idx} className="border border-gray-200 rounded-xl p-4">
-                          <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100">
-                            <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
+                        <div key={idx} className="border border-gray-200 rounded-xl p-3 sm:p-4">
+                          <div className="flex items-center gap-2 sm:gap-3 mb-3 pb-3 border-b border-gray-100">
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
                               {farmerName.charAt(0)}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm text-gray-900">{farmerName}</p>
+                              <p className="font-semibold text-sm text-gray-900 truncate">{farmerName}</p>
                               <p className="text-xs text-gray-400">Shipment {idx + 1} of {order.shipments.length}</p>
                             </div>
                             {returnStatus && (
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getReturnBadge(returnStatus)}`}>
-                                Return: {returnStatus}
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${getReturnBadge(returnStatus)}`}>
+                                {returnStatus}
                               </span>
                             )}
                           </div>
 
                           <div className="space-y-1.5 mb-3">
                             {shipment.items?.map((item, i) => (
-                              <div key={i} className="flex justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
-                                <span className="font-medium text-gray-900">
+                              <div key={i} className="flex justify-between text-sm bg-gray-50 rounded-lg px-2.5 sm:px-3 py-2">
+                                <span className="font-medium text-gray-900 truncate mr-2">
                                   {item.name} <span className="text-gray-400 font-normal">×{item.quantity}</span>
                                   {item.orderType === "bulk" && (
-                                    <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 font-semibold px-1.5 py-0.5 rounded-full">Bulk</span>
+                                    <span className="ml-1 text-xs bg-amber-100 text-amber-700 font-semibold px-1.5 py-0.5 rounded-full">Bulk</span>
                                   )}
                                 </span>
-                                <span className="font-semibold">Rs. {(item.price * item.quantity).toFixed(0)}</span>
+                                <span className="font-semibold flex-shrink-0">Rs.{(item.price * item.quantity).toFixed(0)}</span>
                               </div>
                             ))}
                           </div>
 
-                          {/* Payment status — only show if payment done */}
+                          {/* Payment status */}
                           {!needsPayment && (
-                            <div className="flex items-center justify-between text-xs bg-blue-50 rounded-lg px-3 py-2 mb-2">
-                              <span className="text-blue-700 font-medium capitalize">
+                            <div className="flex items-center justify-between text-xs bg-blue-50 rounded-lg px-2.5 sm:px-3 py-2 mb-2 gap-2">
+                              <span className="text-blue-700 font-medium capitalize truncate">
                                 {shipment.paymentMethod === "cash_on_delivery"
                                   ? "Cash on Delivery"
                                   : shipment.paymentMethod === "fonepay"
                                   ? "FonePay on Delivery"
                                   : shipment.paymentMethod || "Pending"}
                               </span>
-                              <span className={`px-2 py-0.5 rounded-full font-semibold ${getPaymentStatusColor(shipment.paymentStatus)}`}>
+                              <span className={`px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${getPaymentStatusColor(shipment.paymentStatus)}`}>
                                 {shipment.paymentStatus?.toUpperCase() || "PENDING"}
                               </span>
                             </div>
@@ -546,7 +547,7 @@ const ConsumerOrderTracking = () => {
 
                           <div className="flex justify-between text-sm pt-2 border-t border-gray-100 mb-3">
                             <span className="text-gray-500">Shipment total</span>
-                            <span className="font-bold">Rs. {((shipment.subtotal || 0) + (shipment.deliveryFee || 0)).toFixed(0)}</span>
+                            <span className="font-bold">Rs.{((shipment.subtotal || 0) + (shipment.deliveryFee || 0)).toFixed(0)}</span>
                           </div>
 
                           {/* Return action area */}
@@ -554,7 +555,7 @@ const ConsumerOrderTracking = () => {
                             <>
                               {!returnsLoaded && windowOpen && (
                                 <div className="w-full py-2 rounded-xl text-sm text-center text-gray-400 border-2 border-gray-100 animate-pulse">
-                                  Checking return status…
+                                  Checking…
                                 </div>
                               )}
                               {returnsLoaded && canReturn && (
@@ -567,7 +568,7 @@ const ConsumerOrderTracking = () => {
                               )}
                               {returnsLoaded && !canReturn && returnStatus && (
                                 <div className={`w-full text-center py-2 rounded-xl text-sm font-semibold border-2 border-transparent ${getReturnBadge(returnStatus)}`}>
-                                  {returnStatus === "pending"  && "⏳ Return request pending"}
+                                  {returnStatus === "pending"  && "⏳ Return pending"}
                                   {returnStatus === "approved" && "✓ Return approved"}
                                   {returnStatus === "rejected" && "✗ Return rejected"}
                                 </div>
@@ -584,39 +585,40 @@ const ConsumerOrderTracking = () => {
                     })}
 
                     {/* Order summary */}
-                    <div className="bg-gray-50 rounded-xl p-4 space-y-1.5">
-                      <div className="flex justify-between text-sm text-gray-600"><span>Items subtotal</span><span>Rs. {order.itemsSubtotal?.toFixed(0)}</span></div>
-                      <div className="flex justify-between text-sm text-gray-600"><span>Delivery</span><span>Rs. {order.deliveryTotal?.toFixed(0)}</span></div>
-                      <div className="flex justify-between text-sm text-gray-600"><span>Platform charge</span><span>Rs. {order.platformCharge?.toFixed(0) || "25"}</span></div>
-                      <div className="flex justify-between font-bold text-gray-900 pt-1.5 border-t border-gray-200 text-sm"><span>Total</span><span>Rs. {order.totalAmount?.toFixed(0)}</span></div>
+                    <div className="bg-gray-50 rounded-xl p-3 sm:p-4 space-y-1.5">
+                      <div className="flex justify-between text-sm text-gray-600"><span>Items subtotal</span><span>Rs.{order.itemsSubtotal?.toFixed(0)}</span></div>
+                      <div className="flex justify-between text-sm text-gray-600"><span>Delivery</span><span>Rs.{order.deliveryTotal?.toFixed(0)}</span></div>
+                      <div className="flex justify-between text-sm text-gray-600"><span>Platform charge</span><span>Rs.{order.platformCharge?.toFixed(0) || "25"}</span></div>
+                      <div className="flex justify-between font-bold text-gray-900 pt-1.5 border-t border-gray-200 text-sm"><span>Total</span><span>Rs.{order.totalAmount?.toFixed(0)}</span></div>
                     </div>
 
-                    {/* ── PAYMENT OPTIONS (shown when payment is pending) ── */}
+                    {/* ── PAYMENT OPTIONS ── */}
                     {needsPayment && (
-                      <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5">
+                      <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 sm:p-5">
                         <div className="flex items-center gap-3 mb-4">
-                          <span className="text-2xl">💳</span>
+                          <span className="text-xl sm:text-2xl">💳</span>
                           <div>
-                            <p className="font-bold text-amber-900 text-base">Complete your payment</p>
-                            <p className="text-sm text-amber-700 mt-0.5">
-                              Choose how you'd like to pay for this order.
+                            <p className="font-bold text-amber-900 text-sm sm:text-base">Complete your payment</p>
+                            <p className="text-xs sm:text-sm text-amber-700 mt-0.5">
+                              Choose how you'd like to pay.
                             </p>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                        {/* Payment options — stack on mobile, 3-col on sm+ */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-4">
                           {/* eSewa */}
                           <button
                             onClick={() => handleRetryPayment(order, "esewa")}
                             disabled={retryingPayment === orderIdStr}
-                            className="flex flex-col items-center gap-2 border-2 border-green-400 bg-white hover:bg-green-50 rounded-xl p-4 transition disabled:opacity-50 group"
+                            className="flex items-center sm:flex-col sm:items-center gap-3 sm:gap-2 border-2 border-green-400 bg-white hover:bg-green-50 rounded-xl p-3 sm:p-4 transition disabled:opacity-50 group"
                           >
-                            <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center group-hover:bg-green-700 transition">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-600 rounded-xl flex items-center justify-center group-hover:bg-green-700 transition flex-shrink-0">
                               <span className="text-white font-black text-xs">eSewa</span>
                             </div>
-                            <div className="text-center">
+                            <div className="text-left sm:text-center">
                               <p className="font-bold text-green-800 text-sm">Pay via eSewa</p>
-                              <p className="text-xs text-gray-500 mt-0.5">Secure online payment</p>
+                              <p className="text-xs text-gray-500">Secure online payment</p>
                             </div>
                           </button>
 
@@ -624,16 +626,16 @@ const ConsumerOrderTracking = () => {
                           <button
                             onClick={() => handleRetryPayment(order, "cod")}
                             disabled={retryingPayment === orderIdStr}
-                            className="flex flex-col items-center gap-2 border-2 border-blue-400 bg-white hover:bg-blue-50 rounded-xl p-4 transition disabled:opacity-50 group"
+                            className="flex items-center sm:flex-col sm:items-center gap-3 sm:gap-2 border-2 border-blue-400 bg-white hover:bg-blue-50 rounded-xl p-3 sm:p-4 transition disabled:opacity-50 group"
                           >
-                            <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center group-hover:bg-blue-700 transition">
-                              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 rounded-xl flex items-center justify-center group-hover:bg-blue-700 transition flex-shrink-0">
+                              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                               </svg>
                             </div>
-                            <div className="text-center">
+                            <div className="text-left sm:text-center">
                               <p className="font-bold text-blue-800 text-sm">Cash on Delivery</p>
-                              <p className="text-xs text-gray-500 mt-0.5">Pay when it arrives</p>
+                              <p className="text-xs text-gray-500">Pay when it arrives</p>
                             </div>
                           </button>
 
@@ -641,14 +643,14 @@ const ConsumerOrderTracking = () => {
                           <button
                             onClick={() => handleRetryPayment(order, "fonepay")}
                             disabled={retryingPayment === orderIdStr}
-                            className="flex flex-col items-center gap-2 border-2 border-red-300 bg-white hover:bg-red-50 rounded-xl p-4 transition disabled:opacity-50 group"
+                            className="flex items-center sm:flex-col sm:items-center gap-3 sm:gap-2 border-2 border-red-300 bg-white hover:bg-red-50 rounded-xl p-3 sm:p-4 transition disabled:opacity-50 group"
                           >
-                            <div className="w-12 h-12 bg-[#8B1A1A] rounded-xl flex items-center justify-center group-hover:bg-[#6d1414] transition">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#8B1A1A] rounded-xl flex items-center justify-center group-hover:bg-[#6d1414] transition flex-shrink-0">
                               <span className="text-white font-black text-[10px] text-center leading-tight">Fone<br/>Pay</span>
                             </div>
-                            <div className="text-center">
+                            <div className="text-left sm:text-center">
                               <p className="font-bold text-red-900 text-sm">FonePay Delivery</p>
-                              <p className="text-xs text-gray-500 mt-0.5">Scan QR on delivery</p>
+                              <p className="text-xs text-gray-500">Scan QR on delivery</p>
                             </div>
                           </button>
                         </div>
@@ -657,15 +659,14 @@ const ConsumerOrderTracking = () => {
                         {retryingPayment === orderIdStr && (
                           <div className="flex items-center justify-center gap-2 py-2 text-amber-700 text-sm">
                             <div className="w-4 h-4 border-2 border-amber-300 border-t-amber-700 rounded-full animate-spin" />
-                            Processing your payment selection...
+                            Processing…
                           </div>
                         )}
 
                         {/* Info note */}
-                        <div className="bg-white border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
+                        <div className="bg-white border border-amber-200 rounded-xl px-3 sm:px-4 py-3 text-xs text-amber-800">
                           <span className="font-semibold">Note: </span>
-                          Orders without payment are automatically cancelled after 1 hour.
-                          Cash on Delivery and FonePay confirm your order immediately.
+                          Orders without payment are auto-cancelled after 1 hour.
                         </div>
                       </div>
                     )}
@@ -687,7 +688,7 @@ const ConsumerOrderTracking = () => {
                           disabled={cancellingOrder === orderIdStr}
                           className="flex-1 border border-red-300 text-red-600 hover:bg-red-50 font-semibold px-4 py-2.5 rounded-lg text-sm transition"
                         >
-                          {cancellingOrder === orderIdStr ? "Cancelling..." : "Cancel order instead"}
+                          {cancellingOrder === orderIdStr ? "Cancelling..." : "Cancel instead"}
                         </button>
                       )}
                       {!needsPayment && (

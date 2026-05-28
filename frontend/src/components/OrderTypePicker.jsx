@@ -10,9 +10,8 @@ import { NORMAL_MIN_KG, NORMAL_MAX_KG, BULK_MIN_KG } from "../utils/orderConstan
  * Props:
  *   orderType      : "normal" | "bulk"
  *   onTypeChange   : (type: string, snapQty: number) => void
- *                    called with the new type AND the qty to snap to
- *   totalQty       : number   – current total kg in the cart
- *   unit           : string   – e.g. "kg"
+ *   totalQty       : number
+ *   unit           : string
  *   validationError: string | null
  */
 const OrderTypePicker = ({
@@ -34,11 +33,11 @@ const OrderTypePicker = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 space-y-3 sm:space-y-4">
 
       {/* Header */}
       <div>
-        <h3 className="font-bold text-gray-900 text-base">Select order type</h3>
+        <h3 className="font-bold text-gray-900 text-sm sm:text-base">Select order type</h3>
         <p className="text-xs text-gray-500 mt-0.5">
           Selecting a type sets the quantity to its minimum automatically.
         </p>
@@ -51,7 +50,7 @@ const OrderTypePicker = ({
         <button
           type="button"
           onClick={() => handleSelect("normal")}
-          className={`relative rounded-2xl border-2 p-4 text-left transition-all duration-150 ${
+          className={`relative rounded-2xl border-2 p-3.5 sm:p-4 text-left transition-all duration-150 active:scale-[0.98] ${
             isNormal
               ? "border-green-500 bg-green-50 shadow-sm"
               : "border-gray-200 hover:border-green-300 hover:bg-green-50/40 bg-white"
@@ -66,16 +65,16 @@ const OrderTypePicker = ({
             </span>
           )}
 
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
             <span className="text-base" aria-hidden="true">🛒</span>
             <span className="font-bold text-gray-900 text-sm">Normal order</span>
           </div>
 
-          <p className="text-xs text-gray-500 leading-relaxed mb-3">
+          <p className="text-xs text-gray-500 leading-relaxed mb-2.5 sm:mb-3">
             For household or small-business purchases.
           </p>
 
-          <div className="space-y-1 mb-3">
+          <div className="space-y-1 mb-2.5 sm:mb-3">
             <div className="flex items-center justify-between text-xs">
               <span className="text-gray-400">Starts at</span>
               <span className="font-bold text-green-700 text-sm">{NORMAL_MIN_KG} {unit}</span>
@@ -112,7 +111,7 @@ const OrderTypePicker = ({
           {/* Unselected hint */}
           {!isNormal && (
             <span className="text-xs text-gray-400 italic">
-              Click to start at {NORMAL_MIN_KG} {unit}
+              Tap to start at {NORMAL_MIN_KG} {unit}
             </span>
           )}
         </button>
@@ -121,7 +120,7 @@ const OrderTypePicker = ({
         <button
           type="button"
           onClick={() => handleSelect("bulk")}
-          className={`relative rounded-2xl border-2 p-4 text-left transition-all duration-150 ${
+          className={`relative rounded-2xl border-2 p-3.5 sm:p-4 text-left transition-all duration-150 active:scale-[0.98] ${
             isBulk
               ? "border-amber-500 bg-amber-50 shadow-sm"
               : "border-gray-200 hover:border-amber-300 hover:bg-amber-50/40 bg-white"
@@ -136,16 +135,16 @@ const OrderTypePicker = ({
             </span>
           )}
 
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
             <span className="text-base" aria-hidden="true">🏭</span>
             <span className="font-bold text-gray-900 text-sm">Bulk order</span>
           </div>
 
-          <p className="text-xs text-gray-500 leading-relaxed mb-3">
+          <p className="text-xs text-gray-500 leading-relaxed mb-2.5 sm:mb-3">
             For restaurants, hotels, traders and large-scale buyers.
           </p>
 
-          <div className="space-y-1 mb-3">
+          <div className="space-y-1 mb-2.5 sm:mb-3">
             <div className="flex items-center justify-between text-xs">
               <span className="text-gray-400">Starts at</span>
               <span className="font-bold text-amber-700 text-sm">{BULK_MIN_KG} {unit}</span>
@@ -178,14 +177,14 @@ const OrderTypePicker = ({
           {/* Unselected hint */}
           {!isBulk && (
             <span className="text-xs text-gray-400 italic">
-              Click to start at {BULK_MIN_KG} {unit}
+              Tap to start at {BULK_MIN_KG} {unit}
             </span>
           )}
         </button>
       </div>
 
-      {/* Quick reference */}
-      <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+      {/* Quick reference — vertical stack on mobile, row on sm+ */}
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-1.5 sm:gap-4 text-xs text-gray-500">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
           <span>Normal: {NORMAL_MIN_KG}–{NORMAL_MAX_KG} {unit} · regular price</span>
@@ -202,7 +201,7 @@ const OrderTypePicker = ({
 
       {/* Validation error */}
       {validationError && (
-        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 sm:px-4 py-3 text-xs sm:text-sm text-red-700">
           <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
           </svg>

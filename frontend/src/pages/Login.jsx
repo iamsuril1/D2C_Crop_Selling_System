@@ -4,7 +4,6 @@ import { AuthContext }          from "../context/AuthContext";
 import api                      from "../api/axios";
 import AlertModal               from "../components/AlertModal";
 
-/* ── Google sign-in button ── */
 const GoogleButton = () => {
   const handleGoogle = () => {
     window.location.href =
@@ -38,7 +37,7 @@ const GoogleButton = () => {
 };
 
 const Login = () => {
-  const navigate          = useNavigate();
+  const navigate                = useNavigate();
   const { login, getRoleRoute } = useContext(AuthContext);
 
   const [loginMethod, setLoginMethod] = useState("email");
@@ -94,8 +93,6 @@ const Login = () => {
 
       const { token, user } = res.data;
       login(token, user);
-
-      // Navigate directly by role — avoids timing bug with roleRedirect()
       navigate(getRoleRoute(user.role), { replace: true });
 
     } catch (err) {
@@ -111,7 +108,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen grid md:grid-cols-2 font-[Poppins]">
+    <div className="min-h-screen md:grid md:grid-cols-2 font-[Poppins]">
 
       <AlertModal
         isOpen={alertModal.isOpen}
@@ -123,16 +120,23 @@ const Login = () => {
       />
 
       {/* ── Left: Form ── */}
-      <div className="flex items-center justify-center px-6 py-16 bg-gradient-to-b from-[#E6F4EA] to-[#FDF8E3]">
+      <div className="flex items-center justify-center px-4 sm:px-6 py-10 sm:py-16 bg-gradient-to-b from-[#E6F4EA] to-[#FDF8E3] min-h-screen md:min-h-0">
         <form
           onSubmit={handleSubmit}
-          className="w-full max-w-md bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl p-10 space-y-5 animate-fadeIn border border-green-100"
+          className="w-full max-w-md bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl shadow-2xl p-6 sm:p-10 space-y-4 sm:space-y-5 animate-fadeIn border border-green-100"
         >
-          <div className="text-center space-y-2">
-            <h2 className="font-[Montserrat] text-3xl font-bold text-[#1E9C17]">
+          {/* Logo / brand mark for mobile (hidden on desktop where image panel shows) */}
+          <div className="flex justify-center md:hidden mb-1">
+            <span className="text-xs font-semibold tracking-[0.25em] uppercase text-[#1E9C17] bg-green-50 px-3 py-1 rounded-full">
+              MeroBari
+            </span>
+          </div>
+
+          <div className="text-center space-y-1.5 sm:space-y-2">
+            <h2 className="font-[Montserrat] text-2xl sm:text-3xl font-bold text-[#1E9C17]">
               Welcome Back
             </h2>
-            <p className="text-sm text-gray-700">
+            <p className="text-xs sm:text-sm text-gray-700">
               Login to buy fresh crops directly from farmers.
             </p>
           </div>
@@ -144,7 +148,7 @@ const Login = () => {
             <button
               type="button"
               onClick={() => switchMethod("email")}
-              className={`flex-1 py-2.5 text-sm font-semibold transition ${
+              className={`flex-1 py-2 sm:py-2.5 text-sm font-semibold transition ${
                 loginMethod === "email"
                   ? "bg-[#1E9C17] text-white"
                   : "bg-white text-gray-500 hover:bg-green-50"
@@ -155,7 +159,7 @@ const Login = () => {
             <button
               type="button"
               onClick={() => switchMethod("phone")}
-              className={`flex-1 py-2.5 text-sm font-semibold transition ${
+              className={`flex-1 py-2 sm:py-2.5 text-sm font-semibold transition ${
                 loginMethod === "phone"
                   ? "bg-[#1E9C17] text-white"
                   : "bg-white text-gray-500 hover:bg-green-50"
@@ -174,7 +178,8 @@ const Login = () => {
                 value={formData.email}
                 placeholder=" "
                 onChange={handleChange}
-                className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
+                /* text-base prevents iOS auto-zoom */
+                className="peer auth-input text-base bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
               />
               <label className="floating-label text-green-700">Email</label>
             </div>
@@ -183,11 +188,13 @@ const Login = () => {
               <input
                 type="tel"
                 name="phone"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={formData.phone}
                 placeholder=" "
                 onChange={handleChange}
                 maxLength={10}
-                className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
+                className="peer auth-input text-base bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
               />
               <label className="floating-label text-green-700">Mobile Number (10 digits)</label>
             </div>
@@ -201,7 +208,7 @@ const Login = () => {
               value={formData.password}
               placeholder=" "
               onChange={handleChange}
-              className="peer auth-input bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
+              className="peer auth-input text-base bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
             />
             <label className="floating-label text-green-700">Password</label>
           </div>
@@ -221,7 +228,7 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-[#1E9C17] to-[#27AE60] text-white py-3 rounded-2xl font-semibold tracking-wide shadow-lg hover:scale-105 hover:shadow-2xl transition disabled:opacity-60"
+            className="w-full bg-gradient-to-r from-[#1E9C17] to-[#27AE60] text-white py-3 rounded-2xl font-semibold tracking-wide shadow-lg active:scale-95 sm:hover:scale-105 hover:shadow-2xl transition disabled:opacity-60"
           >
             {loading ? "Logging in..." : "Login"}
           </button>
@@ -238,7 +245,7 @@ const Login = () => {
         </form>
       </div>
 
-      {/* ── Right: Image ── */}
+      {/* ── Right: Image (desktop only) ── */}
       <div className="hidden md:block relative">
         <img
           src="Login.jpg"
@@ -246,17 +253,17 @@ const Login = () => {
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/55" />
-        <div className="relative z-10 flex flex-col justify-center h-full px-16 text-white space-y-8 animate-fadeIn">
+        <div className="relative z-10 flex flex-col justify-center h-full px-12 lg:px-16 text-white space-y-6 sm:space-y-8 animate-fadeIn">
           <p className="uppercase tracking-[0.3em] text-sm text-[#FDB933]">
             Direct to Consumer Marketplace
           </p>
-          <h1 className="font-[Montserrat] text-5xl leading-tight font-extrabold">
+          <h1 className="font-[Montserrat] text-4xl lg:text-5xl leading-tight font-extrabold">
             Fresh, Organic Crops <br />
             <span className="text-[#FDB933]">
               Delivered Straight From Farmers
             </span>
           </h1>
-          <p className="text-base text-gray-200 leading-relaxed max-w-2xl">
+          <p className="text-sm lg:text-base text-gray-200 leading-relaxed max-w-2xl">
             MeroBari bridges the gap between farmers and consumers by eliminating middlemen.
           </p>
         </div>

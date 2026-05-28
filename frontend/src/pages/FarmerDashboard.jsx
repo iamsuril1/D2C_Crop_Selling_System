@@ -194,7 +194,7 @@ const FarmerDashboard = () => {
   const inactiveProducts = products.filter((p) => !p.isActive);
 
   return (
-    <div className="min-h-screen bg-gray-50 px-8 py-6 space-y-6">
+    <div className="min-h-screen bg-gray-50 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
 
       <AlertModal
         isOpen={alertModal.isOpen}
@@ -216,66 +216,66 @@ const FarmerDashboard = () => {
       />
 
       {/* ── Top bar ── */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard Overview</h1>
           <p className="text-sm text-gray-500">Welcome back, {user?.firstName || "Farmer"}</p>
         </div>
-        <div className="flex gap-3 flex-wrap justify-end">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => navigate("/farmer/earnings")}
-            className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2"
+            className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5"
           >
             💰 My Earnings
           </button>
           <button
             onClick={() => navigate("/farmer/payment-settings")}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition"
           >
             Payment Settings
           </button>
           <button
             onClick={() => navigate("/add-product")}
-            className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+            className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition"
           >
-            Add Product
+            + Add Product
           </button>
         </div>
       </div>
 
       {/* ── Summary cards ── */}
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm p-4">
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white rounded-xl shadow-sm p-3 sm:p-4">
           <p className="text-xs uppercase text-gray-500 mb-1">Active Products</p>
-          <p className="text-2xl font-semibold">{activeProducts.length}</p>
+          <p className="text-xl sm:text-2xl font-semibold">{activeProducts.length}</p>
           <p className="text-xs text-gray-400 mt-1">
             {inactiveProducts.length > 0 ? `${inactiveProducts.length} disabled` : "All active"}
           </p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-3 sm:p-4">
           <p className="text-xs uppercase text-gray-500 mb-1">Active Orders</p>
-          <p className="text-2xl font-semibold">{activeOrders.length}</p>
+          <p className="text-xl sm:text-2xl font-semibold">{activeOrders.length}</p>
           <p className="text-xs text-gray-400 mt-1">Awaiting completion</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <p className="text-xs uppercase text-gray-500 mb-1">Delivered Orders</p>
-          <p className="text-2xl font-semibold">{deliveredOrders.length}</p>
-          <p className="text-xs text-gray-400 mt-1">Completed successfully</p>
+        <div className="bg-white rounded-xl shadow-sm p-3 sm:p-4">
+          <p className="text-xs uppercase text-gray-500 mb-1">Delivered</p>
+          <p className="text-xl sm:text-2xl font-semibold">{deliveredOrders.length}</p>
+          <p className="text-xs text-gray-400 mt-1">Completed</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <p className="text-xs uppercase text-gray-500 mb-1">Inventory Units</p>
-          <p className="text-2xl font-semibold">
+        <div className="bg-white rounded-xl shadow-sm p-3 sm:p-4">
+          <p className="text-xs uppercase text-gray-500 mb-1">Inventory</p>
+          <p className="text-xl sm:text-2xl font-semibold">
             {activeProducts.reduce((sum, p) => sum + Number(p.quantity || 0), 0)}
           </p>
-          <p className="text-xs text-gray-400 mt-1">Total active stock</p>
+          <p className="text-xs text-gray-400 mt-1">Total stock</p>
         </div>
       </section>
 
       {/* ── Products + Orders ── */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
 
         {/* ── Products ── */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-5">
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-4 sm:p-5">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-base font-semibold text-gray-900">
               My Products
@@ -291,7 +291,7 @@ const FarmerDashboard = () => {
               No products yet. Click "Add Product" to create one.
             </p>
           ) : (
-            <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {products.map((p) => {
                 const pid    = getPid(p);
                 const imgSrc = p.image ? `${APIBASEURL}${p.image}` : "";
@@ -460,14 +460,14 @@ const FarmerDashboard = () => {
                     ) : (
                       /* ── DISPLAY ── */
                       <>
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-semibold text-sm text-gray-900">{p.name}</h3>
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-sm text-gray-900 truncate">{p.name}</h3>
                             <p className="text-xs text-gray-500">{p.category}</p>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex-shrink-0">
                             <span className="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full block">
-                              Rs. {p.price} / {p.unit}
+                              Rs. {p.price}/{p.unit}
                             </span>
                             {p.bulkPrice && Number(p.bulkPrice) > 0 && (
                               <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full mt-1 block">
@@ -509,7 +509,7 @@ const FarmerDashboard = () => {
         <div className="space-y-4">
 
           {/* Active orders */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-5">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-base font-semibold text-gray-900">Active Orders</h2>
               <span className="text-xs text-gray-500">{activeOrders.length}</span>
@@ -532,7 +532,7 @@ const FarmerDashboard = () => {
                           </p>
                           <p className="text-gray-500 capitalize">Status: {o.status}</p>
                         </div>
-                        <span className="text-[11px] px-2 py-1 rounded-full bg-yellow-50 text-yellow-700">
+                        <span className="text-[11px] px-2 py-1 rounded-full bg-yellow-50 text-yellow-700 flex-shrink-0">
                           In progress
                         </span>
                       </div>
@@ -564,7 +564,7 @@ const FarmerDashboard = () => {
           </div>
 
           {/* Delivered orders */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-5">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-base font-semibold text-gray-900">Delivered Orders</h2>
               <span className="text-xs text-gray-500">{deliveredOrders.length}</span>
@@ -586,7 +586,7 @@ const FarmerDashboard = () => {
                           </p>
                           <p className="text-gray-500">Delivered</p>
                         </div>
-                        <span className="text-[11px] px-2 py-1 rounded-full bg-green-50 text-green-700">
+                        <span className="text-[11px] px-2 py-1 rounded-full bg-green-50 text-green-700 flex-shrink-0">
                           Completed
                         </span>
                       </div>
@@ -616,8 +616,8 @@ const FarmerDashboard = () => {
       </section>
 
       {/* ── Crop Sales Analytics ── */}
-      <section className="bg-white rounded-xl shadow-sm p-5">
-        <div className="flex items-center justify-between mb-5">
+      <section className="bg-white rounded-xl shadow-sm p-4 sm:p-5">
+        <div className="flex items-center justify-between mb-4 sm:mb-5">
           <div>
             <h2 className="text-base font-semibold text-gray-900">Crop Sales Analytics</h2>
             <p className="text-xs text-gray-400 mt-0.5">
@@ -626,7 +626,7 @@ const FarmerDashboard = () => {
           </div>
           <button
             onClick={() => navigate("/farmer/earnings")}
-            className="text-xs text-amber-600 hover:text-amber-700 font-semibold border border-amber-200 hover:border-amber-400 px-3 py-1.5 rounded-lg transition"
+            className="text-xs text-amber-600 hover:text-amber-700 font-semibold border border-amber-200 hover:border-amber-400 px-3 py-1.5 rounded-lg transition whitespace-nowrap"
           >
             Full Earnings →
           </button>
@@ -639,46 +639,46 @@ const FarmerDashboard = () => {
             <p className="text-xs mt-1">Analytics will appear once you receive orders.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
 
             {/* ── Left: summary stat cards ── */}
-            <div className="space-y-3">
-              <div className="bg-green-50 border border-green-100 rounded-xl p-4">
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
+              <div className="bg-green-50 border border-green-100 rounded-xl p-3 sm:p-4">
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Revenue</p>
-                <p className="text-2xl font-bold text-green-700">
+                <p className="text-lg sm:text-2xl font-bold text-green-700">
                   Rs. {Math.round(totalRevenue).toLocaleString()}
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">Across all crops</p>
               </div>
 
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Crop Varieties Sold</p>
-                <p className="text-2xl font-bold text-blue-700">{cropAnalytics.length}</p>
-                <p className="text-xs text-gray-400 mt-0.5">Unique products ordered</p>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 sm:p-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Crop Varieties</p>
+                <p className="text-lg sm:text-2xl font-bold text-blue-700">{cropAnalytics.length}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Unique products</p>
               </div>
 
-              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 sm:p-4">
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Top Earner</p>
-                <p className="text-lg font-bold text-amber-700 truncate">
+                <p className="text-base sm:text-lg font-bold text-amber-700 truncate">
                   {cropAnalytics[0]?.[0] || "—"}
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Rs. {Math.round(cropAnalytics[0]?.[1]?.revenue || 0).toLocaleString()} earned
+                  Rs. {Math.round(cropAnalytics[0]?.[1]?.revenue || 0).toLocaleString()}
                 </p>
               </div>
 
-              <div className="bg-purple-50 border border-purple-100 rounded-xl p-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Quantity Sold</p>
-                <p className="text-2xl font-bold text-purple-700">
+              <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 sm:p-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Qty Sold</p>
+                <p className="text-lg sm:text-2xl font-bold text-purple-700">
                   {cropAnalytics.reduce((s, [, v]) => s + v.qty, 0).toLocaleString()}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">Units across all crops</p>
+                <p className="text-xs text-gray-400 mt-0.5">Total units</p>
               </div>
             </div>
 
-            {/* ── Middle: horizontal bar chart ── */}
+            {/* ── Right: horizontal bar chart ── */}
             <div className="lg:col-span-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 sm:mb-4">
                 Revenue breakdown by crop
               </p>
               <div className="space-y-3">
@@ -687,19 +687,19 @@ const FarmerDashboard = () => {
                   const color = CHART_COLORS[i % CHART_COLORS.length];
                   return (
                     <div key={name}>
-                      <div className="flex items-center justify-between text-sm mb-1.5">
+                      <div className="flex items-center justify-between text-sm mb-1.5 gap-2">
                         <div className="flex items-center gap-2 min-w-0">
                           <span
                             className="w-3 h-3 rounded-sm flex-shrink-0"
                             style={{ backgroundColor: color }}
                           />
-                          <span className="font-medium text-gray-800 truncate">{name}</span>
-                          <span className="text-xs text-gray-400 flex-shrink-0">
+                          <span className="font-medium text-gray-800 truncate text-xs sm:text-sm">{name}</span>
+                          <span className="text-xs text-gray-400 flex-shrink-0 hidden sm:inline">
                             {stats.qty} {stats.unit}
                           </span>
                         </div>
-                        <div className="flex items-center gap-3 flex-shrink-0 ml-2">
-                          <span className="text-xs text-gray-500">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-xs text-gray-500 hidden sm:inline">
                             Rs. {Math.round(stats.revenue).toLocaleString()}
                           </span>
                           <span className="text-xs font-bold text-gray-700 w-8 text-right">
@@ -707,7 +707,6 @@ const FarmerDashboard = () => {
                           </span>
                         </div>
                       </div>
-                      {/* Bar track */}
                       <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-700"
@@ -722,8 +721,8 @@ const FarmerDashboard = () => {
                 })}
               </div>
 
-              {/* ── Donut-style legend row at bottom ── */}
-              <div className="mt-5 pt-4 border-t border-gray-100">
+              {/* ── Quantity legend ── */}
+              <div className="mt-4 sm:mt-5 pt-4 border-t border-gray-100">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                   Quantity sold per crop
                 </p>
@@ -733,7 +732,7 @@ const FarmerDashboard = () => {
                     return (
                       <div
                         key={name}
-                        className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2"
+                        className="flex items-center gap-2 bg-gray-50 rounded-lg px-2.5 py-2"
                       >
                         <span
                           className="w-2.5 h-2.5 rounded-full flex-shrink-0"
@@ -749,7 +748,7 @@ const FarmerDashboard = () => {
                     );
                   })}
                   {cropAnalytics.length > 6 && (
-                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-2.5 py-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-gray-300 flex-shrink-0" />
                       <p className="text-xs text-gray-500">
                         +{cropAnalytics.length - 6} more
@@ -759,7 +758,7 @@ const FarmerDashboard = () => {
                 </div>
               </div>
 
-              {/* ── Order type breakdown (normal vs bulk) ── */}
+              {/* ── Order type breakdown ── */}
               {(() => {
                 let normalCount = 0;
                 let bulkCount   = 0;
@@ -785,7 +784,6 @@ const FarmerDashboard = () => {
                       Order type mix
                     </p>
                     <div className="flex items-center gap-3">
-                      {/* Segmented bar */}
                       <div className="flex-1 h-3 rounded-full overflow-hidden flex">
                         <div
                           className="h-full bg-green-500 transition-all duration-700"
@@ -796,7 +794,7 @@ const FarmerDashboard = () => {
                           style={{ width: `${bulkPct}%` }}
                         />
                       </div>
-                      <div className="flex items-center gap-4 flex-shrink-0 text-xs">
+                      <div className="flex items-center gap-3 flex-shrink-0 text-xs">
                         <span className="flex items-center gap-1.5">
                           <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
                           <span className="text-gray-600">Normal {normalPct}%</span>
@@ -808,7 +806,7 @@ const FarmerDashboard = () => {
                       </div>
                     </div>
                     <p className="text-xs text-gray-400 mt-1.5">
-                      {normalCount} normal item rows · {bulkCount} bulk item rows
+                      {normalCount} normal · {bulkCount} bulk item rows
                     </p>
                   </div>
                 );
