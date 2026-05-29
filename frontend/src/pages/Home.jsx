@@ -780,9 +780,7 @@ const Home = () => {
               </Link>
             </div>
 
-            <p className="mt-14 text-[#4a6a4a] text-xs">
-              Final Year Project · Kathmandu Engineering College · Nepal
-            </p>
+            
           </div>
         </section>
 

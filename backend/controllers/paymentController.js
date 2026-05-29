@@ -1,7 +1,7 @@
 /* backend/controllers/paymentController.js
    SIMPLIFIED:
+   - Supports single orderId OR array of orderIds for all payment methods
    - When consumer pays (eSewa / COD / FonePay), shipment.paymentStatus → "paid"
-     (previously was "pending_admin_release" — that middle state is removed)
    - Order.paymentStatus → "paid"
    - Farmer payout queue picks up all orders where paymentStatus = "paid"
      and shipments.farmerPaid = false  (no release step needed)
@@ -30,8 +30,8 @@ const generateEsewaSignature = (totalAmount, transactionUuid, productCode) => {
 const verifyEsewaSignature = (responseData) => {
   const { signed_field_names, signature } = responseData;
   if (!signed_field_names || !signature) return false;
-  const fields  = signed_field_names.split(",");
-  const message = fields.map((f) => `${f}=${responseData[f] ?? ""}`).join(",");
+  const fields   = signed_field_names.split(",");
+  const message  = fields.map((f) => `${f}=${responseData[f] ?? ""}`).join(",");
   const expected = crypto.createHmac("sha256", ESEWA_SECRET_KEY).update(message).digest("base64");
   return expected === signature;
 };
@@ -80,26 +80,38 @@ export const uploadPaymentQR = async (req, res) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
-   INITIATE ESEWA
+   INITIATE ESEWA — supports single orderId OR array of orderIds
 ───────────────────────────────────────────────────────────── */
 export const initiateEsewa = async (req, res) => {
   try {
-    const { orderId } = req.body;
-    const order = await Order.findById(orderId);
-    if (!order) return res.status(404).json({ message: "Order not found" });
-    if (order.consumer.toString() !== req.user._id.toString())
-      return res.status(403).json({ message: "Unauthorized" });
-    if (order.status === "cancelled")
-      return res.status(400).json({ message: "This order has been cancelled" });
+    const { orderId, orderIds } = req.body;
+    const ids = orderIds?.length ? orderIds : [orderId];
 
-    const transactionUuid  = `${orderId}-${Date.now()}`;
-    const itemsAndDelivery = (order.itemsSubtotal || 0) + (order.deliveryTotal || 0);
-    const platformCharge   = order.platformCharge ?? 25;
-    const totalAmount      = order.totalAmount;
+    const orders = await Order.find({ _id: { $in: ids } });
+    if (!orders.length) return res.status(404).json({ message: "Orders not found" });
+
+    // Verify all belong to this consumer
+    for (const order of orders) {
+      if (order.consumer.toString() !== req.user._id.toString())
+        return res.status(403).json({ message: "Unauthorized" });
+      if (order.status === "cancelled")
+        return res.status(400).json({ message: `Order #${order._id.toString().slice(-6)} has been cancelled` });
+    }
+
+    const totalAmount      = orders.reduce((s, o) => s + (o.totalAmount || 0), 0);
+    const itemsAndDelivery = orders.reduce((s, o) => s + (o.itemsSubtotal || 0) + (o.deliveryTotal || 0), 0);
+    const platformCharge   = orders.reduce((s, o) => s + (o.platformCharge ?? 25), 0);
+
+    // Combined transaction UUID encodes all order IDs
+    const transactionUuid = `${ids.join("_")}-${Date.now()}`;
+
+    // Save transactionUuid on all orders
+    for (const order of orders) {
+      order.esewaTransactionUuid = transactionUuid;
+      await order.save();
+    }
 
     const signature = generateEsewaSignature(totalAmount, transactionUuid, ESEWA_MERCHANT_CODE);
-    order.esewaTransactionUuid = transactionUuid;
-    await order.save();
 
     res.json({
       paymentUrl:              `${ESEWA_BASE_URL}/api/epay/main/v2/form`,
@@ -121,10 +133,6 @@ export const initiateEsewa = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   VERIFY ESEWA
-   Shipment paymentStatus → "paid" directly (no pending_admin_release)
-───────────────────────────────────────────────────────────── */
 export const verifyEsewa = async (req, res) => {
   try {
     const { data: encodedData } = req.body;
@@ -144,141 +152,127 @@ export const verifyEsewa = async (req, res) => {
     if ((decoded.status || "").toUpperCase().trim() !== "COMPLETE")
       return res.status(400).json({ message: `Payment not complete. Status: ${decoded.status}` });
 
-    const txUuid  = decoded.transaction_uuid || "";
-    const orderId = txUuid.slice(0, 24);
-    if (orderId.length !== 24)
-      return res.status(400).json({ message: "Could not extract orderId from transaction" });
+    const txUuid = decoded.transaction_uuid || "";
 
-    const order = await Order.findById(orderId);
-    if (!order) return res.status(404).json({ message: "Order not found" });
+    const withoutTimestamp = txUuid.replace(/-\d+$/, "");
+    const orderIdParts     = withoutTimestamp.split("_");
 
-    // Mark all shipments as paid — goes straight to farmer payout queue
-    order.shipments = order.shipments.map((s) => ({
-      ...s.toObject(),
-      paymentMethod: "esewa",
-      paymentStatus: "paid",          // ← was "pending_admin_release"
-      paymentDate:   new Date(),
-      transactionId: decoded.transaction_code,
-    }));
-    order.paymentType   = "pre_payment";
-    order.paymentStatus = "paid";
-    await order.save();
+    const orders = await Order.find({ _id: { $in: orderIdParts } });
+    if (!orders.length) return res.status(404).json({ message: "Orders not found" });
 
-    await sendNotification(
-      order.consumer,
-      "payment_paid",
-      `Payment received for order #${order._id.toString().slice(-6)}`,
-      "Your eSewa payment was successful. The farmer will prepare your order.",
-      { orderId: order._id }
-    );
-    for (const shipment of order.shipments) {
+    for (const order of orders) {
+      order.shipments = order.shipments.map((s) => ({
+        ...s.toObject(),
+        paymentMethod: "esewa",
+        paymentStatus: "paid",
+        paymentDate:   new Date(),
+        transactionId: decoded.transaction_code,
+      }));
+      order.paymentType   = "pre_payment";
+      order.paymentStatus = "paid";
+      await order.save();
+
       await sendNotification(
-        shipment.farmer,
-        "payment_submitted",
+        order.consumer,
+        "payment_paid",
         `Payment received for order #${order._id.toString().slice(-6)}`,
-        "Consumer paid via eSewa. You'll receive your payout from admin.",
+        "Your eSewa payment was successful. The farmer will prepare your order.",
         { orderId: order._id }
       );
+      for (const shipment of order.shipments) {
+        await sendNotification(
+          shipment.farmer,
+          "payment_submitted",
+          `Payment received for order #${order._id.toString().slice(-6)}`,
+          "Consumer paid via eSewa. You'll receive your payout from admin.",
+          { orderId: order._id }
+        );
+      }
     }
 
-    res.json({ message: "eSewa payment verified.", order });
+    res.json({ message: "eSewa payment verified.", orders });
   } catch (err) {
     console.error("[eSewa verify] error:", err);
     res.status(500).json({ message: err.message });
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   CASH ON DELIVERY
-   Shipment paymentStatus → "paid" directly
-───────────────────────────────────────────────────────────── */
 export const confirmCOD = async (req, res) => {
   try {
-    const { orderId, farmerIds } = req.body;
-    const order = await Order.findById(orderId);
-    if (!order) return res.status(404).json({ message: "Order not found" });
-    if (order.consumer.toString() !== req.user._id.toString())
-      return res.status(403).json({ message: "Unauthorized" });
-    if (order.status === "cancelled")
-      return res.status(400).json({ message: "This order has been cancelled" });
+    const { orderId, orderIds } = req.body;
+    const ids = orderIds?.length ? orderIds : [orderId];
 
-    const targetFarmers =
-      Array.isArray(farmerIds) && farmerIds.length > 0
-        ? farmerIds
-        : order.shipments.map((s) => s.farmer.toString());
+    const orders = await Order.find({ _id: { $in: ids } });
+    if (!orders.length) return res.status(404).json({ message: "Orders not found" });
 
-    order.shipments = order.shipments.map((s) => {
-      if (targetFarmers.includes(s.farmer.toString())) {
-        return {
-          ...s.toObject(),
-          paymentMethod: "cash_on_delivery",
-          paymentStatus: "paid",           // ← was "pending_admin_release"
-        };
+    for (const order of orders) {
+      if (order.consumer.toString() !== req.user._id.toString())
+        return res.status(403).json({ message: "Unauthorized" });
+      if (order.status === "cancelled")
+        return res.status(400).json({ message: `Order #${order._id.toString().slice(-6)} has been cancelled` });
+
+      order.shipments = order.shipments.map((s) => ({
+        ...s.toObject(),
+        paymentMethod: "cash_on_delivery",
+        paymentStatus: "paid",
+      }));
+      order.paymentType   = "post_payment";
+      order.paymentStatus = "paid";
+      await order.save();
+
+      for (const shipment of order.shipments) {
+        await sendNotification(
+          shipment.farmer,
+          "payment_submitted",
+          `COD order #${order._id.toString().slice(-6)}`,
+          "Consumer selected Cash on Delivery. Prepare the order for delivery.",
+          { orderId: order._id }
+        );
       }
-      return s;
-    });
-    order.paymentType   = "post_payment";
-    order.paymentStatus = "paid";
-    await order.save();
-
-    for (const farmerId of targetFarmers) {
-      await sendNotification(
-        farmerId,
-        "payment_submitted",
-        `COD order #${order._id.toString().slice(-6)}`,
-        "Consumer selected Cash on Delivery. Prepare the order for delivery.",
-        { orderId: order._id }
-      );
     }
-    res.json({ message: "Cash on delivery confirmed", order });
+
+    res.json({ message: "Cash on delivery confirmed", orders });
   } catch (err) {
     console.error("[COD confirm] error:", err);
     res.status(500).json({ message: err.message });
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   FONEPAY ON DELIVERY
-───────────────────────────────────────────────────────────── */
 export const confirmFonePay = async (req, res) => {
   try {
-    const { orderId, farmerIds } = req.body;
-    const order = await Order.findById(orderId);
-    if (!order) return res.status(404).json({ message: "Order not found" });
-    if (order.consumer.toString() !== req.user._id.toString())
-      return res.status(403).json({ message: "Unauthorized" });
-    if (order.status === "cancelled")
-      return res.status(400).json({ message: "This order has been cancelled" });
+    const { orderId, orderIds } = req.body;
+    const ids = orderIds?.length ? orderIds : [orderId];
 
-    const targetFarmers =
-      Array.isArray(farmerIds) && farmerIds.length > 0
-        ? farmerIds
-        : order.shipments.map((s) => s.farmer.toString());
+    const orders = await Order.find({ _id: { $in: ids } });
+    if (!orders.length) return res.status(404).json({ message: "Orders not found" });
 
-    order.shipments = order.shipments.map((s) => {
-      if (targetFarmers.includes(s.farmer.toString())) {
-        return {
-          ...s.toObject(),
-          paymentMethod: "fonepay",
-          paymentStatus: "paid",           // ← was "pending_admin_release"
-        };
+    for (const order of orders) {
+      if (order.consumer.toString() !== req.user._id.toString())
+        return res.status(403).json({ message: "Unauthorized" });
+      if (order.status === "cancelled")
+        return res.status(400).json({ message: `Order #${order._id.toString().slice(-6)} has been cancelled` });
+
+      order.shipments = order.shipments.map((s) => ({
+        ...s.toObject(),
+        paymentMethod: "fonepay",
+        paymentStatus: "paid",
+      }));
+      order.paymentType   = "post_payment";
+      order.paymentStatus = "paid";
+      await order.save();
+
+      for (const shipment of order.shipments) {
+        await sendNotification(
+          shipment.farmer,
+          "payment_submitted",
+          `FonePay order #${order._id.toString().slice(-6)}`,
+          "Consumer selected FonePay on Delivery. Prepare the order.",
+          { orderId: order._id }
+        );
       }
-      return s;
-    });
-    order.paymentType   = "post_payment";
-    order.paymentStatus = "paid";
-    await order.save();
-
-    for (const farmerId of targetFarmers) {
-      await sendNotification(
-        farmerId,
-        "payment_submitted",
-        `FonePay order #${order._id.toString().slice(-6)}`,
-        "Consumer selected FonePay on Delivery. Prepare the order.",
-        { orderId: order._id }
-      );
     }
-    res.json({ message: "FonePay on delivery confirmed", order });
+
+    res.json({ message: "FonePay on delivery confirmed", orders });
   } catch (err) {
     console.error("[FonePay confirm] error:", err);
     res.status(500).json({ message: err.message });

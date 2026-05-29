@@ -106,7 +106,7 @@ const PayFarmerModal = ({ farmer, onClose, onPaid }) => {
         <div className="p-4 sm:p-6 space-y-4">
           {blocked && (
             <div className="bg-orange-50 border-2 border-orange-300 rounded-xl p-4">
-              <p className="font-bold text-orange-800 text-sm mb-1">⏳ 15-Day Cooldown Active</p>
+              <p className="font-bold text-orange-800 text-sm mb-1">3-Day Cooldown Active</p>
               <p className="text-sm text-orange-700">
                 Last paid {new Date(cooldown.lastPaidAt).toLocaleDateString()} · 
                 <strong> {cooldown.daysLeft} day{cooldown.daysLeft !== 1 ? "s" : ""} remaining</strong>
@@ -549,7 +549,7 @@ const AdminDashboard = () => {
             <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-3">
               <div>
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Pay Farmers</h2>
-                <p className="text-sm text-gray-500 mt-1">Pay each farmer their balance · 15-day cooldown</p>
+                <p className="text-sm text-gray-500 mt-1">Pay each farmer their balance · 3-day cooldown</p>
               </div>
               <button onClick={() => { loadFarmerPayouts(); loadFarmerPayoutStats(); }}
                 className="text-sm border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition text-gray-600 self-start sm:self-auto">↻ Refresh</button>
@@ -576,7 +576,7 @@ const AdminDashboard = () => {
               <div className="text-xs sm:text-sm text-blue-800">
                 <span className="font-semibold">How it works: </span>
                 When a consumer pays, the order appears here. Pay via the farmer's preferred method.
-                Returns auto-deducted. 15-day cooldown prevents duplicate payments.
+                Returns auto-deducted. 3-day cooldown prevents duplicate payments.
               </div>
             </div>
 

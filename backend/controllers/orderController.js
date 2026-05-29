@@ -1,10 +1,3 @@
-/* backend/controllers/orderController.js
-   Per-item order type.
-   Each item in the cart carries its own orderType: "normal" | "bulk".
-   The effective price is determined per-item (bulk price if type=bulk and available).
-   The order document now stores the per-item type inside each shipment item.
-*/
-
 import Order   from "../models/Order.js";
 import Product from "../models/Product.js";
 import User    from "../models/User.js";
@@ -12,18 +5,12 @@ import { sendNotification } from "../utils/notificationHelpers.js";
 
 const toNum = (v) => Number(v);
 
-/* ─────────────────────────────────────────────────────────────
-   CONSTANTS
-───────────────────────────────────────────────────────────── */
 export const ORDER_TYPES     = { NORMAL: "normal", BULK: "bulk" };
 export const NORMAL_MIN_KG   = 20;
 export const NORMAL_MAX_KG   = 99;
 export const BULK_MIN_KG     = 100;
 export const PLATFORM_CHARGE = 25;
 
-/* ─────────────────────────────────────────────────────────────
-   PER-ITEM QUANTITY VALIDATION
-───────────────────────────────────────────────────────────── */
 export const validateItemOrderType = (orderType, qty, unit = "kg") => {
   if (orderType === ORDER_TYPES.NORMAL) {
     if (qty < NORMAL_MIN_KG)
@@ -39,12 +26,8 @@ export const validateItemOrderType = (orderType, qty, unit = "kg") => {
   return null;
 };
 
-/* Legacy alias */
 export const validateOrderTypeQty = validateItemOrderType;
 
-/* ─────────────────────────────────────────────────────────────
-   HELPERS
-───────────────────────────────────────────────────────────── */
 const groupBy = (arr, keyFn) => {
   const map = new Map();
   for (const item of arr) {
@@ -63,10 +46,6 @@ const loadProductsForCart = async (items) => {
   return new Map(products.map((p) => [p._id.toString(), p]));
 };
 
-/**
- * Effective price per unit for a single item.
- * Uses bulkPrice when orderType=bulk and bulkPrice is set and > 0.
- */
 const effectivePrice = (product, orderType) => {
   if (
     orderType === ORDER_TYPES.BULK &&
@@ -78,7 +57,6 @@ const effectivePrice = (product, orderType) => {
   return Number(product.price);
 };
 
-/* ── Delivery fee (distance-based) ── */
 const BASE_FEE     = 50;
 const BASE_KM      = 10;
 const RATE_PER_KM  = 5;
@@ -107,10 +85,6 @@ const calcDeliveryFee = (farmerCoords, consumerCoords) => {
   return Math.min(MAX_FEE, Math.max(MIN_FEE, Math.round(fee)));
 };
 
-/**
- * Normalize cart items, resolving product details and per-item effective price.
- * Each incoming item must have: { productId, quantity, orderType }
- */
 const normalizeItems = (items, productById) =>
   items.map((it) => {
     const p         = productById.get(it.productId);
@@ -135,7 +109,6 @@ const normalizeItems = (items, productById) =>
     };
   });
 
-/* Restore stock */
 const restoreStock = async (order) => {
   try {
     await Promise.all(
@@ -156,10 +129,6 @@ const restoreStock = async (order) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   ESTIMATE — POST /api/orders/estimate
-   Body: { items: [{ productId, quantity, orderType }] }
-───────────────────────────────────────────────────────────── */
 export const estimateDeliveryMultiOrigin = async (req, res) => {
   try {
     const { items } = req.body;
@@ -173,7 +142,6 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
     if (normalized.some((x) => !x || !x.farmerId))
       return res.status(400).json({ message: "One or more products are invalid" });
 
-    /* Validate each item individually */
     for (const item of normalized) {
       const err = validateItemOrderType(item.orderType, item.quantity, item.unit);
       if (err) return res.status(400).json({ message: err, itemName: item.name });
@@ -234,10 +202,7 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   CREATE ORDER — POST /api/orders
-   Body: { items: [{ productId, quantity, orderType }] }
-───────────────────────────────────────────────────────────── */
+// ─── SPLIT ORDER: one Order document per farmer ──────────────────────────────
 export const createOrder = async (req, res) => {
   try {
     const { items } = req.body;
@@ -251,13 +216,13 @@ export const createOrder = async (req, res) => {
     if (normalized.some((x) => !x || !x.farmerId))
       return res.status(400).json({ message: "One or more products are invalid" });
 
-    /* Per-item validation */
+    // Per-item validation
     for (const item of normalized) {
       const err = validateItemOrderType(item.orderType, item.quantity, item.unit);
       if (err) return res.status(400).json({ message: err, itemName: item.name });
     }
 
-    /* Stock check */
+    // Stock check
     for (const item of normalized) {
       if (item.productDoc.quantity < item.quantity) {
         return res.status(400).json({
@@ -267,16 +232,14 @@ export const createOrder = async (req, res) => {
     }
 
     const consumerCoords = req.user?.location?.coordinates || null;
-    const grouped        = groupBy(normalized, (x) => x.farmerId);
 
-    let itemsSubtotal = 0;
-    const shipments   = [];
+    // Group items by farmer
+    const grouped = groupBy(normalized, (x) => x.farmerId);
+
+    const createdOrders = [];
 
     for (const [farmerId, arr] of grouped.entries()) {
-      const sub = arr.reduce((s, it) => s + it.price * it.quantity, 0);
-      itemsSubtotal += sub;
-
-      const farmer       = await User.findById(farmerId).select(
+      const farmer = await User.findById(farmerId).select(
         "paymentMethods preferredPaymentMethod firstName lastName location"
       );
       const farmerCoords = farmer?.location?.coordinates || null;
@@ -284,6 +247,7 @@ export const createOrder = async (req, res) => {
         ? Math.round(haversineKm(farmerCoords, consumerCoords) * 10) / 10
         : null;
       const deliveryFee  = calcDeliveryFee(farmerCoords, consumerCoords);
+      const sub          = arr.reduce((s, it) => s + it.price * it.quantity, 0);
 
       const farmerPaymentInfo = {
         esewaId:       farmer.paymentMethods?.find((p) => p.type === "esewa"         && p.enabled)?.esewaId       || null,
@@ -294,15 +258,15 @@ export const createOrder = async (req, res) => {
         qrCodeImage:   farmer.paymentMethods?.find((p) => p.type === "bank_qr"       && p.enabled)?.qrCodeImage   || null,
       };
 
-      shipments.push({
+      const shipment = {
         farmer:       farmerId,
         items: arr.map((x) => ({
           product:   x.product,
           name:      x.name,
           quantity:  x.quantity,
-          price:     x.price,           // effective price (may be bulk price)
-          basePrice: x.basePrice,       // always the regular price
-          orderType: x.orderType,       // "normal" | "bulk" per item
+          price:     x.price,
+          basePrice: x.basePrice,
+          orderType: x.orderType,
         })),
         distanceKm:    distKm,
         deliveryFee,
@@ -310,30 +274,29 @@ export const createOrder = async (req, res) => {
         paymentMethod: "pending",
         paymentStatus: "pending",
         farmerPaymentInfo,
+      };
+
+      const bulkItemCount = arr.filter((x) => x.orderType === ORDER_TYPES.BULK).length;
+      const dominantType  = bulkItemCount > arr.length / 2
+        ? ORDER_TYPES.BULK
+        : ORDER_TYPES.NORMAL;
+
+      const totalAmount = sub + deliveryFee + PLATFORM_CHARGE;
+
+      const order = await Order.create({
+        consumer:       req.user._id,
+        orderType:      dominantType,
+        shipments:      [shipment],
+        itemsSubtotal:  sub,
+        deliveryTotal:  deliveryFee,
+        platformCharge: PLATFORM_CHARGE,
+        totalAmount,
       });
+
+      createdOrders.push(order);
     }
 
-    const deliveryTotal = shipments.reduce((s, sh) => s + sh.deliveryFee, 0);
-    const totalAmount   = itemsSubtotal + deliveryTotal + PLATFORM_CHARGE;
-
-    /* Determine the dominant order type for the order-level field
-       (kept for compatibility; use item.orderType for per-item accuracy) */
-    const bulkItemCount   = normalized.filter((x) => x.orderType === ORDER_TYPES.BULK).length;
-    const dominantType    = bulkItemCount > normalized.length / 2
-      ? ORDER_TYPES.BULK
-      : ORDER_TYPES.NORMAL;
-
-    const order = await Order.create({
-      consumer:       req.user._id,
-      orderType:      dominantType,
-      shipments,
-      itemsSubtotal,
-      deliveryTotal,
-      platformCharge: PLATFORM_CHARGE,
-      totalAmount,
-    });
-
-    /* Deduct stock */
+    // Deduct stock for ALL items across all orders
     await Promise.all(
       normalized.map((item) =>
         Product.findByIdAndUpdate(
@@ -344,16 +307,18 @@ export const createOrder = async (req, res) => {
       )
     );
 
-    /* Notifications */
+    // Notifications
     const hasBulk = normalized.some((x) => x.orderType === ORDER_TYPES.BULK);
     await sendNotification(
       req.user._id,
       "order_placed",
-      `Order #${order._id.toString().slice(-6)} placed!`,
-      `Your order${hasBulk ? " (includes bulk items)" : ""} is being processed`,
-      { orderId: order._id }
+      `${createdOrders.length} order${createdOrders.length > 1 ? "s" : ""} placed!`,
+      `Your order${createdOrders.length > 1 ? "s have" : " has"} been placed${hasBulk ? " (includes bulk items)" : ""}`,
+      { orderIds: createdOrders.map((o) => o._id) }
     );
-    for (const shipment of shipments) {
+
+    for (const order of createdOrders) {
+      const shipment = order.shipments[0];
       const hasBulkInShipment = shipment.items.some((i) => i.orderType === ORDER_TYPES.BULK);
       await sendNotification(
         shipment.farmer,
@@ -364,16 +329,14 @@ export const createOrder = async (req, res) => {
       );
     }
 
-    res.status(201).json(order);
+    // Return array of orders
+    res.status(201).json(createdOrders);
   } catch (err) {
     console.error("Create order error:", err);
     res.status(500).json({ message: err.message });
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   GET FARMER ORDERS
-───────────────────────────────────────────────────────────── */
 export const getFarmerOrders = async (req, res) => {
   try {
     const orders = await Order.find({ "shipments.farmer": req.user._id })
@@ -386,9 +349,6 @@ export const getFarmerOrders = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   GET MY ORDERS (consumer)
-───────────────────────────────────────────────────────────── */
 export const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ consumer: req.user._id })
@@ -400,9 +360,6 @@ export const getMyOrders = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   UPDATE ORDER STATUS (farmer)
-───────────────────────────────────────────────────────────── */
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -451,9 +408,6 @@ export const updateOrderStatus = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   CANCEL ORDER (consumer)
-───────────────────────────────────────────────────────────── */
 export const cancelOrderConsumer = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -492,9 +446,6 @@ export const cancelOrderConsumer = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   CANCEL ORDER (farmer)
-───────────────────────────────────────────────────────────── */
 export const cancelOrderFarmer = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);

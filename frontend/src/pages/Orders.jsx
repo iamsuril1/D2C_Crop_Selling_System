@@ -257,9 +257,11 @@ const Orders = () => {
     if (placingOrder || !buildOrderItems.length || hasErrors) return;
     setPlacingOrder(true);
     try {
+      // Returns array of orders (one per farmer)
       const res = await api.post("/api/orders", { items: buildOrderItems });
       clearCart();
-      navigate("/payment", { state: { order: res.data } });
+      // res.data is now an array of orders
+      navigate("/payment", { state: { orders: res.data } });
     } catch (err) {
       showAlert(
         "Checkout Failed",

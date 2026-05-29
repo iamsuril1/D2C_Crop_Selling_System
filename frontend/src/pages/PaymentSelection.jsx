@@ -1,4 +1,4 @@
-// PaymentSelection.jsx
+// PaymentSelection.jsx — handles multiple orders (one per farmer)
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/axios";
@@ -17,7 +17,11 @@ const POST_METHODS = {
 const PaymentSelection = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const order    = location.state?.order;
+
+  // Support both legacy single order and new array of orders
+  const rawOrders = location.state?.orders || 
+    (location.state?.order ? [location.state.order] : []);
+  const orders = rawOrders;
 
   const [paymentMode, setPaymentMode] = useState(PAYMENT_MODES.PRE);
   const [postMethod,  setPostMethod]  = useState(POST_METHODS.COD);
@@ -36,21 +40,26 @@ const PaymentSelection = () => {
   };
 
   useEffect(() => {
-    if (!order) navigate("/cart", { replace: true });
-  }, [order, navigate]);
+    if (!orders.length) navigate("/cart", { replace: true });
+  }, [orders, navigate]);
 
-  if (!order) return null;
+  if (!orders.length) return null;
 
-  const orderId        = order._id || order.id;
-  const orderDisplayId = orderId?.toString().slice(-6) || "N/A";
-  const farmerIds      = order.shipments?.map((s) =>
-    s.farmer?._id || s.farmer?.id || s.farmer
-  ) || [];
+  const orderIds   = orders.map((o) => o._id || o.id);
+  const grandTotal = orders.reduce((s, o) => s + (o.totalAmount || 0), 0);
+
+  // Farmer names for display
+  const farmerNames = orders.map((o) => {
+    const farmer = o.shipments?.[0]?.farmer;
+    if (!farmer) return "Farmer";
+    if (typeof farmer === "object") return `${farmer.firstName || ""} ${farmer.lastName || ""}`.trim();
+    return "Farmer";
+  });
 
   const handleEsewa = async () => {
     setSubmitting(true);
     try {
-      const res = await api.post("/api/payments/esewa/initiate", { orderId });
+      const res = await api.post("/api/payments/esewa/initiate", { orderIds });
       const d   = res.data;
 
       const form = document.createElement("form");
@@ -90,10 +99,10 @@ const PaymentSelection = () => {
   const handleCOD = async () => {
     setSubmitting(true);
     try {
-      await api.post("/api/payments/cod/confirm", { orderId, farmerIds });
+      await api.post("/api/payments/cod/confirm", { orderIds });
       showAlert(
-        "Order Confirmed",
-        `Order #${orderDisplayId} placed! Pay cash when your order arrives.`,
+        "Orders Confirmed",
+        `${orders.length} order${orders.length > 1 ? "s" : ""} placed! Pay cash when each order arrives.`,
         "success",
         () => navigate("/my-orders", { replace: true })
       );
@@ -106,37 +115,32 @@ const PaymentSelection = () => {
   const handleFonePay = async () => {
     setSubmitting(true);
     try {
-      await api.post("/api/payments/fonepay/confirm", { orderId, farmerIds });
+      await api.post("/api/payments/fonepay/confirm", { orderIds });
       showAlert(
-        "Order Confirmed",
-        `Order #${orderDisplayId} placed! Pay via FonePay QR scan when your order arrives.`,
+        "Orders Confirmed",
+        `${orders.length} order${orders.length > 1 ? "s" : ""} placed! Pay via FonePay QR scan on delivery.`,
         "success",
         () => navigate("/my-orders", { replace: true })
       );
     } catch (err) {
-      showAlert("FonePay Error", err.response?.data?.message || "Failed to confirm FonePay order.", "error");
+      showAlert("FonePay Error", err.response?.data?.message || "Failed to confirm FonePay.", "error");
       setSubmitting(false);
     }
   };
 
   const handlePay = () => {
-    if (paymentMode === PAYMENT_MODES.PRE) {
-      handleEsewa();
-    } else {
-      if (postMethod === POST_METHODS.FONEPAY) handleFonePay();
-      else handleCOD();
-    }
+    if (paymentMode === PAYMENT_MODES.PRE) handleEsewa();
+    else if (postMethod === POST_METHODS.FONEPAY) handleFonePay();
+    else handleCOD();
   };
-
-  const total = order.totalAmount || 0;
 
   const payButtonLabel = () => {
     if (submitting) return null;
     if (paymentMode === PAYMENT_MODES.PRE)
-      return `Pay Rs. ${total.toFixed(0)} via eSewa`;
+      return `Pay Rs. ${grandTotal.toFixed(0)} via eSewa`;
     if (postMethod === POST_METHODS.FONEPAY)
-      return `Confirm FonePay on Delivery — Rs. ${total.toFixed(0)}`;
-    return `Confirm Cash on Delivery — Rs. ${total.toFixed(0)}`;
+      return `Confirm FonePay on Delivery — Rs. ${grandTotal.toFixed(0)}`;
+    return `Confirm Cash on Delivery — Rs. ${grandTotal.toFixed(0)}`;
   };
 
   const payButtonColor = () => {
@@ -163,40 +167,66 @@ const PaymentSelection = () => {
         <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl p-4 sm:p-6 text-white mb-4 sm:mb-6">
           <h1 className="text-xl sm:text-2xl font-bold mb-1">Complete Payment</h1>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-green-100">
-            <span>Order #{orderDisplayId}</span>
+            <span>{orders.length} order{orders.length > 1 ? "s" : ""}</span>
             <span>·</span>
-            <span>{order.shipments?.length} shipment{order.shipments?.length !== 1 ? "s" : ""}</span>
+            <span>{orders.length} farmer{orders.length > 1 ? "s" : ""}</span>
             <span>·</span>
-            <span className="font-bold text-white">Rs. {total.toFixed(0)}</span>
+            <span className="font-bold text-white">Rs. {grandTotal.toFixed(0)} total</span>
           </div>
         </div>
 
-        {/* Order breakdown */}
+        {/* Per-order breakdown */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 mb-4 sm:mb-5">
           <h3 className="font-semibold text-gray-800 mb-3 text-sm">Order Summary</h3>
-          <div className="space-y-1.5 text-sm">
-            <div className="flex justify-between text-gray-600">
-              <span>Items subtotal</span>
-              <span>Rs. {(order.itemsSubtotal || 0).toFixed(0)}</span>
-            </div>
-            <div className="flex justify-between text-gray-600">
-              <span>Delivery total</span>
-              <span>Rs. {(order.deliveryTotal || 0).toFixed(0)}</span>
-            </div>
-            <div className="flex justify-between text-gray-600">
-              <span>Platform charge</span>
-              <span>Rs. {(order.platformCharge || 25).toFixed(0)}</span>
-            </div>
-            <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-900">
-              <span>Total</span>
-              <span>Rs. {total.toFixed(0)}</span>
-            </div>
+          
+          {/* Individual orders */}
+          <div className="space-y-3 mb-3">
+            {orders.map((order, i) => {
+              const oid        = (order._id || order.id)?.toString();
+              const farmerName = farmerNames[i];
+              return (
+                <div key={oid} className="bg-gray-50 rounded-xl p-3 text-sm">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-semibold text-gray-800">
+                      Order #{oid?.slice(-6)}
+                    </span>
+                    <span className="font-bold text-gray-900">
+                      Rs. {(order.totalAmount || 0).toFixed(0)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-1.5">
+                    Farmer: {farmerName}
+                  </p>
+                  <div className="space-y-0.5 text-xs text-gray-500">
+                    <div className="flex justify-between">
+                      <span>Items</span>
+                      <span>Rs. {(order.itemsSubtotal || 0).toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Delivery</span>
+                      <span>Rs. {(order.deliveryTotal || 0).toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Platform</span>
+                      <span>Rs. {(order.platformCharge || 25).toFixed(0)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+
+          {/* Grand total */}
+          {orders.length > 1 && (
+            <div className="border-t border-gray-200 pt-3 flex justify-between font-bold text-gray-900 text-sm">
+              <span>Grand Total ({orders.length} orders)</span>
+              <span className="text-green-700">Rs. {grandTotal.toFixed(0)}</span>
+            </div>
+          )}
         </div>
 
         {/* Payment mode tabs */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-4 sm:mb-5">
-
           {/* Tab headers */}
           <div className="grid grid-cols-2 border-b border-gray-100">
             <button
@@ -227,16 +257,14 @@ const PaymentSelection = () => {
             </button>
           </div>
 
-          {/* Tab content */}
           <div className="p-4 sm:p-6">
 
             {/* Pre Payment */}
             {paymentMode === PAYMENT_MODES.PRE && (
               <div className="space-y-3 sm:space-y-4">
                 <p className="text-xs text-gray-500">
-                  Pay securely online before your order is processed. Farmers confirm immediately after payment.
+                  Pay all {orders.length} order{orders.length > 1 ? "s" : ""} in one eSewa transaction.
                 </p>
-
                 <div className="flex items-center gap-3 sm:gap-4 border-2 border-green-500 bg-green-50 rounded-2xl p-3 sm:p-4">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
                     <span className="text-white font-black text-xs sm:text-sm">eSewa</span>
@@ -251,10 +279,9 @@ const PaymentSelection = () => {
                     </svg>
                   </span>
                 </div>
-
                 <div className="bg-green-50 border border-green-100 rounded-xl p-3 text-xs text-green-800">
                   <p className="font-semibold mb-0.5">✓ Benefits of pre-payment</p>
-                  <p>Order is confirmed instantly · Farmer prioritises pre-paid orders · Secure encrypted transaction</p>
+                  <p>All orders confirmed instantly · Farmers prioritise pre-paid orders · One transaction for all farmers</p>
                 </div>
               </div>
             )}
@@ -263,25 +290,16 @@ const PaymentSelection = () => {
             {paymentMode === PAYMENT_MODES.POST && (
               <div className="space-y-3 sm:space-y-4">
                 <p className="text-xs text-gray-500">
-                  Choose how you'd like to pay when your order arrives at your door.
+                  Pay each farmer separately when their order arrives at your door.
                 </p>
 
                 {/* Cash on Delivery */}
-                <label
-                  className={`flex items-center gap-3 sm:gap-4 border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${
-                    postMethod === POST_METHODS.COD
-                      ? "border-blue-400 bg-blue-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="postMethod"
-                    value={POST_METHODS.COD}
+                <label className={`flex items-center gap-3 sm:gap-4 border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${
+                  postMethod === POST_METHODS.COD ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"
+                }`}>
+                  <input type="radio" name="postMethod" value={POST_METHODS.COD}
                     checked={postMethod === POST_METHODS.COD}
-                    onChange={() => setPostMethod(POST_METHODS.COD)}
-                    className="sr-only"
-                  />
+                    onChange={() => setPostMethod(POST_METHODS.COD)} className="sr-only" />
                   <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -290,7 +308,7 @@ const PaymentSelection = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-gray-900 text-sm sm:text-base">Cash on Delivery</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Hand cash of Rs. {total.toFixed(0)} to the farmer on arrival
+                      Pay cash to each farmer on arrival
                     </p>
                   </div>
                   <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
@@ -300,35 +318,19 @@ const PaymentSelection = () => {
                   </div>
                 </label>
 
-                {/* FonePay on Delivery */}
-                <label
-                  className={`flex items-center gap-3 sm:gap-4 border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${
-                    postMethod === POST_METHODS.FONEPAY
-                      ? "border-[#8B1A1A] bg-red-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="postMethod"
-                    value={POST_METHODS.FONEPAY}
+                {/* FonePay */}
+                <label className={`flex items-center gap-3 sm:gap-4 border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${
+                  postMethod === POST_METHODS.FONEPAY ? "border-[#8B1A1A] bg-red-50" : "border-gray-200 hover:border-gray-300"
+                }`}>
+                  <input type="radio" name="postMethod" value={POST_METHODS.FONEPAY}
                     checked={postMethod === POST_METHODS.FONEPAY}
-                    onChange={() => setPostMethod(POST_METHODS.FONEPAY)}
-                    className="sr-only"
-                  />
+                    onChange={() => setPostMethod(POST_METHODS.FONEPAY)} className="sr-only" />
                   <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#8B1A1A] flex items-center justify-center flex-shrink-0">
                     <span className="text-white font-black text-xs leading-tight text-center">Fone<br/>Pay</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                      <p className="font-bold text-gray-900 text-sm sm:text-base">FonePay on Delivery</p>
-                      <span className="text-xs bg-red-100 text-[#8B1A1A] font-semibold px-2 py-0.5 rounded-full">
-                        Digital
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Scan the farmer's FonePay QR code when your order arrives
-                    </p>
+                    <p className="font-bold text-gray-900 text-sm sm:text-base">FonePay on Delivery</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Scan QR on delivery for each order</p>
                   </div>
                   <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
                     postMethod === POST_METHODS.FONEPAY ? "border-[#8B1A1A] bg-[#8B1A1A]" : "border-gray-300"
@@ -337,33 +339,17 @@ const PaymentSelection = () => {
                   </div>
                 </label>
 
-                {postMethod === POST_METHODS.COD && (
-                  <div className="space-y-2 sm:space-y-3">
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
-                      <p className="font-semibold mb-0.5">ℹ How it works</p>
-                      <p>1. Order placed → Farmer prepares your items</p>
-                      <p>2. Farmer delivers → You hand over cash</p>
-                      <p>3. Farmer marks payment as received</p>
-                    </div>
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-                      <p className="font-semibold mb-0.5">⚠ Please note</p>
-                      <p>Keep exact change ready. Pre-paid orders may be processed faster.</p>
-                    </div>
-                  </div>
-                )}
-
-                {postMethod === POST_METHODS.FONEPAY && (
-                  <div className="space-y-2 sm:space-y-3">
-                    <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-xs text-[#8B1A1A]">
-                      <p className="font-semibold mb-0.5">ℹ How FonePay on Delivery works</p>
-                      <p>1. Order placed → Farmer prepares your items</p>
-                      <p>2. Farmer arrives with a FonePay QR code</p>
-                      <p>3. Scan the QR in your FonePay app and pay Rs. {total.toFixed(0)}</p>
-                      <p>4. Show the farmer your payment confirmation</p>
-                    </div>
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-                      <p className="font-semibold mb-0.5">⚠ Before placing this order</p>
-                      <p>Make sure you have the FonePay app installed and your account is topped up with at least Rs. {total.toFixed(0)}.</p>
+                {/* Info note for multi-order COD */}
+                {orders.length > 1 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                    <p className="font-semibold mb-0.5">⚠ {orders.length} separate deliveries</p>
+                    <p>You have orders from {orders.length} different farmers. Each farmer will deliver and collect payment separately.</p>
+                    <div className="mt-2 space-y-0.5">
+                      {orders.map((o, i) => (
+                        <p key={o._id || o.id}>
+                          • {farmerNames[i]}: <span className="font-semibold">Rs. {(o.totalAmount || 0).toFixed(0)}</span>
+                        </p>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -377,9 +363,7 @@ const PaymentSelection = () => {
           onClick={handlePay}
           disabled={submitting}
           className={`w-full font-bold py-3.5 sm:py-4 rounded-2xl text-white text-base sm:text-lg transition shadow-lg ${
-            submitting
-              ? "bg-gray-400 cursor-not-allowed"
-              : payButtonColor()
+            submitting ? "bg-gray-400 cursor-not-allowed" : payButtonColor()
           }`}
         >
           {submitting ? (
@@ -390,9 +374,7 @@ const PaymentSelection = () => {
               </svg>
               Processing…
             </span>
-          ) : (
-            payButtonLabel()
-          )}
+          ) : payButtonLabel()}
         </button>
 
         <p className="text-xs text-gray-400 text-center mt-3 sm:mt-4">

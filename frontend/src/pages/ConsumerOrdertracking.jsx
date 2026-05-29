@@ -85,23 +85,22 @@ const ConsumerOrderTracking = () => {
     const orderId = (order._id || order.id)?.toString();
 
     if (method === "esewa") {
-      navigate("/payment", { state: { order } });
+      navigate("/payment", { state: { orders: [order] } });
       return;
     }
 
     try {
       setRetryingPayment(orderId);
-      const farmerIds = order.shipments?.map((s) => toFarmerIdStr(s.farmer)).filter(Boolean);
 
       if (method === "cod") {
-        await api.post("/api/payments/cod/confirm", { orderId, farmerIds });
+        await api.post("/api/payments/cod/confirm", { orderIds: [orderId] });
         showAlert(
           "Order Confirmed",
           `Order #${orderId.slice(-6)} confirmed! Pay cash when your order arrives.`,
           "success"
         );
       } else if (method === "fonepay") {
-        await api.post("/api/payments/fonepay/confirm", { orderId, farmerIds });
+        await api.post("/api/payments/fonepay/confirm", { orderIds: [orderId] });
         showAlert(
           "Order Confirmed",
           `Order #${orderId.slice(-6)} confirmed! Pay via FonePay QR scan on delivery.`,

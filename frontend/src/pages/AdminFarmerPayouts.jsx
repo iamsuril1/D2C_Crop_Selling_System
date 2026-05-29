@@ -1,12 +1,3 @@
-/* src/pages/AdminFarmerPayouts.jsx
-   FIXES:
-   1. Shows 15-day cooldown countdown per farmer
-   2. Disables Pay Now if cooldown active
-   3. Shows deduction info when refund was processed
-   4. Handles 429 cooldown error from API
-   5. Full mobile responsive
-*/
-
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
@@ -167,7 +158,7 @@ const PayModal = ({ farmer, onClose, onPaid }) => {
                 <svg className="w-5 h-5 text-orange-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="font-bold text-orange-800 text-sm">15-Day Cooldown Active</p>
+                <p className="font-bold text-orange-800 text-sm">3-Day Cooldown Active</p>
               </div>
               <p className="text-sm text-orange-700">
                 Last paid on {new Date(cooldown.lastPaidAt).toLocaleDateString()}.
@@ -175,7 +166,7 @@ const PayModal = ({ farmer, onClose, onPaid }) => {
                 {cooldown.nextPayoutAt && ` (${new Date(cooldown.nextPayoutAt).toLocaleDateString()})`}.
               </p>
               <p className="text-xs text-orange-600 mt-2">
-                Prevents duplicate payments. One consolidated payout per 15-day cycle.
+                Prevents duplicate payments. One consolidated payout per 3-day cycle.
               </p>
             </div>
           )}
@@ -335,7 +326,7 @@ const AdminFarmerPayouts = () => {
         <div className="mb-6 sm:mb-8 flex items-start sm:items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Farmer Payouts</h1>
-            <p className="text-gray-500 mt-1 text-xs sm:text-sm">Pay each farmer their accumulated balance · 15-day cooldown enforced</p>
+            <p className="text-gray-500 mt-1 text-xs sm:text-sm">Pay each farmer their accumulated balance · 3-day cooldown enforced</p>
           </div>
           <button onClick={() => navigate("/admin")}
             className="text-xs sm:text-sm border border-gray-200 px-3 sm:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-gray-600 flex-shrink-0">
@@ -366,8 +357,8 @@ const AdminFarmerPayouts = () => {
             <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div className="text-xs sm:text-sm text-blue-800">
-            <p className="font-semibold">15-Day Payout Cooldown Policy</p>
-            <p className="text-blue-700 mt-0.5">Each farmer can only receive a payout once every 15 days to prevent duplicate payments and ensure balances are settled in one transfer.</p>
+            <p className="font-semibold">3-Day Payout Cooldown Policy</p>
+            <p className="text-blue-700 mt-0.5">Each farmer can only receive a payout once every 3 days to prevent duplicate payments and ensure balances are settled in one transfer.</p>
           </div>
         </div>
 
