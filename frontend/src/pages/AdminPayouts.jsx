@@ -1,5 +1,3 @@
-// src/pages/AdminPayouts.jsx — Mobile responsive
-
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import AlertModal   from "../components/AlertModal";

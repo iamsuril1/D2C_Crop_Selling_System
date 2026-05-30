@@ -1,11 +1,3 @@
-/* src/pages/Orders.jsx
-   Per-item Normal / Bulk order type.
-   - Each cart row has its own Normal | Bulk toggle
-   - Price shown updates live (bulk price when available + quantity >= 100)
-   - No global OrderTypePicker at the bottom
-   - Backend receives items: [{ productId, quantity, orderType }]
-*/
-
 import React, { useContext, useMemo, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
@@ -22,10 +14,6 @@ import {
 } from "../utils/orderConstants";
 
 const PLATFORM_CHARGE = 25;
-
-/* ─────────────────────────────────────────────────────────────
-   INLINE ORDER-TYPE TOGGLE — shown inside each cart row
-───────────────────────────────────────────────────────────── */
 const ItemTypePicker = ({ item, itemType, onTypeChange }) => {
   const hasBulkPrice = item?.bulkPrice && Number(item.bulkPrice) > 0;
   const qty          = Number(item?.quantity || 0);
@@ -95,9 +83,6 @@ const ItemTypePicker = ({ item, itemType, onTypeChange }) => {
   );
 };
 
-/* ─────────────────────────────────────────────────────────────
-   EFFECTIVE PRICE
-───────────────────────────────────────────────────────────── */
 const effectiveUnitPrice = (item, itemType) => {
   if (
     itemType === ORDER_TYPES.BULK &&
@@ -109,9 +94,6 @@ const effectiveUnitPrice = (item, itemType) => {
   return Number(item?.price || 0);
 };
 
-/* ─────────────────────────────────────────────────────────────
-   MAIN COMPONENT
-───────────────────────────────────────────────────────────── */
 const Orders = () => {
   const navigate = useNavigate();
   const { cartItems, removeFromCart, updateQty, clearCart } = useContext(CartContext);

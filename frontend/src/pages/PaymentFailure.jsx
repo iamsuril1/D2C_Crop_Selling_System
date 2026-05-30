@@ -1,4 +1,3 @@
-// PaymentFailure.jsx
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 const PaymentFailure = () => {

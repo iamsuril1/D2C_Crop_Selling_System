@@ -1,12 +1,3 @@
-/* src/pages/AdminDashboard.jsx
-   SIMPLIFIED FLOW:
-   - "Release" tab REMOVED entirely
-   - "Pay Farmers" tab now shows all orders where consumer paid but farmer not yet paid
-   - No adminPayout step needed
-   - Refunds tab unchanged (deducts from farmer payout)
-   - Overview shows simplified stats
-*/
-
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
@@ -14,7 +5,6 @@ import { APIBASEURL } from "../utils/config";
 import AlertModal   from "../components/AlertModal";
 import ConfirmModal from "../components/ConfirmModal";
 
-/* ── QR image helper ── */
 const QRImage = ({ src }) => {
   if (!src) return null;
   const full = src.startsWith("http") ? src : `${APIBASEURL}${src}`;
@@ -24,7 +14,6 @@ const QRImage = ({ src }) => {
   );
 };
 
-/* ── Farmer payment details ── */
 const PaymentDetails = ({ details }) => {
   if (!details) return <p className="text-xs text-gray-400">No payment methods set</p>;
   const { preferred, esewa, bankQr, bankTransfer } = details;
@@ -61,7 +50,6 @@ const PaymentDetails = ({ details }) => {
   );
 };
 
-/* ── Pay Farmer Modal ── */
 const PayFarmerModal = ({ farmer, onClose, onPaid }) => {
   const { paymentDetails, cooldown } = farmer;
   const blocked = cooldown && !cooldown.allowed;
@@ -94,7 +82,6 @@ const PayFarmerModal = ({ farmer, onClose, onPaid }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      {/* FIX: On mobile slides up from bottom (rounded-t-2xl), on sm+ is centered card */}
       <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md overflow-hidden max-h-[90vh] overflow-y-auto">
         <div className="bg-gradient-to-r from-green-600 to-green-700 px-5 py-4 sm:px-6 sm:py-5 text-white">
           <h2 className="text-lg sm:text-xl font-bold">Pay {farmer.farmerName}</h2>
@@ -132,7 +119,6 @@ const PayFarmerModal = ({ farmer, onClose, onPaid }) => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900">{m.label}</p>
-                  {/* FIX: truncate long detail strings */}
                   <p className="text-xs text-gray-500 truncate">{m.detail}</p>
                 </div>
                 {paymentDetails?.preferred === m.value && <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">Preferred</span>}
@@ -161,10 +147,6 @@ const PayFarmerModal = ({ farmer, onClose, onPaid }) => {
     </div>
   );
 };
-
-/* ══════════════════════════════════════════════════════════════
-   MAIN ADMIN DASHBOARD
-══════════════════════════════════════════════════════════════ */
 const AdminDashboard = () => {
   const navigate   = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
@@ -200,8 +182,6 @@ const AdminDashboard = () => {
   const showAlert    = (title, message, type="error") => setAlertModal({ isOpen:true, title, message, type });
   const closeAlert   = () => setAlertModal(p => ({ ...p, isOpen:false }));
   const closeConfirm = () => setConfirmModal(p => ({ ...p, isOpen:false, action:null }));
-
-  /* ── LOADERS ── */
   const loadDashboard = async () => {
     try {
       setLoading(true);
@@ -272,16 +252,12 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (activeTab === "refunds") loadRefunds(refundTab);
   }, [activeTab, refundTab]);
-
-  /* ── Farmer payout actions ── */
   const handleFarmerPaid = () => {
     setPayingFarmer(null);
     showAlert("Payment recorded","The farmer has been notified.","success");
     loadFarmerPayoutStats();
     loadFarmerPayouts();
   };
-
-  /* ── Refund actions ── */
   const getRefundForm = (retId, ret) => {
     if (refundForms[retId]) return refundForms[retId];
     const totalAmt = ret.items?.reduce((s,i) => s+(i.price||0)*(i.quantity||0), 0)||0;
@@ -310,8 +286,6 @@ const AdminDashboard = () => {
       },
     });
   };
-
-  /* ── Filtered orders ── */
   const filteredOrders = useMemo(() => {
     let list = [...orders];
     if (orderStatusFilter !== "all") list = list.filter(o=>o.status===orderStatusFilter);
@@ -327,7 +301,6 @@ const AdminDashboard = () => {
     return list;
   }, [orders, orderStatusFilter, orderSearch]);
 
-  /* Tabs */
   const TABS = [
     { id:"overview",       label:"Overview",    icon:"📊" },
     { id:"farmer-payouts", label:"Pay Farmers", icon:"💸" },
@@ -362,14 +335,11 @@ const AdminDashboard = () => {
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-8 py-4 sm:py-8">
 
-        {/* ── Header ── */}
         <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
-            {/* FIX: smaller title on mobile */}
             <h1 className="text-2xl sm:text-4xl font-bold text-gray-900">Admin Dashboard</h1>
             <p className="text-gray-500 mt-0.5 text-sm">MeroBari platform management</p>
           </div>
-          {/* FIX: alert buttons wrap cleanly, full width on xs */}
           <div className="flex flex-col xs:flex-row gap-2 sm:gap-3">
             {farmerPayoutStats?.pendingFarmers > 0 && (
               <button onClick={() => setActiveTab("farmer-payouts")}
@@ -385,10 +355,6 @@ const AdminDashboard = () => {
             )}
           </div>
         </div>
-
-        {/* ── Tab bar ──
-            FIX: On mobile show only icon (no label/badge) to fit all 6 tabs.
-            On sm+ show icon + label + badge as before. */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 mb-6 sm:mb-8 flex gap-1 overflow-x-auto">
           {TABS.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)}
@@ -396,9 +362,7 @@ const AdminDashboard = () => {
                 activeTab===t.id ? "bg-green-600 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
               }`}>
               <span className="text-base">{t.icon}</span>
-              {/* Label hidden on very small screens */}
               <span className="hidden xs:inline sm:inline">{t.label}</span>
-              {/* Badges: always visible as dot on mobile */}
               {t.id==="farmer-payouts" && farmerPayoutStats?.pendingFarmers>0 && (
                 <span className="hidden sm:inline bg-green-400 text-green-900 text-xs font-bold px-1.5 py-0.5 rounded-full">{farmerPayoutStats.pendingFarmers}</span>
               )}
@@ -417,11 +381,8 @@ const AdminDashboard = () => {
             </button>
           ))}
         </div>
-
-        {/* ══ OVERVIEW ══ */}
         {activeTab==="overview" && (
           <div className="space-y-4 sm:space-y-6">
-            {/* FIX: 2-col on xs, 4-col on lg */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {[
                 { label:"Total Users",    value:stats.totalUsers,                             sub:`${stats.farmers} farmers · ${stats.consumers} consumers`, icon:"👥", bg:"bg-green-50",   text:"text-green-700"   },
@@ -434,14 +395,12 @@ const AdminDashboard = () => {
                     <p className="text-xs sm:text-sm font-medium text-gray-600 leading-tight">{c.label}</p>
                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/60 rounded-xl flex items-center justify-center text-lg sm:text-xl flex-shrink-0">{c.icon}</div>
                   </div>
-                  {/* FIX: smaller number on mobile */}
                   <p className={`text-2xl sm:text-3xl font-bold ${c.text} truncate`}>{c.value}</p>
                   <p className="text-xs text-gray-500 mt-1 leading-tight">{c.sub}</p>
                 </div>
               ))}
             </div>
 
-            {/* Quick cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {farmerPayoutStats && (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
@@ -452,7 +411,6 @@ const AdminDashboard = () => {
                     </div>
                     <button onClick={() => setActiveTab("farmer-payouts")} className="text-sm text-green-600 hover:underline font-medium">Pay →</button>
                   </div>
-                  {/* FIX: mini stats — col-3 with smaller text on mobile */}
                   <div className="grid grid-cols-3 gap-2 sm:gap-3">
                     {[
                       { label:"To Pay",   value:farmerPayoutStats.pendingFarmers,                              color:"text-orange-600", bg:"bg-orange-50" },
@@ -523,7 +481,6 @@ const AdminDashboard = () => {
                             </div>
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">{order.consumer?.firstName} {order.consumer?.lastName}</p>
-                              {/* FIX: hide email on xs to save space */}
                               <p className="text-xs text-gray-400 truncate hidden sm:block">{order.consumer?.email}</p>
                             </div>
                           </div>
@@ -543,7 +500,6 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* ══ PAY FARMERS ══ */}
         {activeTab==="farmer-payouts" && (
           <div className="space-y-4 sm:space-y-6">
             <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-3">
@@ -556,7 +512,6 @@ const AdminDashboard = () => {
             </div>
 
             {farmerPayoutStats && (
-              /* FIX: 3-col even on mobile — tighter padding + smaller text */
               <div className="grid grid-cols-3 gap-2 sm:gap-4">
                 {[
                   { label:"Awaiting",  value:farmerPayoutStats.pendingFarmers,                           color:"text-yellow-600", bg:"bg-yellow-50",  border:"border-l-yellow-400" },
@@ -580,7 +535,6 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            {/* Sub-tabs */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-1.5 flex gap-1">
               {[{value:"pending",label:"Pending Payouts"},{value:"history",label:"History"}].map(t => (
                 <button key={t.value} onClick={() => setFarmerPayoutTab(t.value)}
@@ -610,7 +564,6 @@ const AdminDashboard = () => {
                     const hasDeduct  = farmer.pendingShipments?.some(s => s.returnDeduction>0);
                     return (
                       <div key={farmer.farmerId} className={`bg-white rounded-2xl border-2 shadow-sm transition-all ${isExpanded?"border-green-400":blocked?"border-orange-200":"border-gray-100 hover:border-gray-200"}`}>
-                        {/* FIX: stack vertically on mobile */}
                         <div className="px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                           <div className="flex items-center gap-3 flex-1 min-w-0">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${blocked?"bg-orange-400":"bg-gradient-to-br from-green-400 to-emerald-500"}`}>
@@ -621,7 +574,6 @@ const AdminDashboard = () => {
                               <p className="text-xs text-gray-400 truncate">{farmer.farmerEmail}</p>
                             </div>
                           </div>
-                          {/* Amount + actions row */}
                           <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 flex-wrap">
                             <div className="text-left sm:text-right">
                               <p className={`text-xl sm:text-2xl font-black ${blocked?"text-gray-400":"text-green-700"}`}>Rs. {farmer.pendingAmount.toLocaleString()}</p>
@@ -738,8 +690,6 @@ const AdminDashboard = () => {
             )}
           </div>
         )}
-
-        {/* ══ REFUNDS ══ */}
         {activeTab==="refunds" && (
           <div className="space-y-4 sm:space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-3">
@@ -761,7 +711,6 @@ const AdminDashboard = () => {
                 ))}
               </div>
             )}
-            {/* FIX: sub-tabs fill width on mobile */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-1.5 flex gap-1">
               {[{value:"pending_refund",label:"Needs Refund"},{value:"processed",label:"Refunded"},{value:"all",label:"All"}].map(t => (
                 <button key={t.value} onClick={() => setRefundTab(t.value)}
@@ -819,7 +768,6 @@ const AdminDashboard = () => {
                               {ret.refundMethod==="esewa" ? (
                                 <div>
                                   <p className="text-xs font-bold text-green-700">eSewa</p>
-                                  {/* FIX: break-all on eSewa ID */}
                                   <p className="font-mono font-bold text-gray-900 text-lg sm:text-xl break-all">{ret.refundPaymentDetail?.esewaId||"—"}</p>
                                 </div>
                               ) : ret.refundMethod==="bank_transfer" ? (
@@ -906,7 +854,6 @@ const AdminDashboard = () => {
         {/* ══ ORDERS ══ */}
         {activeTab==="orders" && (
           <div className="space-y-4 sm:space-y-6">
-            {/* FIX: status filter — 3-col on mobile → 6-col on lg */}
             <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
               {[
                 { label:"All",       value:orders.length,                                   filter:"all",       color:"text-gray-900",   bg:"bg-white"     },
@@ -968,7 +915,6 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* ══ USERS ══ */}
         {activeTab==="users" && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-4 sm:px-6 py-4 border-b border-gray-100">
@@ -1009,7 +955,6 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* ══ PRODUCTS ══ */}
         {activeTab==="products" && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-4 sm:px-6 py-4 border-b border-gray-100">

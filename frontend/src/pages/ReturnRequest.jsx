@@ -1,7 +1,3 @@
-// src/pages/ReturnRequest.jsx
-// Added: refund payment method selection (eSewa / Bank Transfer / Cash)
-// Consumer specifies how they want their refund before submitting.
-
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/axios";

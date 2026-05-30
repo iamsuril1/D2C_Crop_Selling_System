@@ -90,7 +90,6 @@ const FarmerOrders = () => {
     });
   };
 
-  /* Payment status label — simplified, no "Held by admin" */
   const getPaymentStatusLabel = (status) => {
     switch (status) {
       case "paid":    return { text: "Paid",             color: "text-green-600",  bg: "bg-green-100 text-green-800"   };
@@ -102,8 +101,6 @@ const FarmerOrders = () => {
     }
   };
 
-  /* Can farmer take action on this order?
-     Block if consumer hasn't paid yet (paymentStatus = "pending") */
   const canFarmerAct = (order) => {
     if (order.status === "cancelled") return false;
     if (order.status === "delivered") return false;

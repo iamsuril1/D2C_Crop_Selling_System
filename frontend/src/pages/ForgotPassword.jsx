@@ -234,7 +234,6 @@ const ForgotPassword = () => {
                 onChange={(e) => setOtp(e.target.value)}
                 placeholder="000000"
                 maxLength={6}
-                /* tracking reduced on mobile to stay within bounds; text-base prevents iOS zoom */
                 className="w-full text-center text-2xl sm:text-3xl font-bold tracking-[0.3em] sm:tracking-[0.5em] border-2 border-green-200 rounded-xl py-3 sm:py-4 text-base focus:outline-none focus:ring-2 focus:ring-green-400"
               />
             </div>

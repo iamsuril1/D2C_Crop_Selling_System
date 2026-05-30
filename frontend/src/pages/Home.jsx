@@ -1,9 +1,5 @@
 import { Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-
-/* ────────────────────────────────────────────────────────────
-   HOOK: Intersection Observer (fires once)
-──────────────────────────────────────────────────────────── */
 const useReveal = (threshold = 0.12) => {
   const ref         = useRef(null);
   const [on, setOn] = useState(false);
@@ -19,10 +15,6 @@ const useReveal = (threshold = 0.12) => {
   }, []);
   return [ref, on];
 };
-
-/* ────────────────────────────────────────────────────────────
-   VEGETABLES with emojis (wheel only)
-──────────────────────────────────────────────────────────── */
 const VEGGIES = [
   { name: "Tomato",    color: "#E74C3C", emoji: "🍅" },
   { name: "Spinach",   color: "#27AE60", emoji: "🥬" },
@@ -37,10 +29,6 @@ const VEGGIES = [
   { name: "Capsicum",  color: "#E74C3C", emoji: "🫑" },
   { name: "Cucumber",  color: "#28B463", emoji: "🥒" },
 ];
-
-/* ────────────────────────────────────────────────────────────
-   ROTATING VEGGIE WHEEL — emojis on the ring
-──────────────────────────────────────────────────────────── */
 const VeggieWheel = () => {
   const [angle, setAngle] = useState(0);
   const raf               = useRef(null);
@@ -124,10 +112,6 @@ const VeggieWheel = () => {
     </svg>
   );
 };
-
-/* ────────────────────────────────────────────────────────────
-   FLIGHT PATH — plane emoji + box emoji animated
-──────────────────────────────────────────────────────────── */
 const FlightPath = () => {
   return (
     <div className="relative w-full overflow-hidden py-20 px-6 lg:px-16 bg-[#F5F0E8]">
@@ -307,10 +291,6 @@ const FlightPath = () => {
     </div>
   );
 };
-
-/* ────────────────────────────────────────────────────────────
-   TICKER — color dots + names, no emojis
-──────────────────────────────────────────────────────────── */
 const Ticker = () => {
   const items = [...VEGGIES, ...VEGGIES];
   return (
@@ -335,10 +315,6 @@ const Ticker = () => {
     </div>
   );
 };
-
-/* ────────────────────────────────────────────────────────────
-   MAIN COMPONENT
-──────────────────────────────────────────────────────────── */
 const Home = () => {
   const [ready,    setReady]    = useState(false);
   const [howRef,   howOn]       = useReveal(0.1);
@@ -391,10 +367,6 @@ const Home = () => {
       `}</style>
 
       <div className="dm text-[#0A1F0A] overflow-x-hidden bg-[#F5F0E8]">
-
-        {/* ══════════════════════════════════════════════════════
-            HERO
-        ══════════════════════════════════════════════════════ */}
         <section className="relative min-h-screen bg-[#0A1F0A] flex flex-col overflow-hidden">
 
           <div
@@ -502,15 +474,7 @@ const Home = () => {
 
           <div className="h-16 bg-gradient-to-b from-transparent to-[#F5F0E8]" />
         </section>
-
-        {/* ══════════════════════════════════════════════════════
-            TICKER
-        ══════════════════════════════════════════════════════ */}
         <Ticker />
-
-        {/* ══════════════════════════════════════════════════════
-            FLIGHT PATH
-        ══════════════════════════════════════════════════════ */}
         <div
           ref={howRef}
           style={{
@@ -521,10 +485,6 @@ const Home = () => {
         >
           <FlightPath />
         </div>
-
-        {/* ══════════════════════════════════════════════════════
-            TWO DOORS
-        ══════════════════════════════════════════════════════ */}
         <section ref={doorsRef} className="bg-[#0A1F0A] py-28 px-6 lg:px-16">
           <div className="max-w-6xl mx-auto">
 
@@ -646,10 +606,6 @@ const Home = () => {
             </div>
           </div>
         </section>
-
-        {/* ══════════════════════════════════════════════════════
-            VOICES
-        ══════════════════════════════════════════════════════ */}
         <section ref={voiceRef} className="bg-[#F5F0E8] py-28 px-6 lg:px-16">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-14">
@@ -716,10 +672,6 @@ const Home = () => {
             </div>
           </div>
         </section>
-
-        {/* ══════════════════════════════════════════════════════
-            FINAL CTA
-        ══════════════════════════════════════════════════════ */}
         <section ref={ctaRef} className="bg-[#0A1F0A] py-32 px-6 lg:px-16 relative overflow-hidden">
 
           <div
