@@ -1,9 +1,5 @@
 import Order from "../models/Order.js";
 import { sendNotification } from "../utils/notificationHelpers.js";
-
-/* ─────────────────────────────────────────────────────────────
-   GET STATS — GET /api/payouts/stats
-───────────────────────────────────────────────────────────── */
 export const getPayoutStats = async (req, res) => {
   try {
     const [pending, released] = await Promise.all([
@@ -36,11 +32,6 @@ export const getPayoutStats = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-/* ─────────────────────────────────────────────────────────────
-   GET PENDING — GET /api/payouts/pending
-   Orders where consumer paid but admin has not yet released.
-───────────────────────────────────────────────────────────── */
 export const getPendingPayouts = async (req, res) => {
   try {
     const orders = await Order.find({
@@ -57,11 +48,6 @@ export const getPendingPayouts = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-/* ─────────────────────────────────────────────────────────────
-   GET ALL — GET /api/payouts/all
-   All paid orders regardless of release status.
-───────────────────────────────────────────────────────────── */
 export const getAllPayouts = async (req, res) => {
   try {
     const orders = await Order.find({ paymentStatus: "paid" })
@@ -75,12 +61,6 @@ export const getAllPayouts = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   RELEASE FULL ORDER — PUT /api/payouts/:orderId/release
-   Releases payment to ALL farmers in one order at once.
-   Farmer receives: shipment.subtotal (items only)
-   Admin keeps:     shipment.deliveryFee + platformCharge
-───────────────────────────────────────────────────────────── */
 export const releasePayoutForOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.orderId)
@@ -133,10 +113,6 @@ export const releasePayoutForOrder = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   RELEASE SINGLE SHIPMENT — PUT /api/payouts/:orderId/release/:farmerId
-   Releases payment to one specific farmer's shipment.
-───────────────────────────────────────────────────────────── */
 export const releasePayoutForShipment = async (req, res) => {
   try {
     const { orderId, farmerId } = req.params;
@@ -170,7 +146,6 @@ export const releasePayoutForShipment = async (req, res) => {
       releasedAt: new Date(),
     });
 
-    // If every shipment is now paid, mark the whole order as fully released
     const allPaid = order.shipments.every((s) => s.paymentStatus === "paid");
     if (allPaid) {
       order.adminPayout.released   = true;

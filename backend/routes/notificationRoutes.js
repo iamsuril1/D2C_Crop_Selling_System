@@ -8,7 +8,7 @@ import {
 
 const router = express.Router();
 
-router.use(protect); // All require auth
+router.use(protect); 
 
 router.get("/", getNotifications);
 router.put("/:id/read", markAsRead);

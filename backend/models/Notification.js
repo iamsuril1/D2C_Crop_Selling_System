@@ -16,12 +16,10 @@ const notificationSchema = new mongoose.Schema({
       "order_delivered",
       "order_cancelled",
       "new_product_like",
-      // Payment (added in previous fix)
       "payment_submitted",
       "payment_received",
       "payment_paid",
       "payment_failed",
-      // Returns (new)
       "return_requested",
       "return_approved",
       "return_rejected",

@@ -1,7 +1,3 @@
-// backend/models/Return.js
-// ADDED: farmerDeductionAmount — items-only deduction from farmer
-//        refundRecord.amount   — actual amount paid to consumer (may differ from refundAmount)
-
 import mongoose from "mongoose";
 
 const returnItemSchema = new mongoose.Schema(
@@ -44,13 +40,11 @@ const returnSchema = new mongoose.Schema(
     farmerNote: { type: String, default: "" },
     decidedAt:  { type: Date },
 
-    // ── Refund payment info (collected from consumer at request time) ──
     refundMethod: {
       type: String,
       enum: ["esewa", "bank_transfer", "cash", null],
       default: null,
     },
-    // For dashboard display: consumer's eSewa ID or "Cash"
     refundEsewaId: { type: String, default: "" },
 
     refundPaymentDetail: {
@@ -59,14 +53,9 @@ const returnSchema = new mongoose.Schema(
       accountNumber: { type: String, default: "" },
       accountName:   { type: String, default: "" },
     },
-
-    // ── Refund amounts ──
-    // refundAmount          = full consumer refund (items + delivery + platform portion)
-    // farmerDeductionAmount = only items cost deducted from farmer
     refundAmount:          { type: Number, default: 0 },
     farmerDeductionAmount: { type: Number, default: 0 },
 
-    // ── Refund processing (filled by admin) ──
     refundStatus: {
       type:    String,
       enum:    ["pending", "processed", "skipped"],
@@ -81,7 +70,6 @@ const returnSchema = new mongoose.Schema(
       note:        { type: String, default: "" },
     },
 
-    // ── Farmer deduction ──
     farmerDeducted:   { type: Boolean, default: false },
     farmerDeductedAt: { type: Date },
   },

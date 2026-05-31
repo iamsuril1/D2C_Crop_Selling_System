@@ -11,7 +11,6 @@ import {
 
 const router = express.Router();
 
-// All payout routes are admin-only
 router.use(protect, authorize("admin"));
 
 router.get("/stats",                      getPayoutStats);

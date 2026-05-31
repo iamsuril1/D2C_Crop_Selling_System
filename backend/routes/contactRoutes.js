@@ -5,8 +5,8 @@ import { submitContact } from "../controllers/contactController.js";
 const router = express.Router();
 
 const contactLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,   // 1 hour window
-  max: 5,                      // max 5 submissions per IP per hour
+  windowMs: 60 * 60 * 1000,   
+  max: 5,                     
   message: {
     message: "Too many messages sent from this IP. Please wait an hour before trying again.",
   },

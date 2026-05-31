@@ -11,11 +11,9 @@ export const sendOtp = async (req, res) => {
     const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ message: "Email already registered" });
 
-    // Generate 6-digit OTP
     const code = crypto.randomInt(100000, 999999).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Delete any previous OTP for this email
     await Otp.deleteMany({ email });
 
     await Otp.create({ email, code, expiresAt });

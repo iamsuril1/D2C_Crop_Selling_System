@@ -1,22 +1,9 @@
-/* backend/controllers/farmerPayoutController.js
-   SIMPLIFIED FLOW:
-   - Removed adminPayout.released requirement entirely
-   - As soon as consumer pays (paymentStatus: "paid"), order appears in farmer payout queue
-   - Admin directly pays farmers — no separate "release" step
-   - Return deductions still applied
-   - 15-day cooldown still enforced
-*/
-
 import Order  from "../models/Order.js";
 import User   from "../models/User.js";
 import Return from "../models/Return.js";
 import { sendNotification } from "../utils/notificationHelpers.js";
 
 const PAYOUT_COOLDOWN_DAYS = 3;
-
-/* ─────────────────────────────────────────────────────────────
-   HELPER — pull enabled payment methods for a farmer
-───────────────────────────────────────────────────────────── */
 const extractPaymentDetails = (farmer) => {
   const methods = farmer.paymentMethods || [];
   const esewa        = methods.find((m) => m.type === "esewa"         && m.enabled);
@@ -35,10 +22,6 @@ const extractPaymentDetails = (farmer) => {
     } : null,
   };
 };
-
-/* ─────────────────────────────────────────────────────────────
-   HELPER — check 15-day cooldown for a farmer
-───────────────────────────────────────────────────────────── */
 const checkPayoutCooldown = async (farmerId) => {
   const recentOrder = await Order.findOne({
     "shipments.farmer":     farmerId,
@@ -72,18 +55,12 @@ const checkPayoutCooldown = async (farmerId) => {
     daysLeft:   Math.max(0, daysLeft),
   };
 };
-
-/* ─────────────────────────────────────────────────────────────
-   GET /api/farmer-payouts
-   Now: any order where consumer paid AND farmer not yet paid
-   No longer requires adminPayout.released = true
-───────────────────────────────────────────────────────────── */
 export const getFarmerPayouts = async (req, res) => {
   try {
     const orders = await Order.find({
-      paymentStatus:          "paid",          // consumer has paid
+      paymentStatus:          "paid",       
       status:                 { $nin: ["cancelled"] },
-      "shipments.farmerPaid": { $ne: true },   // farmer not yet paid
+      "shipments.farmerPaid": { $ne: true },   
     })
       .populate("consumer", "firstName lastName")
       .populate(
@@ -96,7 +73,7 @@ export const getFarmerPayouts = async (req, res) => {
     for (const order of orders) {
       for (const shipment of order.shipments) {
         if (shipment.farmerPaid)              continue;
-        if (shipment.paymentStatus === "pending") continue; // shipment-level not yet confirmed
+        if (shipment.paymentStatus === "pending") continue; 
 
         const farmer = shipment.farmer;
         if (!farmer) continue;
@@ -169,9 +146,6 @@ export const getFarmerPayouts = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   GET /api/farmer-payouts/history
-───────────────────────────────────────────────────────────── */
 export const getFarmerPayoutHistory = async (req, res) => {
   try {
     const orders = await Order.find({
@@ -253,7 +227,6 @@ export const markFarmerPaid = async (req, res) => {
       });
     }
 
-    // 15-day cooldown check
     const cooldown = await checkPayoutCooldown(farmerId);
     if (!cooldown.allowed) {
       return res.status(429).json({
@@ -266,7 +239,6 @@ export const markFarmerPaid = async (req, res) => {
       });
     }
 
-    // Find all orders where this farmer has an unpaid shipment and consumer has paid
     const orders = await Order.find({
       paymentStatus:          "paid",
       "shipments.farmer":     farmerId,
@@ -332,9 +304,6 @@ export const markFarmerPaid = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   GET /api/farmer-payouts/stats
-───────────────────────────────────────────────────────────── */
 export const getFarmerPayoutStats = async (req, res) => {
   try {
     const [pendingOrders, paidShipmentOrders] = await Promise.all([

@@ -81,8 +81,7 @@ userSchema.set("toJSON", {
     ret.id = ret._id.toString();
     delete ret._id;
     delete ret.__v;
-    delete ret.password; // extra safety net
-    return ret;
+    delete ret.password; 
   },
 });
 userSchema.set("toObject", { virtuals: true });

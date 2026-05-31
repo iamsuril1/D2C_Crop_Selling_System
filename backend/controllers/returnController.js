@@ -1,12 +1,3 @@
-// backend/controllers/returnController.js
-// FIXES:
-//  - createReturn: refundAmount now = items subtotal + delivery fee + platform charge
-//                  farmerDeductionAmount stored separately = items subtotal only
-//  - processAdminRefund: consumer gets full refundAmount (items+delivery+platform)
-//                        farmer deducted only farmerDeductionAmount (items only)
-//  - getAdminReturns: also returns /all with status query param for dashboard
-//  - getAdminReturnStats: added pendingRefund and pendingAmount fields
-
 import Return  from "../models/Return.js";
 import Order   from "../models/Order.js";
 import Product from "../models/Product.js";
@@ -28,7 +19,6 @@ const moveToPrivate = (filename) => {
 const RETURN_WINDOW_DAYS = 2;
 const PLATFORM_CHARGE    = 25;
 
-// ─── POST /api/returns ───────────────────────────────────────────────────────
 
 export const createReturn = async (req, res) => {
   try {
@@ -111,19 +101,13 @@ export const createReturn = async (req, res) => {
       refundPaymentDetail.accountNumber = accountNumber?.trim();
       refundPaymentDetail.accountName   = accountName?.trim();
     }
-
-    // ── FIXED: Full refund amount = items + delivery for this shipment + platform charge
-    // Platform charge is shared across all shipments; for a single-shipment return
-    // we include the full platform charge. If multiple shipments exist, prorate it.
     const shipmentCount          = order.shipments.length || 1;
     const itemsSubtotal          = shipment.subtotal       || 0;
     const deliveryFee            = shipment.deliveryFee    || 0;
     const proratedPlatformCharge = Math.round((order.platformCharge || PLATFORM_CHARGE) / shipmentCount);
 
-    // Full amount consumer paid for this shipment
     const refundAmount = itemsSubtotal + deliveryFee + proratedPlatformCharge;
 
-    // Only items are deducted from farmer (delivery & platform stay with admin/platform)
     const farmerDeductionAmount = itemsSubtotal;
 
     const returnDoc = await Return.create({
@@ -141,8 +125,8 @@ export const createReturn = async (req, res) => {
       evidencePhoto,
       refundMethod,
       refundPaymentDetail,
-      refundAmount,               // full amount consumer gets back
-      farmerDeductionAmount,      // only items deducted from farmer
+      refundAmount,               
+      farmerDeductionAmount,      
     });
 
     await sendNotification(

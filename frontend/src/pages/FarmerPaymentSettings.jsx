@@ -216,16 +216,7 @@ const FarmerPaymentSettings = () => {
               using the payment method you configure below. Make sure at least one method is set up and
               your preferred method is selected.
             </p>
-            <div className="flex items-start gap-2 text-sm text-blue-800">
-              <span className="text-base mt-0.5 flex-shrink-0">💵</span>
-              <div>
-                <p className="font-semibold">Cash on Delivery</p>
-                <p className="text-blue-700 text-xs mt-0.5">
-                  Buyers can always pay cash — no setup needed from you. You collect it on delivery.
-                  This does not affect how admin pays your earnings.
-                </p>
-              </div>
-            </div>
+            
           </div>
 
           <div className="space-y-4 sm:space-y-6">

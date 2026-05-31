@@ -1,12 +1,3 @@
-/* backend/controllers/paymentController.js
-   SIMPLIFIED:
-   - Supports single orderId OR array of orderIds for all payment methods
-   - When consumer pays (eSewa / COD / FonePay), shipment.paymentStatus → "paid"
-   - Order.paymentStatus → "paid"
-   - Farmer payout queue picks up all orders where paymentStatus = "paid"
-     and shipments.farmerPaid = false  (no release step needed)
-*/
-
 import crypto   from "crypto";
 import Order    from "../models/Order.js";
 import User     from "../models/User.js";
@@ -36,7 +27,6 @@ const verifyEsewaSignature = (responseData) => {
   return expected === signature;
 };
 
-/* ── Farmer Payment Methods ── */
 export const getFarmerPaymentMethods = async (req, res) => {
   try {
     const farmer = await User.findById(req.params.farmerId).select(
@@ -78,10 +68,6 @@ export const uploadPaymentQR = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-/* ─────────────────────────────────────────────────────────────
-   INITIATE ESEWA — supports single orderId OR array of orderIds
-───────────────────────────────────────────────────────────── */
 export const initiateEsewa = async (req, res) => {
   try {
     const { orderId, orderIds } = req.body;
@@ -90,7 +76,6 @@ export const initiateEsewa = async (req, res) => {
     const orders = await Order.find({ _id: { $in: ids } });
     if (!orders.length) return res.status(404).json({ message: "Orders not found" });
 
-    // Verify all belong to this consumer
     for (const order of orders) {
       if (order.consumer.toString() !== req.user._id.toString())
         return res.status(403).json({ message: "Unauthorized" });
@@ -102,10 +87,8 @@ export const initiateEsewa = async (req, res) => {
     const itemsAndDelivery = orders.reduce((s, o) => s + (o.itemsSubtotal || 0) + (o.deliveryTotal || 0), 0);
     const platformCharge   = orders.reduce((s, o) => s + (o.platformCharge ?? 25), 0);
 
-    // Combined transaction UUID encodes all order IDs
     const transactionUuid = `${ids.join("_")}-${Date.now()}`;
 
-    // Save transactionUuid on all orders
     for (const order of orders) {
       order.esewaTransactionUuid = transactionUuid;
       await order.save();
@@ -279,7 +262,6 @@ export const confirmFonePay = async (req, res) => {
   }
 };
 
-/* ── Mark FonePay received (farmer) ── */
 export const markFonePayReceived = async (req, res) => {
   try {
     const { orderId, transactionId } = req.body;
@@ -305,7 +287,6 @@ export const markFonePayReceived = async (req, res) => {
   }
 };
 
-/* ── Mark COD received (farmer) ── */
 export const markCODReceived = async (req, res) => {
   try {
     const { orderId } = req.body;
@@ -330,7 +311,6 @@ export const markCODReceived = async (req, res) => {
   }
 };
 
-/* ── Serve private files ── */
 export const servePaymentFile = async (req, res) => {
   try {
     const filename = path.basename(req.params.filename);
@@ -350,7 +330,6 @@ export const servePaymentFile = async (req, res) => {
   }
 };
 
-/* ── Farmer verifies manual payment ── */
 export const verifyPayment = async (req, res) => {
   try {
     const { orderId, status } = req.body;
