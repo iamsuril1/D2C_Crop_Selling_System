@@ -1,8 +1,3 @@
-/* src/components/ProductForm.jsx
-   Updated: tips sidebar now references NORMAL_MIN_KG / NORMAL_MAX_KG / BULK_MIN_KG
-   from orderConstants so the numbers are always in sync.
-*/
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";

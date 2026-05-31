@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import api             from "../api/axios";
 import AlertModal      from "../components/AlertModal";
 
-/* ── Google sign-in button ── */
 const GoogleButton = () => {
   const handleGoogle = () => {
     window.location.href =
@@ -200,8 +199,6 @@ const Register = () => {
               Create Account
             </h2>
 
-            <GoogleButton />
-
             {/* Name row — stacks to single column on very small screens */}
             <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="relative">
@@ -305,6 +302,7 @@ const Register = () => {
               </label>
             </div>
 
+            {/* Send OTP button */}
             <button
               type="submit"
               disabled={loading}
@@ -312,6 +310,9 @@ const Register = () => {
             >
               {loading ? "Sending OTP..." : "Send Verification Code"}
             </button>
+
+            {/* Google button — after Send Verification Code */}
+            <GoogleButton />
 
             <p className="text-center text-sm text-gray-700">
               Already have an account?{" "}

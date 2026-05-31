@@ -1,19 +1,4 @@
-/* src/components/OrderTypePicker.jsx
-   Clicking a type card immediately snaps the order quantity to that
-   type's minimum (20 for Normal, 100 for Bulk) and tells the parent
-   via onTypeChange(type, snapQty) so the cart can update accordingly.
-*/
-
 import { NORMAL_MIN_KG, NORMAL_MAX_KG, BULK_MIN_KG } from "../utils/orderConstants";
-
-/**
- * Props:
- *   orderType      : "normal" | "bulk"
- *   onTypeChange   : (type: string, snapQty: number) => void
- *   totalQty       : number
- *   unit           : string
- *   validationError: string | null
- */
 const OrderTypePicker = ({
   orderType,
   onTypeChange,

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+
 const useReveal = (threshold = 0.12) => {
   const ref         = useRef(null);
   const [on, setOn] = useState(false);
@@ -15,6 +16,7 @@ const useReveal = (threshold = 0.12) => {
   }, []);
   return [ref, on];
 };
+
 const VEGGIES = [
   { name: "Tomato",    color: "#E74C3C", emoji: "🍅" },
   { name: "Spinach",   color: "#27AE60", emoji: "🥬" },
@@ -29,6 +31,7 @@ const VEGGIES = [
   { name: "Capsicum",  color: "#E74C3C", emoji: "🫑" },
   { name: "Cucumber",  color: "#28B463", emoji: "🥒" },
 ];
+
 const VeggieWheel = () => {
   const [angle, setAngle] = useState(0);
   const raf               = useRef(null);
@@ -48,12 +51,10 @@ const VeggieWheel = () => {
 
   return (
     <svg viewBox="0 0 320 320" className="w-full h-full" aria-hidden="true">
-      {/* Decorative rings */}
       <circle cx={cx} cy={cy} r={150} fill="none" stroke="#1E9C17" strokeWidth="1"   opacity="0.15" strokeDasharray="5 5" />
       <circle cx={cx} cy={cy} r={130} fill="none" stroke="#E8A020" strokeWidth="0.5" opacity="0.12" />
       <circle cx={cx} cy={cy} r={60}  fill="none" stroke="#1E9C17" strokeWidth="0.5" opacity="0.2"  strokeDasharray="3 3" />
 
-      {/* Spoke lines */}
       {VEGGIES.map((v, i) => {
         const a  = (i * (360 / VEGGIES.length) + angle) * (Math.PI / 180);
         const x  = cx + radius * Math.cos(a);
@@ -63,16 +64,12 @@ const VeggieWheel = () => {
         return (
           <line
             key={`spoke-${i}`}
-            x1={x0} y1={y0}
-            x2={x}  y2={y}
-            stroke={v.color}
-            strokeWidth="0.6"
-            opacity="0.2"
+            x1={x0} y1={y0} x2={x} y2={y}
+            stroke={v.color} strokeWidth="0.6" opacity="0.2"
           />
         );
       })}
 
-      {/* Rotating emoji dots */}
       {VEGGIES.map((v, i) => {
         const a    = (i * (360 / VEGGIES.length) + angle) * (Math.PI / 180);
         const x    = cx + radius * Math.cos(a);
@@ -81,20 +78,15 @@ const VeggieWheel = () => {
         const size  = Math.round(20 * scale);
         return (
           <text
-            key={i}
-            x={x}
-            y={y}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontSize={size}
-            style={{ userSelect: "none" }}
+            key={i} x={x} y={y}
+            textAnchor="middle" dominantBaseline="central"
+            fontSize={size} style={{ userSelect: "none" }}
           >
             {v.emoji}
           </text>
         );
       })}
 
-      {/* Center badge */}
       <circle cx={cx} cy={cy} r={58} fill="#0A1F0A" />
       <circle cx={cx} cy={cy} r={54} fill="#0A1F0A" stroke="#1E9C17" strokeWidth="1.5" />
       <text x={cx} y={cy - 10} textAnchor="middle" fill="#1E9C17"
@@ -112,18 +104,19 @@ const VeggieWheel = () => {
     </svg>
   );
 };
+
 const FlightPath = () => {
   return (
-    <div className="relative w-full overflow-hidden py-20 px-6 lg:px-16 bg-[#F5F0E8]">
+    <div className="relative w-full overflow-hidden py-14 px-4 sm:py-20 sm:px-6 lg:px-16 bg-[#F5F0E8]">
       <div className="max-w-5xl mx-auto">
 
-        <div className="text-center mb-16">
+        <div className="text-center mb-10 sm:mb-16">
           <span className="text-xs font-semibold tracking-[0.3em] uppercase text-[#1E9C17]">
             How it works
           </span>
           <h2
             className="cd font-bold text-[#0A1F0A] mt-3 leading-tight"
-            style={{ fontSize: "clamp(2rem, 4vw, 3rem)" }}
+            style={{ fontSize: "clamp(1.5rem, 5vw, 3rem)" }}
           >
             Farm to your door, directly.
           </h2>
@@ -132,8 +125,59 @@ const FlightPath = () => {
           </p>
         </div>
 
-        {/* SVG Flight path */}
-        <div className="relative">
+        {/* Mobile: vertical stack of nodes */}
+        <div className="block sm:hidden mb-10">
+          <div className="flex flex-col items-center gap-0">
+            {/* Farmer */}
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-[#0A1F0A] flex items-center justify-center shadow-xl">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#1E9C17" strokeWidth="1.5" className="w-7 h-7">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2a7 7 0 0 1 7 7c0 5.25-7 13-7 13S5 14.25 5 9a7 7 0 0 1 7-7z" />
+                  <circle cx="12" cy="9" r="2.5" />
+                </svg>
+              </div>
+              <p className="cd font-bold text-[#0A1F0A] text-sm">Farmer</p>
+              <p className="text-[#1E9C17] text-xs font-medium">Lists crops</p>
+            </div>
+            {/* Arrow down */}
+            <div className="flex flex-col items-center gap-1 py-3">
+              <div className="w-px h-5 bg-[#1E9C17] opacity-40" />
+              <span className="text-xl leading-none">✈️</span>
+              <div className="w-px h-5 bg-[#1E9C17] opacity-40" />
+            </div>
+            {/* Platform */}
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className="w-14 h-14 rounded-full bg-[#1E9C17] flex items-center justify-center shadow-xl ring-4 ring-[#1E9C17]/20">
+                <span className="cd font-black text-white text-[9px] leading-tight text-center tracking-wide">
+                  MERO<br />BARI
+                </span>
+              </div>
+              <p className="cd font-bold text-[#0A1F0A] text-sm">Platform</p>
+              <p className="text-[#1E9C17] text-xs font-medium">Connects both</p>
+            </div>
+            {/* Arrow down */}
+            <div className="flex flex-col items-center gap-1 py-3">
+              <div className="w-px h-5 bg-[#E8A020] opacity-40" />
+              <span className="text-xl leading-none">📦</span>
+              <div className="w-px h-5 bg-[#E8A020] opacity-40" />
+            </div>
+            {/* Consumer */}
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-[#E8A020] flex items-center justify-center shadow-xl">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#0A1F0A" strokeWidth="1.5" className="w-7 h-7">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                  <line x1="3" y1="6" x2="21" y2="6" strokeLinecap="round" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 10a4 4 0 0 1-8 0" />
+                </svg>
+              </div>
+              <p className="cd font-bold text-[#0A1F0A] text-sm">Consumer</p>
+              <p className="text-[#E8A020] text-xs font-medium">Buys fresh</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop: SVG flight path with absolute-positioned nodes */}
+        <div className="relative hidden sm:block">
           <svg
             viewBox="0 0 900 180"
             className="w-full"
@@ -148,57 +192,19 @@ const FlightPath = () => {
                 <path d="M0,0 L7,3.5 L0,7 Z" fill="#E8A020" />
               </marker>
             </defs>
-
-            {/* Path 1: Farmer → Platform */}
-            <path
-              d="M 130,90 Q 280,25 430,90"
-              fill="none"
-              stroke="#1E9C17"
-              strokeWidth="2"
-              strokeDasharray="8 5"
-              opacity="0.4"
-              markerEnd="url(#arrowGreen)"
-            />
-
-            {/* Path 2: Platform → Consumer */}
-            <path
-              d="M 470,90 Q 620,25 760,90"
-              fill="none"
-              stroke="#E8A020"
-              strokeWidth="2"
-              strokeDasharray="8 5"
-              opacity="0.4"
-              markerEnd="url(#arrowGold)"
-            />
-
-            {/* Animated plane emoji on path 1 */}
+            <path d="M 130,90 Q 280,25 430,90" fill="none" stroke="#1E9C17" strokeWidth="2" strokeDasharray="8 5" opacity="0.4" markerEnd="url(#arrowGreen)" />
+            <path d="M 470,90 Q 620,25 760,90" fill="none" stroke="#E8A020" strokeWidth="2" strokeDasharray="8 5" opacity="0.4" markerEnd="url(#arrowGold)" />
             <text fontSize="22" textAnchor="middle" dominantBaseline="central" style={{ userSelect: "none" }}>
               ✈️
-              <animateMotion
-                dur="3.2s"
-                repeatCount="indefinite"
-                path="M 130,90 Q 280,25 430,90"
-                rotate="auto"
-              />
+              <animateMotion dur="3.2s" repeatCount="indefinite" path="M 130,90 Q 280,25 430,90" rotate="auto" />
             </text>
-
-            {/* Animated box emoji on path 2 */}
             <text fontSize="20" textAnchor="middle" dominantBaseline="central" style={{ userSelect: "none" }}>
               📦
-              <animateMotion
-                dur="3.2s"
-                repeatCount="indefinite"
-                begin="1.6s"
-                path="M 470,90 Q 620,25 760,90"
-                rotate="auto"
-              />
+              <animateMotion dur="3.2s" repeatCount="indefinite" begin="1.6s" path="M 470,90 Q 620,25 760,90" rotate="auto" />
             </text>
           </svg>
 
-          {/* Three nodes */}
           <div className="absolute inset-0 flex items-center justify-between px-[5%] pointer-events-none">
-
-            {/* Farmer node */}
             <div className="flex flex-col items-center gap-3 text-center w-28">
               <div className="w-16 h-16 rounded-2xl bg-[#0A1F0A] flex items-center justify-center shadow-xl">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#1E9C17" strokeWidth="1.5" className="w-8 h-8">
@@ -211,8 +217,6 @@ const FlightPath = () => {
                 <p className="text-[#1E9C17] text-xs font-medium">Lists crops</p>
               </div>
             </div>
-
-            {/* Platform node */}
             <div className="flex flex-col items-center gap-3 text-center w-28">
               <div className="w-16 h-16 rounded-full bg-[#1E9C17] flex items-center justify-center shadow-xl ring-4 ring-[#1E9C17]/20">
                 <span className="cd font-black text-white text-[10px] leading-tight text-center tracking-wide">
@@ -224,8 +228,6 @@ const FlightPath = () => {
                 <p className="text-[#1E9C17] text-xs font-medium">Connects both</p>
               </div>
             </div>
-
-            {/* Consumer node */}
             <div className="flex flex-col items-center gap-3 text-center w-28">
               <div className="w-16 h-16 rounded-2xl bg-[#E8A020] flex items-center justify-center shadow-xl">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#0A1F0A" strokeWidth="1.5" className="w-8 h-8">
@@ -243,47 +245,26 @@ const FlightPath = () => {
         </div>
 
         {/* Step cards */}
-        <div className="grid md:grid-cols-3 gap-6 mt-20">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mt-10 sm:mt-20">
           {[
-            {
-              num:   "01",
-              title: "Register & List",
-              body:  "Farmers sign up free and list crops with harvest details and pricing. Live in minutes.",
-              color: "#1E9C17",
-            },
-            {
-              num:   "02",
-              title: "Browse & Order",
-              body:  "Consumers discover nearby farms, see harvest dates, and place normal or bulk orders.",
-              color: "#E8A020",
-            },
-            {
-              num:   "03",
-              title: "Pay & Receive",
-              body:  "Pay via eSewa, FonePay, or Cash on Delivery. Produce delivered directly to you.",
-              color: "#C4846A",
-            },
+            { num: "01", title: "Register & List", body: "Farmers sign up free and list crops with harvest details and pricing. Live in minutes.", color: "#1E9C17" },
+            { num: "02", title: "Browse & Order",  body: "Consumers discover nearby farms, see harvest dates, and place normal or bulk orders.",   color: "#E8A020" },
+            { num: "03", title: "Pay & Receive",   body: "Pay via eSewa, FonePay, or Cash on Delivery. Produce delivered directly to you.",        color: "#C4846A" },
           ].map((s, i) => (
             <div
               key={i}
-              className="bg-white rounded-2xl p-7 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all relative overflow-hidden"
+              className="bg-white rounded-2xl p-5 sm:p-7 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all relative overflow-hidden"
             >
               <span
-                className="absolute top-4 right-5 cd font-black text-6xl leading-none select-none pointer-events-none"
+                className="absolute top-4 right-5 cd font-black text-5xl sm:text-6xl leading-none select-none pointer-events-none"
                 style={{ color: s.color, opacity: 0.08 }}
               >
                 {s.num}
               </span>
-              <div
-                className="w-3 h-3 rounded-full mb-5"
-                style={{ backgroundColor: s.color }}
-              />
-              <h3 className="cd font-bold text-[#0A1F0A] text-lg mb-2">{s.title}</h3>
+              <div className="w-3 h-3 rounded-full mb-4 sm:mb-5" style={{ backgroundColor: s.color }} />
+              <h3 className="cd font-bold text-[#0A1F0A] text-base sm:text-lg mb-2">{s.title}</h3>
               <p className="text-[#5a7a5a] text-sm leading-relaxed">{s.body}</p>
-              <div
-                className="absolute bottom-0 left-0 h-1 w-full rounded-b-2xl opacity-20"
-                style={{ backgroundColor: s.color }}
-              />
+              <div className="absolute bottom-0 left-0 h-1 w-full rounded-b-2xl opacity-20" style={{ backgroundColor: s.color }} />
             </div>
           ))}
         </div>
@@ -291,10 +272,11 @@ const FlightPath = () => {
     </div>
   );
 };
+
 const Ticker = () => {
   const items = [...VEGGIES, ...VEGGIES];
   return (
-    <div className="overflow-hidden py-4 border-y-2 border-[#0A1F0A]/10 bg-[#F5F0E8]">
+    <div className="overflow-hidden py-3 sm:py-4 border-y-2 border-[#0A1F0A]/10 bg-[#F5F0E8]">
       <div
         className="flex gap-0 w-max"
         style={{ animation: "tickerSlide 30s linear infinite" }}
@@ -302,19 +284,17 @@ const Ticker = () => {
         {items.map((v, i) => (
           <div
             key={i}
-            className="flex items-center gap-3 px-8 border-r border-[#0A1F0A]/8 shrink-0"
+            className="flex items-center gap-2 sm:gap-3 px-4 sm:px-8 border-r border-[#0A1F0A]/8 shrink-0"
           >
-            <span
-              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: v.color }}
-            />
-            <p className="font-semibold text-[#0A1F0A] text-sm tracking-wide">{v.name}</p>
+            <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: v.color }} />
+            <p className="font-semibold text-[#0A1F0A] text-xs sm:text-sm tracking-wide">{v.name}</p>
           </div>
         ))}
       </div>
     </div>
   );
 };
+
 const Home = () => {
   const [ready,    setReady]    = useState(false);
   const [howRef,   howOn]       = useReveal(0.1);
@@ -364,10 +344,45 @@ const Home = () => {
 
         .cd { font-family: 'Clash Display', 'Montserrat', sans-serif; }
         .dm { font-family: 'DM Sans', 'Poppins', sans-serif; }
+
+        /* ── Mobile-specific fixes ── */
+
+        /* Prevent horizontal overflow on small screens */
+        * { box-sizing: border-box; }
+
+        /* Ensure buttons are always fully tappable on mobile */
+        @media (max-width: 639px) {
+          .hero-cta-btn {
+            width: 100%;
+            min-height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          /* Reduce hero heading size further on very small phones */
+          .hero-headline {
+            font-size: clamp(2.4rem, 18vw, 5rem) !important;
+          }
+
+          /* Improve readability of badge chips */
+          .feature-chip {
+            font-size: 11px;
+            padding: 6px 12px;
+          }
+        }
+
+        /* Smooth touch scrolling */
+        html { -webkit-overflow-scrolling: touch; }
+
+        /* Prevent text selection on decorative elements */
+        .no-select { user-select: none; -webkit-user-select: none; }
       `}</style>
 
       <div className="dm text-[#0A1F0A] overflow-x-hidden bg-[#F5F0E8]">
-        <section className="relative min-h-screen bg-[#0A1F0A] flex flex-col overflow-hidden">
+
+        {/* ── HERO ── */}
+        <section className="relative min-h-[100svh] bg-[#0A1F0A] flex flex-col overflow-hidden">
 
           <div
             className="absolute inset-0 opacity-[0.05]"
@@ -376,27 +391,27 @@ const Home = () => {
             }}
           />
           <div
-            className="absolute top-0 right-0 w-[700px] h-[700px] opacity-[0.15] pointer-events-none"
+            className="absolute top-0 right-0 w-[280px] h-[280px] sm:w-[500px] sm:h-[500px] lg:w-[700px] lg:h-[700px] opacity-[0.15] pointer-events-none"
             style={{ background: "radial-gradient(circle at 70% 25%, #1E9C17 0%, transparent 60%)" }}
           />
 
-          <div className="relative flex-1 flex flex-col lg:flex-row items-center max-w-7xl mx-auto w-full px-6 lg:px-16 pt-32 pb-16 gap-12">
+          <div className="relative flex-1 flex flex-col lg:flex-row items-center max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-16 pt-24 sm:pt-32 pb-10 sm:pb-16 gap-6 lg:gap-12">
 
-            {/* Left */}
-            <div className="flex-1 min-w-0">
+            {/* Left text */}
+            <div className="flex-1 min-w-0 w-full text-center lg:text-left">
 
               {ready && (
-                <div className="flex items-center gap-3 mb-8 hero-word w1">
-                  <span className="w-8 h-px bg-[#1E9C17]" />
-                  <span className="text-[#1E9C17] text-xs font-semibold tracking-[0.3em] uppercase">
+                <div className="flex items-center justify-center lg:justify-start gap-3 mb-5 sm:mb-8 hero-word w1">
+                  <span className="w-6 sm:w-8 h-px bg-[#1E9C17]" />
+                  <span className="text-[#1E9C17] text-[10px] sm:text-xs font-semibold tracking-[0.25em] sm:tracking-[0.3em] uppercase">
                     Nepal's Farm to Table Platform
                   </span>
                 </div>
               )}
 
               <h1
-                className="cd font-bold leading-[0.9] text-white"
-                style={{ fontSize: "clamp(3.2rem, 9vw, 8rem)" }}
+                className="cd font-bold leading-[0.9] text-white hero-headline"
+                style={{ fontSize: "clamp(2.8rem, 14vw, 8rem)" }}
               >
                 {ready && (
                   <>
@@ -408,31 +423,31 @@ const Home = () => {
               </h1>
 
               {ready && (
-                <p className="hero-word w5 mt-8 text-[#a0b8a0] text-lg lg:text-xl leading-relaxed max-w-lg">
+                <p className="hero-word w5 mt-5 sm:mt-8 text-[#a0b8a0] text-sm sm:text-lg leading-relaxed max-w-xs sm:max-w-lg mx-auto lg:mx-0">
                   MeroBari connects Nepal's farmers directly with consumers.
                   No middlemen. No hidden markups. Real harvests at fair prices.
                 </p>
               )}
 
               {ready && (
-                <div className="hero-word w6 mt-10 flex flex-wrap gap-4">
+                <div className="hero-word w6 mt-6 sm:mt-10 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-center lg:items-start">
                   <Link
                     to="/register"
-                    className="group relative overflow-hidden bg-[#1E9C17] text-white cd font-semibold px-8 py-4 rounded-2xl text-sm tracking-wide transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#1E9C17]/40"
+                    className="hero-cta-btn group relative overflow-hidden bg-[#1E9C17] text-white cd font-semibold px-7 sm:px-8 py-4 rounded-2xl text-sm tracking-wide transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#1E9C17]/40 text-center"
                   >
                     <span className="absolute inset-0 bg-white/10 translate-x-[-101%] group-hover:translate-x-0 transition-transform duration-500 skew-x-12" />
                     <span className="relative">Join as Farmer</span>
                   </Link>
                   <Link
                     to="/register"
-                    className="group relative overflow-hidden bg-[#E8A020] text-[#0A1F0A] cd font-semibold px-8 py-4 rounded-2xl text-sm tracking-wide transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#E8A020]/40"
+                    className="hero-cta-btn group relative overflow-hidden bg-[#E8A020] text-[#0A1F0A] cd font-semibold px-7 sm:px-8 py-4 rounded-2xl text-sm tracking-wide transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#E8A020]/40 text-center"
                   >
                     <span className="absolute inset-0 bg-white/15 translate-x-[-101%] group-hover:translate-x-0 transition-transform duration-500 skew-x-12" />
                     <span className="relative">Shop Fresh Produce</span>
                   </Link>
                   <Link
                     to="/login"
-                    className="border-2 border-white/20 text-white cd font-semibold px-8 py-4 rounded-2xl text-sm tracking-wide transition-all hover:border-white/50 hover:-translate-y-1"
+                    className="hero-cta-btn border-2 border-white/20 text-white cd font-semibold px-7 sm:px-8 py-4 rounded-2xl text-sm tracking-wide transition-all hover:border-white/50 hover:-translate-y-1 text-center"
                   >
                     Sign In
                   </Link>
@@ -440,7 +455,7 @@ const Home = () => {
               )}
 
               {ready && (
-                <div className="hero-word w7 mt-8 flex flex-wrap gap-3">
+                <div className="hero-word w7 mt-5 sm:mt-8 flex flex-wrap gap-2 justify-center lg:justify-start">
                   {[
                     "Free to register",
                     "Nearby farms first",
@@ -449,7 +464,7 @@ const Home = () => {
                   ].map((f) => (
                     <span
                       key={f}
-                      className="bg-white/8 border border-white/12 text-white/60 text-xs font-medium px-4 py-2 rounded-full"
+                      className="feature-chip bg-white/8 border border-white/12 text-white/60 text-[10px] sm:text-xs font-medium px-3 sm:px-4 py-1.5 sm:py-2 rounded-full"
                     >
                       {f}
                     </span>
@@ -458,10 +473,10 @@ const Home = () => {
               )}
             </div>
 
-            {/* Right — floating wheel */}
+            {/* Veggie wheel — centered below text on mobile, side-by-side on desktop */}
             {ready && (
               <div
-                className="w-72 h-72 lg:w-[400px] lg:h-[400px] flex-shrink-0"
+                className="w-44 h-44 xs:w-52 xs:h-52 sm:w-64 sm:h-64 lg:w-[400px] lg:h-[400px] flex-shrink-0 mx-auto lg:mx-0 mt-2 sm:mt-0"
                 style={{
                   animation: `scaleIn 1s cubic-bezier(.16,1,.3,1) 0.4s both,
                               floatY 5s ease-in-out 1.4s infinite`,
@@ -472,9 +487,12 @@ const Home = () => {
             )}
           </div>
 
-          <div className="h-16 bg-gradient-to-b from-transparent to-[#F5F0E8]" />
+          <div className="h-12 sm:h-16 bg-gradient-to-b from-transparent to-[#F5F0E8]" />
         </section>
+
         <Ticker />
+
+        {/* ── HOW IT WORKS ── */}
         <div
           ref={howRef}
           style={{
@@ -485,11 +503,13 @@ const Home = () => {
         >
           <FlightPath />
         </div>
-        <section ref={doorsRef} className="bg-[#0A1F0A] py-28 px-6 lg:px-16">
+
+        {/* ── TWO DOORS ── */}
+        <section ref={doorsRef} className="bg-[#0A1F0A] py-16 sm:py-28 px-4 sm:px-6 lg:px-16">
           <div className="max-w-6xl mx-auto">
 
             <div
-              className="text-center mb-14"
+              className="text-center mb-8 sm:mb-14"
               style={{
                 opacity:    doorsOn ? 1 : 0,
                 transform:  doorsOn ? "translateY(0)" : "translateY(24px)",
@@ -501,17 +521,17 @@ const Home = () => {
               </span>
               <h2
                 className="cd font-bold text-white mt-3 leading-tight"
-                style={{ fontSize: "clamp(2rem, 4vw, 3.2rem)" }}
+                style={{ fontSize: "clamp(1.6rem, 5vw, 3.2rem)" }}
               >
                 One platform. Two doors.
               </h2>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
 
               {/* Farmer door */}
               <div
-                className="relative bg-white/5 border border-white/10 rounded-3xl p-10 overflow-hidden hover:bg-white/8 hover:-translate-y-1 transition-all"
+                className="relative bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-10 overflow-hidden hover:bg-white/8 hover:-translate-y-1 transition-all"
                 style={{
                   opacity:    doorsOn ? 1 : 0,
                   transform:  doorsOn ? "translateY(0)" : "translateY(32px)",
@@ -521,18 +541,18 @@ const Home = () => {
                 <div className="absolute top-0 right-0 w-40 h-40 opacity-10 pointer-events-none"
                   style={{ background: "radial-gradient(circle, #1E9C17 0%, transparent 70%)" }} />
 
-                <div className="w-14 h-14 rounded-2xl bg-[#1E9C17]/15 border border-[#1E9C17]/20 flex items-center justify-center mb-6">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="#1E9C17" strokeWidth="1.5" className="w-7 h-7">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#1E9C17]/15 border border-[#1E9C17]/20 flex items-center justify-center mb-5 sm:mb-6">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#1E9C17" strokeWidth="1.5" className="w-6 h-6 sm:w-7 sm:h-7">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 2a7 7 0 0 1 7 7c0 5.25-7 13-7 13S5 14.25 5 9a7 7 0 0 1 7-7z" />
                     <circle cx="12" cy="9" r="2.5" />
                   </svg>
                 </div>
 
-                <h3 className="cd font-bold text-white text-2xl mb-3">For Farmers</h3>
-                <p className="text-[#a0b8a0] text-sm leading-relaxed mb-8">
+                <h3 className="cd font-bold text-white text-xl sm:text-2xl mb-3">For Farmers</h3>
+                <p className="text-[#a0b8a0] text-sm leading-relaxed mb-5 sm:mb-8">
                   List your crops, set your own prices, manage orders and returns — all from a single dashboard built for Nepal's farmers.
                 </p>
-                <ul className="space-y-3 mb-10">
+                <ul className="space-y-3 mb-7 sm:mb-10">
                   {[
                     "Free to register and list crops",
                     "Set regular and bulk pricing",
@@ -547,7 +567,7 @@ const Home = () => {
                 </ul>
                 <Link
                   to="/register"
-                  className="inline-flex items-center gap-2 bg-[#1E9C17] text-white cd font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#158212] transition-colors"
+                  className="inline-flex items-center gap-2 bg-[#1E9C17] text-white cd font-semibold px-5 sm:px-6 py-3 rounded-xl text-sm hover:bg-[#158212] transition-colors w-full sm:w-auto justify-center sm:justify-start"
                 >
                   Register as Farmer
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -558,7 +578,7 @@ const Home = () => {
 
               {/* Consumer door */}
               <div
-                className="relative bg-white/5 border border-white/10 rounded-3xl p-10 overflow-hidden hover:bg-white/8 hover:-translate-y-1 transition-all"
+                className="relative bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-10 overflow-hidden hover:bg-white/8 hover:-translate-y-1 transition-all"
                 style={{
                   opacity:    doorsOn ? 1 : 0,
                   transform:  doorsOn ? "translateY(0)" : "translateY(32px)",
@@ -568,19 +588,19 @@ const Home = () => {
                 <div className="absolute top-0 right-0 w-40 h-40 opacity-10 pointer-events-none"
                   style={{ background: "radial-gradient(circle, #E8A020 0%, transparent 70%)" }} />
 
-                <div className="w-14 h-14 rounded-2xl bg-[#E8A020]/15 border border-[#E8A020]/20 flex items-center justify-center mb-6">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="#E8A020" strokeWidth="1.5" className="w-7 h-7">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#E8A020]/15 border border-[#E8A020]/20 flex items-center justify-center mb-5 sm:mb-6">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#E8A020" strokeWidth="1.5" className="w-6 h-6 sm:w-7 sm:h-7">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
                     <line x1="3" y1="6" x2="21" y2="6" strokeLinecap="round" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 10a4 4 0 0 1-8 0" />
                   </svg>
                 </div>
 
-                <h3 className="cd font-bold text-white text-2xl mb-3">For Consumers</h3>
-                <p className="text-[#a0b8a0] text-sm leading-relaxed mb-8">
+                <h3 className="cd font-bold text-white text-xl sm:text-2xl mb-3">For Consumers</h3>
+                <p className="text-[#a0b8a0] text-sm leading-relaxed mb-5 sm:mb-8">
                   Browse fresh produce from farms near you, choose normal or bulk quantities, and pay with the method that suits you.
                 </p>
-                <ul className="space-y-3 mb-10">
+                <ul className="space-y-3 mb-7 sm:mb-10">
                   {[
                     "Farms sorted by distance from you",
                     "Normal and bulk pricing per item",
@@ -595,7 +615,7 @@ const Home = () => {
                 </ul>
                 <Link
                   to="/register"
-                  className="inline-flex items-center gap-2 bg-[#E8A020] text-[#0A1F0A] cd font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#d49018] transition-colors"
+                  className="inline-flex items-center gap-2 bg-[#E8A020] text-[#0A1F0A] cd font-semibold px-5 sm:px-6 py-3 rounded-xl text-sm hover:bg-[#d49018] transition-colors w-full sm:w-auto justify-center sm:justify-start"
                 >
                   Start Shopping
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -606,21 +626,23 @@ const Home = () => {
             </div>
           </div>
         </section>
-        <section ref={voiceRef} className="bg-[#F5F0E8] py-28 px-6 lg:px-16">
+
+        {/* ── TESTIMONIALS ── */}
+        <section ref={voiceRef} className="bg-[#F5F0E8] py-16 sm:py-28 px-4 sm:px-6 lg:px-16">
           <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-14">
+            <div className="text-center mb-8 sm:mb-14">
               <span className="text-xs font-semibold tracking-[0.3em] uppercase text-[#C4846A]">
                 In their words
               </span>
               <h2
                 className="cd font-bold text-[#0A1F0A] mt-3"
-                style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)" }}
+                style={{ fontSize: "clamp(1.5rem, 4vw, 2.8rem)" }}
               >
                 Real people. Real results.
               </h2>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {[
                 {
                   quote:  "I set my own price for the first time in 12 years of farming.",
@@ -640,7 +662,7 @@ const Home = () => {
               ].map((v, i) => (
                 <div
                   key={i}
-                  className="bg-[#0A1F0A] rounded-2xl p-8 relative overflow-hidden border border-white/5"
+                  className="bg-[#0A1F0A] rounded-2xl p-6 sm:p-8 relative overflow-hidden border border-white/5"
                   style={{
                     opacity:    voiceOn ? 1 : 0,
                     transform:  voiceOn ? "translateY(0)" : "translateY(32px)",
@@ -653,8 +675,8 @@ const Home = () => {
                   >
                     "
                   </div>
-                  <div className="w-8 h-0.5 rounded-full mb-6" style={{ backgroundColor: v.accent }} />
-                  <p className="text-white/80 text-sm leading-relaxed mb-8">{v.quote}</p>
+                  <div className="w-8 h-0.5 rounded-full mb-5 sm:mb-6" style={{ backgroundColor: v.accent }} />
+                  <p className="text-white/80 text-sm leading-relaxed mb-6 sm:mb-8">{v.quote}</p>
                   <div className="flex items-center gap-3">
                     <div
                       className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
@@ -672,7 +694,9 @@ const Home = () => {
             </div>
           </div>
         </section>
-        <section ref={ctaRef} className="bg-[#0A1F0A] py-32 px-6 lg:px-16 relative overflow-hidden">
+
+        {/* ── CTA ── */}
+        <section ref={ctaRef} className="bg-[#0A1F0A] py-20 sm:py-32 px-4 sm:px-6 lg:px-16 relative overflow-hidden">
 
           <div
             className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
@@ -680,7 +704,7 @@ const Home = () => {
           >
             <span
               className="cd font-bold text-white/[0.025] whitespace-nowrap"
-              style={{ fontSize: "clamp(6rem, 18vw, 20rem)" }}
+              style={{ fontSize: "clamp(3rem, 12vw, 20rem)" }}
             >
               MEROBARI
             </span>
@@ -694,45 +718,43 @@ const Home = () => {
               transition: "all 0.8s ease",
             }}
           >
-            <div className="inline-flex items-center gap-2 mb-8">
-              <span className="w-8 h-px bg-[#E8A020]" />
+            <div className="inline-flex items-center gap-2 mb-5 sm:mb-8">
+              <span className="w-6 sm:w-8 h-px bg-[#E8A020]" />
               <span className="text-[#E8A020] text-xs font-semibold tracking-[0.3em] uppercase">Join today</span>
-              <span className="w-8 h-px bg-[#E8A020]" />
+              <span className="w-6 sm:w-8 h-px bg-[#E8A020]" />
             </div>
 
             <h2
               className="cd font-bold text-white leading-[0.95]"
-              style={{ fontSize: "clamp(3rem, 8vw, 7rem)" }}
+              style={{ fontSize: "clamp(2.2rem, 10vw, 7rem)" }}
             >
               Grow with us.
             </h2>
 
-            <p className="mt-6 text-[#a0b8a0] text-lg max-w-xl mx-auto leading-relaxed">
+            <p className="mt-4 sm:mt-6 text-[#a0b8a0] text-sm sm:text-lg max-w-xs sm:max-w-xl mx-auto leading-relaxed">
               Free to join. No listing fees. Built for Nepal's farmers and the people who love fresh food.
             </p>
 
-            <div className="mt-12 flex flex-wrap gap-4 justify-center">
+            <div className="mt-8 sm:mt-12 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center items-stretch sm:items-center">
               <Link
                 to="/register"
-                className="bg-[#1E9C17] text-white cd font-semibold px-10 py-5 rounded-2xl text-base hover:bg-[#158212] hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#1E9C17]/30 transition-all"
+                className="bg-[#1E9C17] text-white cd font-semibold px-7 sm:px-10 py-4 sm:py-5 rounded-2xl text-sm sm:text-base hover:bg-[#158212] hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#1E9C17]/30 transition-all text-center"
               >
                 Register as Farmer
               </Link>
               <Link
                 to="/register"
-                className="bg-[#E8A020] text-[#0A1F0A] cd font-semibold px-10 py-5 rounded-2xl text-base hover:bg-[#d49018] hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#E8A020]/30 transition-all"
+                className="bg-[#E8A020] text-[#0A1F0A] cd font-semibold px-7 sm:px-10 py-4 sm:py-5 rounded-2xl text-sm sm:text-base hover:bg-[#d49018] hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#E8A020]/30 transition-all text-center"
               >
                 Shop as Consumer
               </Link>
               <Link
                 to="/login"
-                className="border-2 border-white/20 text-white cd font-semibold px-10 py-5 rounded-2xl text-base hover:border-white/50 hover:-translate-y-1 transition-all"
+                className="border-2 border-white/20 text-white cd font-semibold px-7 sm:px-10 py-4 sm:py-5 rounded-2xl text-sm sm:text-base hover:border-white/50 hover:-translate-y-1 transition-all text-center"
               >
                 Sign In
               </Link>
             </div>
-
-            
           </div>
         </section>
 

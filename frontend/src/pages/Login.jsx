@@ -141,8 +141,6 @@ const Login = () => {
             </p>
           </div>
 
-          <GoogleButton />
-
           {/* Login method toggle */}
           <div className="flex rounded-xl overflow-hidden border-2 border-green-200">
             <button
@@ -178,7 +176,6 @@ const Login = () => {
                 value={formData.email}
                 placeholder=" "
                 onChange={handleChange}
-                /* text-base prevents iOS auto-zoom */
                 className="peer auth-input text-base bg-white/80 border-green-200 focus:ring-green-300 focus:ring-2 transition"
               />
               <label className="floating-label text-green-700">Email</label>
@@ -225,6 +222,7 @@ const Login = () => {
             </div>
           )}
 
+          {/* Login button */}
           <button
             type="submit"
             disabled={loading}
@@ -232,6 +230,9 @@ const Login = () => {
           >
             {loading ? "Logging in..." : "Login"}
           </button>
+
+          {/* Google button — after Login */}
+          <GoogleButton />
 
           <p className="text-center text-sm text-gray-700">
             Don't have an account?{" "}
