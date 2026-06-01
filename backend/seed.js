@@ -62,7 +62,8 @@ const upsertUser = async (data) => {
     { ...rest, password: hashed },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
-   return user;
+ 
+  return user;
 };
 const seed = async () => {
   try {

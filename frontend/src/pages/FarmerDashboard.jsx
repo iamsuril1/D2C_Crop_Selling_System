@@ -126,13 +126,20 @@ const FarmerDashboard = () => {
     });
   };
 
+  /* ── Farmer id matcher (handles raw string, {_id}, or {id}) ── */
+  const matchFarmerId = (farmer, myId) => {
+    if (!farmer || !myId) return false;
+    return (
+      farmer?._id?.toString() === myId ||
+      farmer?.id?.toString()  === myId ||
+      farmer?.toString()       === myId
+    );
+  };
+
   /* ── Payment label ── */
   const getMyShipment = (order) => {
     const myId = user?._id?.toString() || user?.id?.toString();
-    return order.shipments?.find((s) => {
-      const farmerId = s.farmer?._id?.toString() || s.farmer?.toString();
-      return farmerId === myId;
-    });
+    return order.shipments?.find((s) => matchFarmerId(s.farmer, myId));
   };
 
   const getPaymentStatusLabel = (status) => {
@@ -151,10 +158,7 @@ const FarmerDashboard = () => {
     const statsMap = {};
     for (const order of orders) {
       if (order.status === "cancelled") continue;
-      const myShipment = order.shipments?.find((s) => {
-        const fid = s.farmer?._id?.toString() || s.farmer?.toString();
-        return fid === myId;
-      });
+      const myShipment = order.shipments?.find((s) => matchFarmerId(s.farmer, myId));
       if (!myShipment) continue;
       for (const item of myShipment.items || []) {
         const key = item.name || "Unknown";
@@ -764,10 +768,7 @@ const FarmerDashboard = () => {
                 let bulkCount   = 0;
                 for (const order of orders) {
                   if (order.status === "cancelled") continue;
-                  const myShipment = order.shipments?.find((s) => {
-                    const fid = s.farmer?._id?.toString() || s.farmer?.toString();
-                    return fid === myId;
-                  });
+                  const myShipment = order.shipments?.find((s) => matchFarmerId(s.farmer, myId));
                   if (!myShipment) continue;
                   for (const item of myShipment.items || []) {
                     if (item.orderType === "bulk") bulkCount++;

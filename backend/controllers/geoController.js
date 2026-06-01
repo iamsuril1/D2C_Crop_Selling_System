@@ -1,4 +1,3 @@
-// controllers/geoController.js
 import User from "../models/User.js";
 import Product from "../models/Product.js";
 
@@ -36,7 +35,6 @@ export const getNearbyFarmersForMe = async (req, res) => {
   }
 };
 
-// GET /api/geo/nearby-products?maxDistance=5000&limit=20
 export const getNearbyProductsForMe = async (req, res) => {
   try {
     const { maxDistance = 5000, limit = 20, category, subcategory } = req.query;
@@ -48,7 +46,6 @@ export const getNearbyProductsForMe = async (req, res) => {
 
     const [lng, lat] = coords;
 
-    // Step 1: find nearby farmers (requires 2dsphere index) [web:30]
     const nearbyFarmers = await User.find({
       role: "farmer",
       location: {
@@ -61,7 +58,6 @@ export const getNearbyProductsForMe = async (req, res) => {
 
     const farmerIds = nearbyFarmers.map((u) => u._id);
 
-    // Step 2: products from those farmers
     const filter = {
       isActive: true,
       ...notExpiredFilter(),

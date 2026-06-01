@@ -5,7 +5,6 @@ const notExpiredFilter = () => ({
   $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
 });
 
-/* ── GET /api/products/:id ── */
 export const getProductById = async (req, res) => {
   try {
     const product = await Product.findOne({
@@ -21,7 +20,6 @@ export const getProductById = async (req, res) => {
   }
 };
 
-/* ── POST /api/products ── */
 export const createProduct = async (req, res) => {
   try {
     const {
@@ -82,7 +80,6 @@ export const createProduct = async (req, res) => {
   }
 };
 
-/* ── PUT /api/products/:id ── */
 export const updateProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -101,7 +98,6 @@ export const updateProduct = async (req, res) => {
         if (isNaN(num)) return res.status(400).json({ message: `${field} must be a valid number` });
         product[field] = num;
       }
-      // allow clearing bulkPrice
       if (field === "bulkPrice" && (req.body[field] === "" || req.body[field] === null)) {
         product.bulkPrice = null;
       }
@@ -113,7 +109,6 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // validate after updates
     if (product.bulkPrice !== null && product.bulkPrice >= product.price) {
       return res.status(400).json({ message: "Bulk price must be less than the regular price" });
     }
@@ -141,7 +136,6 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-/* ── GET /api/products/my-products ── */
 export const getMyProducts = async (req, res) => {
   try {
     const products = await Product.find({ farmer: req.user._id }).sort({ createdAt: -1 });
@@ -151,7 +145,6 @@ export const getMyProducts = async (req, res) => {
   }
 };
 
-/* ── DELETE /api/products/:id ── */
 export const deleteProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -167,7 +160,6 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
-/* ── GET /api/products (public) ── */
 export const getPublicProducts = async (req, res) => {
   try {
     const { category, subcategory, limit = 20, lat, lng, maxDistance = 5000 } = req.query;

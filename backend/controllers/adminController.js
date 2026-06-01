@@ -1,7 +1,3 @@
-/* backend/controllers/adminController.js
-   FIX: $unwind preserveNullAndEmpty → preserveNullAndEmptyArrays (correct MongoDB option)
-*/
-
 import User    from '../models/User.js';
 import Product from '../models/Product.js';
 import Order   from '../models/Order.js';
@@ -87,16 +83,9 @@ export const deleteProductAdmin = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────────────────────────
-   GET ALL ORDERS
-   FIX: preserveNullAndEmpty → preserveNullAndEmptyArrays
-   This is the correct MongoDB $unwind option name. The old name
-   does not exist and throws error code 28811.
-───────────────────────────────────────────────────────────── */
 export const getAllOrders = async (req, res) => {
   try {
     const orders = await Order.aggregate([
-      // 1. Join consumer
       {
         $lookup: {
           from:         'users',
@@ -111,11 +100,9 @@ export const getAllOrders = async (req, res) => {
       {
         $unwind: {
           path: '$consumer',
-          preserveNullAndEmptyArrays: true,   // ← FIX: was preserveNullAndEmpty
+          preserveNullAndEmptyArrays: true,   
         },
       },
-
-      // 2. Collect farmer IDs from shipments
       {
         $addFields: {
           farmerIds: {
@@ -124,7 +111,6 @@ export const getAllOrders = async (req, res) => {
         },
       },
 
-      // 3. Lookup all shipment farmers in one round-trip
       {
         $lookup: {
           from:         'users',
@@ -136,8 +122,6 @@ export const getAllOrders = async (req, res) => {
           ],
         },
       },
-
-      // 4. Replace shipment.farmer ObjectId with populated doc
       {
         $addFields: {
           shipments: {
@@ -167,8 +151,6 @@ export const getAllOrders = async (req, res) => {
           },
         },
       },
-
-      // 5. Clean up temp fields
       { $unset: ['farmerIds', 'farmerDocs'] },
 
       { $sort: { createdAt: -1 } },

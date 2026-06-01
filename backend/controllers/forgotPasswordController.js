@@ -35,7 +35,6 @@ export const verifyForgotOtp = async (req, res) => {
     if (otp.code !== code) return res.status(400).json({ message: "Invalid OTP" });
     if (otp.expiresAt < new Date()) return res.status(400).json({ message: "OTP expired" });
 
-    // Mark as verified but don't delete — needed for reset step
     otp.verified = true;
     await otp.save();
 

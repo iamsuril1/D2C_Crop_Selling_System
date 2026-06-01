@@ -1,9 +1,3 @@
-/* src/pages/ProductDetails.jsx
-   Fix: handleAdd now passes bulkPrice to addToCart so the cart
-   row can correctly show the Normal/Bulk toggle with live pricing.
-   Mobile: responsive layout for all screen sizes.
-*/
-
 import { useEffect, useMemo, useState, useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/axios";

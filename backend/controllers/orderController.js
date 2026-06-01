@@ -202,7 +202,6 @@ export const estimateDeliveryMultiOrigin = async (req, res) => {
   }
 };
 
-// ─── SPLIT ORDER: one Order document per farmer ──────────────────────────────
 export const createOrder = async (req, res) => {
   try {
     const { items } = req.body;
@@ -216,13 +215,11 @@ export const createOrder = async (req, res) => {
     if (normalized.some((x) => !x || !x.farmerId))
       return res.status(400).json({ message: "One or more products are invalid" });
 
-    // Per-item validation
     for (const item of normalized) {
       const err = validateItemOrderType(item.orderType, item.quantity, item.unit);
       if (err) return res.status(400).json({ message: err, itemName: item.name });
     }
 
-    // Stock check
     for (const item of normalized) {
       if (item.productDoc.quantity < item.quantity) {
         return res.status(400).json({
@@ -233,7 +230,6 @@ export const createOrder = async (req, res) => {
 
     const consumerCoords = req.user?.location?.coordinates || null;
 
-    // Group items by farmer
     const grouped = groupBy(normalized, (x) => x.farmerId);
 
     const createdOrders = [];

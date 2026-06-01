@@ -1,10 +1,3 @@
-/* src/context/CartContext.jsx
-   Change: addToCart now defaults to NORMAL_MIN_KG (20) instead of 1
-   when a product is first added to the cart.
-   If the item already exists, the quantity increments by the same
-   default (20) so repeated "Add to Cart" clicks still make sense.
-*/
-
 import { createContext, useEffect, useMemo, useState, useContext } from "react";
 import AuthContext from "./AuthContext.jsx";
 import { NORMAL_MIN_KG } from "../utils/orderConstants";
